@@ -339,8 +339,10 @@ async function cargarCatalogo() {
   try {
     document.getElementById('catalogo-list').innerHTML = '<div class="spinner"></div>';
     const res = await jsonp(COSTEO_URL + '?t=' + Date.now());
-    if (res.success && res.data) {
-      parsearDatos(res.data);
+    if (res.success) {
+      // New script returns res.data as parsed catalogo array
+      const rawData = res.data || [];
+      parsearDatos(rawData);
       poblarSelects();
       renderCatalogo();
     }
@@ -352,42 +354,34 @@ async function cargarCatalogo() {
   }
 }
 
-function parsearDatos(rows) {
-  catalogo = [];
-  let productoActual = null;
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    // Col 0: nombre producto (celda combinada, solo aparece en primera fila del producto)
-    const nombreProd = r[0] ? r[0].toString().trim() : '';
-    // Col 3: tipo insumo, Col 4: nombre insumo
-    const tipoInsumo = r[3] ? r[3].toString().trim().toUpperCase() : '';
-    const nombreInsumo = r[4] ? r[4].toString().trim() : '';
-    const costoPorKg = parseFloat(r[5]) || 0;
-    const proveedor = r[6] ? r[6].toString().trim() : '';
-    const cant100 = parseFloat(r[7]) || 0;
-    const cant300 = parseFloat(r[8]) || 0;
-    const cant500 = parseFloat(r[9]) || 0;
-    const cant1000 = parseFloat(r[10]) || 0;
-
-    // Nuevo producto cuando col 0 tiene nombre
-    if (nombreProd && nombreProd !== 'NOMBRE' && nombreProd.length > 2) {
-      productoActual = { nombre: nombreProd, insumos: [] };
-      catalogo.push(productoActual);
-    }
-    // Agregar insumo si tiene tipo y nombre válidos
-    if (productoActual && nombreInsumo && tipoInsumo &&
-        tipoInsumo !== 'NOMBRE' && !tipoInsumo.includes('CANTIDAD') && !tipoInsumo.includes('COSTO')) {
-      productoActual.insumos.push({
-        tipo: tipoInsumo,
-        nombre: nombreInsumo,
-        costoPorKg,
-        proveedor,
-        cantidades: { 100: cant100, 300: cant300, 500: cant500, 1000: cant1000 }
+function parsearDatos(data) {
+  // Nueva estructura: el script ya devuelve el catalogo parseado directamente
+  if (Array.isArray(data) && data.length > 0 && data[0].nombre) {
+    // Ya viene parseado desde el nuevo script
+    catalogo = data;
+  } else if (Array.isArray(data)) {
+    // Estructura antigua de rows - parsear manualmente
+    const map = {};
+    for (let i = 1; i < data.length; i++) {
+      const r = data[i];
+      const producto = (r[0] || '').toString().trim();
+      const tipo = (r[1] || '').toString().trim().toUpperCase();
+      const nombre = (r[2] || '').toString().trim();
+      const proveedor = (r[3] || '').toString().trim();
+      const costoKg = parseFloat(r[4]) || 0;
+      const kg100 = parseFloat(r[5]) || 0;
+      const kg300 = parseFloat(r[6]) || 0;
+      const kg500 = parseFloat(r[7]) || 0;
+      const kg1000 = parseFloat(r[8]) || 0;
+      if (!producto || !tipo || !nombre) continue;
+      if (!map[producto]) map[producto] = { nombre: producto, insumos: [] };
+      map[producto].insumos.push({
+        tipo, nombre, proveedor, costoPorKg: costoKg,
+        cantidades: { 100: kg100, 300: kg300, 500: kg500, 1000: kg1000 }
       });
     }
+    catalogo = Object.values(map).filter(p => p.insumos.length > 0);
   }
-  // Filtrar productos sin insumos o con nombres inválidos
-  catalogo = catalogo.filter(p => p.insumos.length > 0);
   localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
   console.log('Catálogo cargado:', catalogo.length, 'productos');
 }
@@ -699,50 +693,190 @@ function cerrarEditorProducto() {
   editorProdIdx = null;
 }
 
+// Estado de items por tipo en el editor
+let editorItems = {};
+
+function initEditorItems(prod, nombre) {
+  const tipos = getTiposInsumo(nombre);
+  editorItems = {};
+  tipos.forEach(tipo => {
+    const existentes = prod ? prod.insumos.filter(i => i.tipo === tipo) : [];
+    editorItems[tipo] = existentes.length > 0 ? existentes.map(i => ({...i})) : [{ tipo, nombre:'', proveedor:'', costoPorKg:0, costoUnd:0, cantidades:{100:0,300:0,500:0,1000:0} }];
+  });
+}
+
+function getTipoConfig(tipo) {
+  if (['INSUMO','CAPSULA','LAINA'].includes(tipo)) return 'kg';
+  if (['ENVASE','CAJA'].includes(tipo)) return 'und';
+  return 'manual'; // ETIQUETA
+}
+
+function calcCostosKg(kg100, costoKg) {
+  const k = parseFloat(kg100)||0;
+  const c = parseFloat(costoKg)||0;
+  return { 100: k*c, 300: k*3*c, 500: k*5*c, 1000: k*10*c };
+}
+
+function calcCostosUnd(costoUnd) {
+  const u = parseFloat(costoUnd)||0;
+  return { 100: u*100, 300: u*300, 500: u*500, 1000: u*1000 };
+}
+
 function renderEditorInsumos(prod) {
   const nombre = document.getElementById('editor-nombre').value || (prod ? prod.nombre : '');
   const tipos = getTiposInsumo(nombre);
+  initEditorItems(prod, nombre);
+  renderEditorItems();
+}
+
+function renderEditorItems() {
+  const nombre = document.getElementById('editor-nombre').value;
+  const tipos = getTiposInsumo(nombre);
   const div = document.getElementById('editor-insumos');
+  const COLORS = {INSUMO:'var(--purple)',CAPSULA:'var(--green)',LAINA:'var(--muted)',ENVASE:'var(--blue)',ETIQUETA:'var(--amber)',CAJA:'var(--amber)'};
 
   div.innerHTML = tipos.map(tipo => {
-    const ins = prod ? prod.insumos.find(i => i.tipo === tipo) : null;
-    const color = tipo === 'CAPSULA' ? 'var(--green)' : tipo === 'INSUMO' ? 'var(--purple)' : tipo === 'CAJA' ? 'var(--amber)' : tipo === 'ETIQUETA' ? 'var(--blue)' : 'var(--muted)';
+    const config = getTipoConfig(tipo);
+    const items = editorItems[tipo] || [{}];
+    const color = COLORS[tipo] || 'var(--muted)';
+
+    const itemsHtml = items.map((ins, idx) => {
+      const costos = ins.cantidades || {100:0,300:0,500:0,1000:0};
+      const c100 = costos[100]||0, c300=costos[300]||0, c500=costos[500]||0, c1000=costos[1000]||0;
+
+      if (config === 'kg') {
+        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px" id="item-${tipo}-${idx}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
+            <input type="text" value="${ins.nombre||''}" placeholder="Ej: Maltodextrina" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+            <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
+            <input type="text" value="${ins.proveedor||''}" placeholder="Ej: INVERFOOD" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px">
+            <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">S/ por KG</label>
+            <input type="number" value="${ins.costoPorKg||''}" placeholder="0.00" step="0.01" oninput="updateItemKg('${tipo}',${idx},'costo',this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.3);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
+            <div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">KG x100</label>
+            <input type="number" value="${ins.kg100||''}" placeholder="0" step="0.001" oninput="updateItemKg('${tipo}',${idx},'kg',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--text);outline:none"></div>
+            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x100</label>
+            <input type="number" id="calc-${tipo}-${idx}-100" value="${c100.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},100,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
+            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x300</label>
+            <input type="number" id="calc-${tipo}-${idx}-300" value="${c300.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},300,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
+            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x500</label>
+            <input type="number" id="calc-${tipo}-${idx}-500" value="${c500.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},500,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr;gap:6px">
+            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x1000</label>
+            <input type="number" id="calc-${tipo}-${idx}-1000" value="${c1000.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},1000,this.value)" style="width:200px;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
+          </div>
+          ${items.length>1?`<button onclick="removeItem('${tipo}',${idx})" style="margin-top:8px;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">✕ Eliminar</button>`:''}
+        </div>`;
+      }
+
+      if (config === 'und') {
+        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px" id="item-${tipo}-${idx}">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+            <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
+            <input type="text" value="${ins.nombre||''}" placeholder="Ej: Envase PET 100ml" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+            <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
+            <input type="text" value="${ins.proveedor||''}" placeholder="Ej: ANDRAPLAST" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+            <div><label style="font-size:11px;color:var(--amber);display:block;margin-bottom:3px">S/ por und</label>
+            <input type="number" value="${ins.costoUnd||''}" placeholder="0.00" step="0.01" oninput="updateItemUnd('${tipo}',${idx},this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.3);border-radius:7px;padding:7px 9px;font-family:DM Mono,monospace;font-size:13px;color:var(--amber);outline:none"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x100</label>
+            <input type="number" id="calc-${tipo}-${idx}-100" value="${c100.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},100,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
+            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x300</label>
+            <input type="number" id="calc-${tipo}-${idx}-300" value="${c300.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},300,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
+            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x500</label>
+            <input type="number" id="calc-${tipo}-${idx}-500" value="${c500.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},500,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
+            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x1000</label>
+            <input type="number" id="calc-${tipo}-${idx}-1000" value="${c1000.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},1000,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
+          </div>
+          ${items.length>1?`<button onclick="removeItem('${tipo}',${idx})" style="margin-top:8px;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">✕ Eliminar</button>`:''}
+        </div>`;
+      }
+
+      // ETIQUETA - manual
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
+          <input type="text" value="${ins.nombre||''}" placeholder="Ej: Etiqueta Lamina Brillo" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+          <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
+          <input type="text" value="${ins.proveedor||''}" placeholder="Ej: PHANTONE" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+          <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo x100</label>
+          <input type="number" id="calc-${tipo}-${idx}-100" value="${c100||''}" placeholder="0.00" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},100,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
+          <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo x300</label>
+          <input type="number" id="calc-${tipo}-${idx}-300" value="${c300||''}" placeholder="0.00" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},300,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
+          <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo x500</label>
+          <input type="number" id="calc-${tipo}-${idx}-500" value="${c500||''}" placeholder="0.00" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},500,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
+          <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo x1000</label>
+          <input type="number" id="calc-${tipo}-${idx}-1000" value="${c1000||''}" placeholder="0.00" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},1000,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
+        </div>
+        ${items.length>1?`<button onclick="removeItem('${tipo}',${idx})" style="margin-top:8px;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">✕ Eliminar</button>`:''}
+      </div>`;
+    }).join('');
+
     return `<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:1rem;margin-bottom:10px">
-      <div style="font-size:12px;font-weight:600;color:${color};margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">${tipo}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div>
-          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Descripción / Nombre</label>
-          <input id="ins-${tipo}-nombre" type="text" value="${ins ? ins.nombre : ''}" placeholder="Ej: Capsulas PET verde con tapa" style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none">
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Proveedor</label>
-          <input id="ins-${tipo}-prov" type="text" value="${ins ? ins.proveedor : ''}" placeholder="Ej: ANDRAPLAST" style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none">
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:.06em">${tipo}</div>
+        <button onclick="addItem('${tipo}')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(124,111,239,.3);background:var(--purple-dim);color:var(--purple);cursor:pointer">+ Agregar otro</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
-        <div>
-          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">S/ por KG</label>
-          <input id="ins-${tipo}-costo" type="number" value="${ins ? ins.costoPorKg : ''}" placeholder="0.00" step="0.01" style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none">
-        </div>
-        <div>
-          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">KG x100</label>
-          <input id="ins-${tipo}-100" type="number" value="${ins ? ins.cantidades[100]||'' : ''}" placeholder="0" step="0.001" style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--text);outline:none">
-        </div>
-        <div>
-          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">KG x300</label>
-          <input id="ins-${tipo}-300" type="number" value="${ins ? ins.cantidades[300]||'' : ''}" placeholder="0" step="0.001" style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--text);outline:none">
-        </div>
-        <div>
-          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">KG x500</label>
-          <input id="ins-${tipo}-500" type="number" value="${ins ? ins.cantidades[500]||'' : ''}" placeholder="0" step="0.001" style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--text);outline:none">
-        </div>
-        <div>
-          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">KG x1000</label>
-          <input id="ins-${tipo}-1000" type="number" value="${ins ? ins.cantidades[1000]||'' : ''}" placeholder="0" step="0.001" style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--text);outline:none">
-        </div>
-      </div>
+      ${itemsHtml}
     </div>`;
   }).join('');
+}
+
+function updateItem(tipo, idx, field, val) {
+  if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
+  editorItems[tipo][idx][field] = val;
+}
+
+function updateItemKg(tipo, idx, field, val) {
+  if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
+  const ins = editorItems[tipo][idx];
+  if (field === 'costo') ins.costoPorKg = parseFloat(val)||0;
+  if (field === 'kg') ins.kg100 = parseFloat(val)||0;
+  const kg = ins.kg100||0;
+  const costo = ins.costoPorKg||0;
+  const costos = calcCostosKg(kg, costo);
+  ins.cantidades = costos;
+  // Update UI
+  [100,300,500,1000].forEach(e => {
+    const el = document.getElementById(`calc-${tipo}-${idx}-${e}`);
+    if (el) el.value = costos[e].toFixed(2);
+  });
+}
+
+function updateItemUnd(tipo, idx, val) {
+  if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
+  const ins = editorItems[tipo][idx];
+  ins.costoUnd = parseFloat(val)||0;
+  const costos = calcCostosUnd(ins.costoUnd);
+  ins.cantidades = costos;
+  [100,300,500,1000].forEach(e => {
+    const el = document.getElementById(`calc-${tipo}-${idx}-${e}`);
+    if (el) el.value = costos[e].toFixed(2);
+  });
+}
+
+function updateItemCostoDirecto(tipo, idx, escala, val) {
+  if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
+  if (!editorItems[tipo][idx].cantidades) editorItems[tipo][idx].cantidades = {100:0,300:0,500:0,1000:0};
+  editorItems[tipo][idx].cantidades[escala] = parseFloat(val)||0;
+}
+
+function addItem(tipo) {
+  if (!editorItems[tipo]) editorItems[tipo] = [];
+  editorItems[tipo].push({ tipo, nombre:'', proveedor:'', costoPorKg:0, costoUnd:0, cantidades:{100:0,300:0,500:0,1000:0} });
+  renderEditorItems();
+}
+
+function removeItem(tipo, idx) {
+  if (!editorItems[tipo] || editorItems[tipo].length <= 1) return;
+  editorItems[tipo].splice(idx, 1);
+  renderEditorItems();
 }
 
 document.getElementById('editor-nombre').addEventListener('input', function() {
@@ -758,14 +892,18 @@ async function guardarProductoSheets() {
   const insumos = [];
 
   for (const tipo of tipos) {
-    const n = (document.getElementById('ins-'+tipo+'-nombre')?.value||'').trim();
-    const prov = (document.getElementById('ins-'+tipo+'-prov')?.value||'').trim();
-    const costo = parseFloat(document.getElementById('ins-'+tipo+'-costo')?.value)||0;
-    const c100 = parseFloat(document.getElementById('ins-'+tipo+'-100')?.value)||0;
-    const c300 = parseFloat(document.getElementById('ins-'+tipo+'-300')?.value)||0;
-    const c500 = parseFloat(document.getElementById('ins-'+tipo+'-500')?.value)||0;
-    const c1000 = parseFloat(document.getElementById('ins-'+tipo+'-1000')?.value)||0;
-    if (n) insumos.push({ tipo, nombre: n, proveedor: prov, costoPorKg: costo, cantidades: {100:c100,300:c300,500:c500,1000:c1000} });
+    const items = editorItems[tipo] || [];
+    items.forEach(ins => {
+      if (ins.nombre && ins.nombre.trim()) {
+        insumos.push({
+          tipo,
+          nombre: ins.nombre.trim(),
+          proveedor: ins.proveedor||'',
+          costoPorKg: ins.costoPorKg||0,
+          cantidades: ins.cantidades || {100:0,300:0,500:0,1000:0}
+        });
+      }
+    });
   }
 
   if (!insumos.length) { mostrarToast('Agrega al menos un insumo'); return; }
