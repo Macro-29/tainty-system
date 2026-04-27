@@ -921,10 +921,13 @@ async function guardarProductoSheets() {
   mostrarToast('Guardando en Sheets...');
 
   try {
-    const form = new FormData();
-    form.append('data', JSON.stringify({ action: 'guardarProducto', producto: nombre, insumos }));
-    await fetch('https://script.google.com/macros/s/AKfycbyo9YwFQUBAIclp35UPBKaiZY4iDVM-1AKfV_l-i9OyLDclOeL9db7KT75AT-XGczGw/exec', { method: 'POST', body: form, mode: 'no-cors' });
-    await new Promise(r => setTimeout(r, 1500));
+    const dataObj = { action: 'guardarProducto', producto: nombre, insumos };
+    const payload = encodeURIComponent(JSON.stringify(dataObj));
+    console.log('Enviando a Sheets:', dataObj);
+    const url = 'https://script.google.com/macros/s/AKfycbyo9YwFQUBAIclp35UPBKaiZY4iDVM-1AKfV_l-i9OyLDclOeL9db7KT75AT-XGczGw/exec?data=' + payload + '&t=' + Date.now();
+    console.log('URL length:', url.length);
+    const res = await jsonp(url);
+    console.log('Respuesta Sheets:', res);
 
     // Actualizar catalogo local
     if (prod) {
@@ -937,9 +940,16 @@ async function guardarProductoSheets() {
     localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
     cerrarEditorProducto();
     renderCatalogo();
-    mostrarToast('Guardado correctamente');
+    mostrarToast('✓ Guardado en Sheets');
   } catch(e) {
-    mostrarToast('Error al guardar');
+    console.error('Error guardando:', e);
+    // Guardar solo local si falla Sheets
+    if (prod) { prod.nombre = nombre; prod.insumos = insumos; }
+    else { catalogo.push({ nombre, insumos }); poblarSelects(); }
+    localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
+    cerrarEditorProducto();
+    renderCatalogo();
+    mostrarToast('Guardado local (error Sheets: ' + e.message + ')');
   }
   document.getElementById('btn-guardar-prod').disabled = false;
 }
