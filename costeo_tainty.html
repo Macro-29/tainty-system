@@ -880,7 +880,16 @@ function removeItem(tipo, idx) {
 }
 
 document.getElementById('editor-nombre').addEventListener('input', function() {
-  if (editorProdIdx === null) renderEditorInsumos(null);
+  // Only re-render if the type changes (cap vs non-cap) to avoid resetting form
+  const nombre = this.value;
+  const tipos = getTiposInsumo(nombre);
+  const tiposActuales = Object.keys(editorItems);
+  const mismoTipo = tipos.length === tiposActuales.length && 
+    tipos.every((t,i) => t === tiposActuales[i]);
+  if (!mismoTipo) {
+    initEditorItems(null, nombre);
+    renderEditorItems();
+  }
 });
 
 async function guardarProductoSheets() {
