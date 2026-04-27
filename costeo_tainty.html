@@ -923,7 +923,7 @@ async function guardarProductoSheets() {
   try {
     const form = new FormData();
     form.append('data', JSON.stringify({ action: 'guardarProducto', producto: nombre, insumos }));
-    await fetch('${COSTEO_URL}', { method: 'POST', body: form, mode: 'no-cors' });
+    await fetch('https://script.google.com/macros/s/AKfycbyo9YwFQUBAIclp35UPBKaiZY4iDVM-1AKfV_l-i9OyLDclOeL9db7KT75AT-XGczGw/exec', { method: 'POST', body: form, mode: 'no-cors' });
     await new Promise(r => setTimeout(r, 1500));
 
     // Actualizar catalogo local
