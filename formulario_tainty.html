@@ -236,6 +236,38 @@ textarea { resize: vertical; min-height: 80px; }
   .logo{font-size:12px}
   .date-chip{font-size:11px;padding:3px 10px}
 }
+
+@media(max-width:640px){
+  .topbar{padding:.75rem 1rem;flex-wrap:wrap;gap:6px}
+  .topbar-right{gap:6px}
+  .main{padding:1rem}
+  .stats-row,.stats-grid{grid-template-columns:1fr 1fr}
+  .charts-grid,.tables-grid{grid-template-columns:1fr}
+  .chart-card.full{grid-column:1}
+  .chart-wrap{height:180px}
+  .controls{flex-direction:column}
+  .filter-tabs,.filters{flex-wrap:wrap}
+  .modal{margin:1rem;max-width:100%;width:calc(100% - 2rem)}
+  .two-col{grid-template-columns:1fr}
+  .grid{grid-template-columns:1fr;padding:.75rem 1rem 1.5rem}
+  .costo-grid{grid-template-columns:1fr 1fr}
+  .pedido-grid{grid-template-columns:1fr}
+  .manual-row{flex-direction:column}
+  .pin-card{width:90vw;max-width:320px;padding:1.5rem}
+  .estado-btns{gap:3px}
+  .est-btn{font-size:10px;padding:3px 7px}
+  .insumo-row{flex-direction:column;align-items:flex-start;gap:6px}
+  table{font-size:12px}
+  th,td{padding:8px 10px}
+  .stat-val{font-size:18px}
+  .logo{font-size:13px}
+}
+@media(min-width:641px) and (max-width:900px){
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .charts-grid{grid-template-columns:1fr}
+  .chart-card.full{grid-column:1}
+  .tables-grid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>

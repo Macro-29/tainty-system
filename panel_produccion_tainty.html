@@ -148,6 +148,11 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
 .saving-toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--muted);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
 .saving-toast.visible{opacity:1}
 @media(max-width:640px){
+  .ticket-footer{flex-wrap:wrap;gap:6px}
+  .ticket-estado-wrap{padding:8px 12px}
+  .insumo-row{flex-wrap:wrap}
+  .insumo-right{flex-wrap:wrap;gap:4px}
+
   .topbar{padding:.75rem 1rem;flex-wrap:wrap;gap:8px}
   .topbar-center{order:3;width:100%;font-size:11px;text-align:left}
   .topbar-right{gap:6px}
@@ -181,18 +186,18 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
   <div class="topbar-right">
     <div class="stat-pill">Activos: <span id="stat-activos">—</span></div>
     <div class="stat-pill">Pendientes: <span id="stat-pendientes">—</span></div>
-    <button class="admin-btn" id="admin-btn" onclick="toggleAdmin()">🔒 Admin</button>
     <div class="refresh-bar"><div class="refresh-fill" id="refresh-fill"></div></div>
   </div>
 </div>
 
 <div class="filters">
   <button class="filter-btn active" onclick="setFiltro('todos',this)">Todos</button>
-  <button class="filter-btn" onclick="setFiltro('pendiente',this)">⏳ Pendiente</button>
-  <button class="filter-btn" onclick="setFiltro('compras',this)">👷 En producción</button>
-  <button class="filter-btn" onclick="setFiltro('recibido',this)">🚚 En camino</button>
+  <button class="filter-btn" onclick="setFiltro('recibido',this)">📬 Recibido</button>
+  <button class="filter-btn" onclick="setFiltro('compras',this)">🛒 Compras</button>
+  <button class="filter-btn" onclick="setFiltro('produccion',this)">⚙️ En producción</button>
+  <button class="filter-btn" onclick="setFiltro('camino',this)">🚚 En camino</button>
+  <button class="filter-btn" onclick="setFiltro('envio',this)">📦 Listo para envío</button>
   <button class="filter-btn" onclick="setFiltro('cancelado',this)">❌ Cancelado</button>
-  <button class="filter-btn" onclick="setFiltro('envio',this)">📦 Pendiente de envío</button>
 </div>
 
 <div class="grid" id="grid">
@@ -238,13 +243,13 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
 
 <script>
 const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx1Nh7OzKW8p5D2Xp4iKrVnicIKxZaSUDkaFHxrGAUHZKJ1kRlWmOgOUNeNTzqaSTrWdg/exec';
-const PIN_CORRECTO='2206';
+const PIN_CORRECTO='200720';
 const ESTADOS_INSUMO=['pendiente','compra','produccion','camino','oficina','noaplica'];
 const LABELS_INSUMO={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica'};
 const DOT_CLS={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica'};
 const CHIP_CLS={'pendiente':'chip-pendiente','compra':'chip-compra','produccion':'chip-produccion','camino':'chip-camino','oficina':'chip-oficina','noaplica':'chip-noaplica'};
-const ESTADOS_TICKET=['Pendiente de entrega','Compras de insumos','En produccion','Recibido','Pendiente de envio','Entregado'];
-const LABELS_TICKET={'Pendiente de entrega':'⏳ Pendiente de entrega','Compras de insumos':'👷 Compras de insumos','En produccion':'⚙️ En producción','Recibido':'🚚 Recibido','Pendiente de envio':'📦 Pendiente de envío','Entregado':'✅ Entregado'};
+const ESTADOS_TICKET=['Recibido','Compras de insumos','En produccion','En camino','Listo para envio','Entregado'];
+const LABELS_TICKET={'Recibido':'📬 Recibido','Compras de insumos':'🛒 Compras de insumos','En produccion':'⚙️ En producción','En camino':'🚚 En camino','Listo para envio':'📦 Listo para envío','Entregado':'✅ Entregado'};
 
 let pedidos=[];
 let estadosInsumos={};
@@ -290,20 +295,58 @@ function getFechasInsumos(tipo,fechaStr){
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const baseD=new Date(base);baseD.setHours(0,0,0,0);
   const esTarde=baseD.getTime()===hoy.getTime()&&new Date().getHours()>=13;
+  // Antes de 1pm: insumos +1, caja +2 | Después de 1pm: insumos +2, caja +3
   const d=esTarde?2:1;
   return insumos.map(nombre=>({nombre,fecha:sumarHabiles(base,nombre==='Caja'?d+1:d)}));
+}
+
+function calcFechaTentativa(fechaStr){
+  const base=parseFecha(fechaStr)||new Date();
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const baseD=new Date(base);baseD.setHours(0,0,0,0);
+  // Si el pedido es de hoy: antes 1pm = +4 dias habiles, despues 1pm = +5
+  const esTarde=baseD.getTime()===hoy.getTime()&&new Date().getHours()>=13;
+  return sumarHabiles(base,esTarde?5:4);
 }
 function getEstadoTicket(estado){
   const e=(estado||'').toLowerCase().trim();
   if(e.includes('cancelado'))return{cls:'estado-cancelado',icon:'❌',label:'Cancelado',key:'cancelado'};
-  if(e.includes('compras'))return{cls:'estado-produccion',icon:'👷',label:'En producción',key:'compras'};
-  if(e.includes('recibido'))return{cls:'estado-camino',icon:'🚚',label:'En camino',key:'recibido'};
-  if(e.includes('envio')||e.includes('envío'))return{cls:'estado-camino',icon:'📦',label:'Pendiente de envío',key:'envio'};
-  if(e.includes('listo'))return{cls:'estado-listo',icon:'✅',label:'Listo',key:'listo'};
-  return{cls:'estado-pendiente',icon:'⏳',label:'Pendiente',key:'pendiente'};
+  if(e.includes('compras'))return{cls:'estado-produccion',icon:'🛒',label:'Compras de insumos',key:'compras'};
+  if(e.includes('produccion')||e.includes('producción'))return{cls:'estado-produccion',icon:'⚙️',label:'En producción',key:'produccion'};
+  if(e.includes('camino'))return{cls:'estado-camino',icon:'🚚',label:'En camino',key:'camino'};
+  if(e.includes('listo'))return{cls:'estado-listo',icon:'📦',label:'Listo para envío',key:'envio'};
+  if(e.includes('entregado'))return{cls:'estado-listo',icon:'✅',label:'Entregado',key:'entregado'};
+  if(e.includes('recibido'))return{cls:'estado-pendiente',icon:'📬',label:'Recibido',key:'recibido'};
+  return{cls:'estado-pendiente',icon:'📬',label:'Recibido',key:'recibido'};
 }
-function fechaEntregaLabel(str){
-  const f=parseFecha(str);if(!f||isNaN(f))return null;
+
+function calcEstadoAutomatico(pedidoId, tipo, estadoActual){
+  // No tocar cancelados ni entregados
+  const e=(estadoActual||'').toLowerCase();
+  if(e.includes('cancelado')||e.includes('entregado')) return estadoActual;
+
+  const insumos=getInsumos(tipo);
+  // Insumos clave para determinar estado (excluir Etiqueta y Caja)
+  const insumosClave=insumos.filter(i=>i==='Insumo'||i==='Capsula'||i==='Envase');
+
+  const estados=insumosClave.map(i=>getEstadoInsumo(pedidoId,i));
+  const todosOficina=insumos.filter(i=>getEstadoInsumo(pedidoId,i)!=='noaplica').every(i=>getEstadoInsumo(pedidoId,i)==='oficina');
+  const algunoCamino=estados.some(s=>s==='camino');
+  const algunoProduccion=estados.some(s=>s==='produccion');
+  const algunoCompra=estados.some(s=>s==='compra');
+  const todoPendiente=estados.every(s=>s==='pendiente'||s==='noaplica');
+
+  if(todosOficina) return 'Listo para envio';
+  if(algunoCamino) return 'En camino';
+  if(algunoProduccion) return 'En produccion';
+  if(algunoCompra) return 'Compras de insumos';
+  return 'Recibido';
+}
+function fechaEntregaLabel(str, fechaPedido){
+  let f=parseFecha(str);
+  // Si no tiene fecha tentativa, calcularla dinamicamente
+  if(!f||isNaN(f)) f=calcFechaTentativa(fechaPedido);
+  if(!f||isNaN(f))return null;
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const diff=Math.round((f-hoy)/86400000);
   if(diff<0)return{text:'Vencido',cls:'fecha-urgente'};
@@ -330,9 +373,11 @@ function getProgressColor(pct){
 
 function renderTicket(p){
   const tipo=getTipo(p.producto);
-  const est=getEstadoTicket(p.estado);
+  // Calcular estado automatico basado en insumos
+  const estadoDinamico=calcEstadoAutomatico(p.numPedido,tipo,p.estado);
+  const est=getEstadoTicket(estadoDinamico);
   const fechas=getFechasInsumos(tipo,p.fecha);
-  const entrega=fechaEntregaLabel(p.fechaTentativa);
+  const entrega=fechaEntregaLabel(p.fechaTentativa,p.fecha);
   const pct=calcProgreso(p.numPedido,tipo);
   const insumos=getInsumos(tipo);
 
@@ -411,7 +456,10 @@ function renderGrid(){
     const esCancelado=e.includes('cancelado');
     if(filtroActual==='todos')return!esCancelado;
     if(filtroActual==='cancelado')return esCancelado;
-    if(filtroActual==='envio')return e.includes('envio')||e.includes('envío');
+    if(filtroActual==='envio')return e.includes('listo')||e.includes('envio')||e.includes('envío');
+    if(filtroActual==='recibido')return e.includes('recibido');
+    if(filtroActual==='compras')return e.includes('compras');
+    if(filtroActual==='camino')return e.includes('camino');
     return e.includes(filtroActual);
   });
   lista=lista.slice().sort((a,b)=>{
@@ -536,10 +584,10 @@ function cerrarModal(){
   actualizarDots();
 }
 function pinPress(d){
-  if(pinBuffer.length>=4)return;
+  if(pinBuffer.length>=6)return;
   pinBuffer+=d;
   actualizarDots();
-  if(pinBuffer.length===4){
+  if(pinBuffer.length===6){
     setTimeout(()=>{
       if(pinBuffer===PIN_CORRECTO){
         adminMode=true;
