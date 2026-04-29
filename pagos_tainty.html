@@ -169,8 +169,8 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
     <button class="btn-add-pago" onclick="abrirModalBuscar()">+ Agregar pago</button>
   </div>
   <div class="table-wrap"><div class="table-scroll"><table>
-    <thead><tr><th>N&#176; Pedido</th><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Total</th><th>Abonos</th><th>Restante</th><th>Estado</th><th>Accion</th></tr></thead>
-    <tbody id="tabla-body"><tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)"><div class="spinner"></div>Cargando...</td></tr></tbody>
+    <thead><tr><th>N&#176; Pedido</th><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Cantidad</th><th>Precio/und</th><th>Total</th><th>Abonos</th><th>Restante</th><th>Estado</th><th>Accion</th></tr></thead>
+    <tbody id="tabla-body"><tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted)"><div class="spinner"></div>Cargando...</td></tr></tbody>
   </table></div></div>
 </div>
 <div class="modal-overlay" id="modal-abono">
@@ -208,7 +208,7 @@ function updDots(){for(let i=0;i<6;i++){const d=document.getElementById('pd'+i);
 function bloquear(){pinBuf='';updDots();document.getElementById('pin-overlay').classList.remove('hidden');}
 function switchTab(id,btn){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='dashboard')renderCharts();}
 function jsonp(url){return new Promise((resolve,reject)=>{const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);const s=document.createElement('script');const t=setTimeout(()=>{cleanup();reject(new Error('timeout'));},12000);function cleanup(){clearTimeout(t);delete window[cb];if(s.parentNode)s.parentNode.removeChild(s);}window[cb]=data=>{cleanup();resolve(data);};s.src=url+(url.includes('?')?'&':'?')+'callback='+cb;s.onerror=()=>{cleanup();reject(new Error('error'));};document.head.appendChild(s);});}
-async function cargarPagos(){try{const res=await jsonp(SCRIPT_URL+'?action=pagos&t='+Date.now());if(res.success&&res.pagos){pagos=res.pagos;poblarFiltroClientes();renderStats();renderCharts();renderTabla();}}catch(e){document.getElementById('tabla-body').innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--red)">Error al conectar.</td></tr>';}}
+async function cargarPagos(){try{const res=await jsonp(SCRIPT_URL+'?action=pagos&t='+Date.now());if(res.success&&res.pagos){pagos=res.pagos;poblarFiltroClientes();renderStats();renderCharts();renderTabla();}}catch(e){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--red)">Error al conectar.</td></tr>';}}
 function poblarFiltroClientes(){const sel=document.getElementById('filtro-cliente');const clientes=[...new Set(pagos.map(p=>p.cliente).filter(Boolean))].sort();sel.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(c=>`<option>${c}</option>`).join('');}
 function getRestante(p){const total=parseFloat(p.montoTotal)||0;const ab=[p.abono1,p.abono2,p.abono3,p.abono4].map(a=>parseFloat(a)||0).reduce((s,a)=>s+a,0);return Math.max(0,total-ab);}
 function getTotalAbonado(p){return[p.abono1,p.abono2,p.abono3,p.abono4].map(a=>parseFloat(a)||0).reduce((s,a)=>s+a,0);}
@@ -243,7 +243,7 @@ function renderTabla(){
     if(q)return(p.numPedido||'').toLowerCase().includes(q)||(p.cliente||'').toLowerCase().includes(q)||(p.producto||'').toLowerCase().includes(q);
     return true;
   });
-  if(!lista.length){document.getElementById('tabla-body').innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--hint)">No hay resultados</td></tr>';return;}
+  if(!lista.length){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--hint)">No hay resultados</td></tr>';return;}
   document.getElementById('tabla-body').innerHTML=lista.map(p=>{
     const est=getEstadoPago(p);const restante=getRestante(p);const abonado=getTotalAbonado(p);const total=parseFloat(p.montoTotal)||0;
     const pct=total>0?Math.round((abonado/total)*100):0;const sig=getSiguienteAbono(p);
@@ -253,7 +253,9 @@ function renderTabla(){
     const accion=est==='realizado'?'<span style="font-size:12px;color:var(--green)">Pagado</span>':sig?`<button class="btn-abono" onclick="abrirModal('${p.numPedido}')">+ Abono</button>`:'<span style="font-size:11px;color:var(--hint)">Max</span>';
     const pc2=pct===100?'var(--green)':pct>0?'var(--amber)':'var(--red)';
     const fechaStr=p.fecha?String(p.fecha).split('T')[0]:'';
-    return`<tr><td><span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${pct}%;background:${pc2}"></div></div><span style="font-size:10px;color:var(--hint)">${pct}% abonado</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
+    const cantidad=parseInt(p.cantidad||0);
+    const precioUnd=cantidad>0&&total>0?(total/cantidad):0;
+    return`<tr><td><span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span></td><td><span class="td-mono" style="color:var(--blue)">${cantidad.toLocaleString()} und</span></td><td><span class="td-mono" style="color:var(--muted)">S/ ${precioUnd.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${pct}%;background:${pc2}"></div></div><span style="font-size:10px;color:var(--hint)">${pct}% abonado</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
   }).join('');
 }
 function setFiltro(f,btn){filtroActual=f;document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderTabla();}
