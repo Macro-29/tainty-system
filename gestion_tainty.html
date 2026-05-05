@@ -71,6 +71,8 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
 .est-btn.sel-produccion{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
 .est-btn.sel-camino{background:var(--blue-dim);color:var(--blue);border-color:rgba(76,163,232,.3)}
 .est-btn.sel-oficina{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.3)}
+.est-btn.sel-encurso{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
+.est-btn.sel-finalizado{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.3)}
 .est-btn.sel-noaplica{background:transparent;color:var(--hint);border-color:var(--hint);text-decoration:line-through}
 .saving-indicator{font-size:11px;color:var(--muted);padding:2px 8px}
 .seccion-insumo{margin-bottom:2rem}
@@ -93,7 +95,7 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
 .fila-info{display:flex;align-items:center;gap:10px;min-width:0}
 .fila-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--hint);white-space:nowrap}
 .fila-cliente{font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
-.fila-prod{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.fila-prod{font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px}
 .fila-cant{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
 .fila-estado-actual{display:flex;align-items:center;gap:6px;margin-right:8px}
 .seccion-empty{padding:1.5rem;text-align:center;color:var(--hint);font-size:13px}
@@ -161,8 +163,9 @@ const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx1Nh7OzKW8p5D2Xp4iKrV
 const PIN='200720';
 const PIN_LEN=6;
 const ESTADOS=['pendiente','compra','produccion','camino','oficina','noaplica'];
-const LABELS={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica'};
-const DOT={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica'};
+const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
+const LABELS={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica','encurso':'⚙️ En curso','finalizado':'✅ Finalizado'};
+const DOT={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
 let pinBuf='',pedidos=[],estadosInsumos={},filtroActual='todos';
 
 function initDots(){
@@ -231,7 +234,7 @@ function getTipo(n){
   return'ml';
 }
 function getInsumos(t){
-  return t==='cap'?['Insumo','Capsula','Envase','Etiqueta','Caja']:['Insumo','Envase','Etiqueta','Caja'];
+  return t==='cap'?['Insumo','Capsula','Envase','Etiqueta','Caja','Maquina']:['Insumo','Envase','Etiqueta','Caja','Maquina'];
 }
 function getEstadoInsumo(pid,ins){return estadosInsumos[pid+'|'+ins]||'pendiente';}
 
@@ -239,10 +242,13 @@ function calcEstadoAuto(pid,tipo){
   const insumos=getInsumos(tipo);
   const clave=insumos.filter(i=>i==='Insumo'||i==='Capsula'||i==='Envase');
   const estados=clave.map(i=>getEstadoInsumo(pid,i));
-  const todosOficina=insumos.filter(i=>getEstadoInsumo(pid,i)!=='noaplica').every(i=>getEstadoInsumo(pid,i)==='oficina');
-  if(todosOficina)return'listo';
+  // "Listo" requiere que todos los insumos físicos aplicables estén en oficina Y la máquina finalizada
+  const fisicos=insumos.filter(i=>i!=='Maquina'&&getEstadoInsumo(pid,i)!=='noaplica');
+  const todosFisicosOK=fisicos.every(i=>getEstadoInsumo(pid,i)==='oficina');
+  const maquinaOK=getEstadoInsumo(pid,'Maquina')==='finalizado';
+  if(todosFisicosOK&&maquinaOK)return'listo';
   if(estados.some(s=>s==='camino'))return'camino';
-  if(estados.some(s=>s==='produccion'))return'produccion';
+  if(estados.some(s=>s==='produccion')||getEstadoInsumo(pid,'Maquina')==='encurso')return'produccion';
   if(estados.some(s=>s==='compra'))return'compras';
   return'recibido';
 }
@@ -263,14 +269,19 @@ function calcProgreso(pid,tipo){
   const ins=getInsumos(tipo);
   const aplic=ins.filter(i=>getEstadoInsumo(pid,i)!=='noaplica');
   if(!aplic.length)return 100;
-  return Math.round(aplic.filter(i=>getEstadoInsumo(pid,i)==='oficina').length/aplic.length*100);
+  const completados=aplic.filter(i=>{
+    const e=getEstadoInsumo(pid,i);
+    return i==='Maquina'?e==='finalizado':e==='oficina';
+  }).length;
+  return Math.round(completados/aplic.length*100);
 }
 
-const ICONO_INSUMO={'Insumo':'🧪','Capsula':'💊','Envase':'🫙','Etiqueta':'🏷️','Caja':'📦'};
-const ORDEN_INSUMOS=['Insumo','Capsula','Envase','Etiqueta','Caja'];
+const ICONO_INSUMO={'Insumo':'🧪','Capsula':'💊','Envase':'🫙','Etiqueta':'🏷️','Caja':'📦','Maquina':'🏭'};
+const ORDEN_INSUMOS=['Insumo','Capsula','Envase','Etiqueta','Caja','Maquina'];
 
-// Mapea el filtro superior (estado del pedido) al estado de insumo equivalente
+// Mapea el filtro superior al estado equivalente para insumos físicos y para máquina
 const FILTRO_A_ESTADO={'recibido':'pendiente','compras':'compra','produccion':'produccion','camino':'camino','listo':'oficina'};
+const FILTRO_A_ESTADO_MAQ={'recibido':'pendiente','compras':null,'produccion':'encurso','camino':null,'listo':'finalizado'};
 
 function renderLista(){
   const q=(document.getElementById('search').value||'').toLowerCase();
@@ -288,10 +299,13 @@ function renderLista(){
     return;
   }
 
-  const estadoFiltro=FILTRO_A_ESTADO[filtroActual]||null;
-
   // Construir cada sección de insumo
   const seccionesHtml=ORDEN_INSUMOS.map(insumo=>{
+    const esMaquina=insumo==='Maquina';
+    const estadosSeccion=esMaquina?ESTADOS_MAQUINA:ESTADOS;
+    const estadoFiltro=esMaquina?FILTRO_A_ESTADO_MAQ[filtroActual]:FILTRO_A_ESTADO[filtroActual];
+    const filtroAplicable=filtroActual==='todos'?null:estadoFiltro;
+
     // Pedidos que aplican a este insumo (las cápsulas solo aplican a tipo 'cap')
     const pedidosSeccion=lista.filter(p=>{
       const insumosDelPedido=getInsumos(getTipo(p.producto));
@@ -301,7 +315,9 @@ function renderLista(){
     if(!pedidosSeccion.length)return'';
 
     // Conteo de estados para los pills de la cabecera
-    const conteo={pendiente:0,compra:0,produccion:0,camino:0,oficina:0};
+    const conteo=esMaquina
+      ?{pendiente:0,encurso:0,finalizado:0}
+      :{pendiente:0,compra:0,produccion:0,camino:0,oficina:0};
     pedidosSeccion.forEach(p=>{
       const e=getEstadoInsumo(p.numPedido,insumo);
       if(e in conteo)conteo[e]++;
@@ -309,8 +325,13 @@ function renderLista(){
 
     // Aplicar filtro de estado si corresponde
     let pedidosFiltrados=pedidosSeccion;
-    if(estadoFiltro){
-      pedidosFiltrados=pedidosSeccion.filter(p=>getEstadoInsumo(p.numPedido,insumo)===estadoFiltro);
+    if(filtroActual!=='todos'){
+      if(filtroAplicable===null){
+        // Este filtro no aplica a esta sección (ej. "Compras" no aplica a Máquina)
+        pedidosFiltrados=[];
+      }else{
+        pedidosFiltrados=pedidosSeccion.filter(p=>getEstadoInsumo(p.numPedido,insumo)===filtroAplicable);
+      }
     }
 
     // Render de las filas
@@ -320,15 +341,14 @@ function renderLista(){
     }else{
       bodyHtml=pedidosFiltrados.map(p=>{
         const est=getEstadoInsumo(p.numPedido,insumo);
-        const btns=ESTADOS.map(s=>{
+        const btns=estadosSeccion.map(s=>{
           const isSel=est===s;
           return`<button class="est-btn${isSel?' sel-'+s:''}" onclick="cambiarEstado('${p.numPedido}','${insumo}','${s}')">${LABELS[s]}</button>`;
         }).join('');
         return`<div class="fila-pedido">
           <div class="fila-info">
             <span class="fila-num">${p.numPedido||''}</span>
-            <span class="fila-cliente">${p.cliente||''}</span>
-            <span class="fila-prod">· ${p.producto||''}</span>
+            <span class="fila-prod">${p.producto||''}</span>
             <span class="fila-cant">${parseInt(p.cantidad||0).toLocaleString()} und</span>
           </div>
           <div class="fila-estado-actual">
@@ -341,13 +361,18 @@ function renderLista(){
     }
 
     // Pills de estado en la cabecera
-    const pillsHtml=[
+    const pillsConfig=esMaquina?[
+      ['pendiente','⏳',conteo.pendiente],
+      ['produccion','⚙️',conteo.encurso],
+      ['oficina','✅',conteo.finalizado],
+    ]:[
       ['pendiente','⏳',conteo.pendiente],
       ['compra','🛒',conteo.compra],
       ['produccion','⚙️',conteo.produccion],
       ['camino','🚚',conteo.camino],
       ['oficina','📦',conteo.oficina],
-    ].map(([k,ic,n])=>`<span class="stat-pill s-${k}${n>0?' has-count':''}">${ic} ${n}</span>`).join('');
+    ];
+    const pillsHtml=pillsConfig.map(([k,ic,n])=>`<span class="stat-pill s-${k}${n>0?' has-count':''}">${ic} ${n}</span>`).join('');
 
     return`<div class="seccion-insumo">
       <div class="seccion-header">

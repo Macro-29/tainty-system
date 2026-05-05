@@ -245,9 +245,10 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
 const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx1Nh7OzKW8p5D2Xp4iKrVnicIKxZaSUDkaFHxrGAUHZKJ1kRlWmOgOUNeNTzqaSTrWdg/exec';
 const PIN_CORRECTO='200720';
 const ESTADOS_INSUMO=['pendiente','compra','produccion','camino','oficina','noaplica'];
-const LABELS_INSUMO={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica'};
-const DOT_CLS={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica'};
-const CHIP_CLS={'pendiente':'chip-pendiente','compra':'chip-compra','produccion':'chip-produccion','camino':'chip-camino','oficina':'chip-oficina','noaplica':'chip-noaplica'};
+const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
+const LABELS_INSUMO={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica','encurso':'⚙️ En curso','finalizado':'✅ Finalizado'};
+const DOT_CLS={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
+const CHIP_CLS={'pendiente':'chip-pendiente','compra':'chip-compra','produccion':'chip-produccion','camino':'chip-camino','oficina':'chip-oficina','noaplica':'chip-noaplica','encurso':'chip-produccion','finalizado':'chip-oficina'};
 const ESTADOS_TICKET=['Recibido','Compras de insumos','En produccion','En camino','Listo para envio','Entregado'];
 const LABELS_TICKET={'Recibido':'📬 Recibido','Compras de insumos':'🛒 Compras de insumos','En produccion':'⚙️ En producción','En camino':'🚚 En camino','Listo para envio':'📦 Listo para envío','Entregado':'✅ Entregado'};
 
@@ -264,7 +265,7 @@ function getTipo(n){
   return'ml';
 }
 function getInsumos(t){
-  return t==='cap'?['Insumo','Capsula','Envase','Etiqueta','Caja']:['Insumo','Envase','Etiqueta','Caja'];
+  return t==='cap'?['Insumo','Capsula','Envase','Etiqueta','Caja','Maquina']:['Insumo','Envase','Etiqueta','Caja','Maquina'];
 }
 function sumarHabiles(base,dias){
   const d=new Date(base);let s=0;
@@ -297,7 +298,12 @@ function getFechasInsumos(tipo,fechaStr){
   const esTarde=baseD.getTime()===hoy.getTime()&&new Date().getHours()>=13;
   // Antes de 1pm: insumos +1, caja +2 | Después de 1pm: insumos +2, caja +3
   const d=esTarde?2:1;
-  return insumos.map(nombre=>({nombre,fecha:sumarHabiles(base,nombre==='Caja'?d+1:d)}));
+  // Máquina usa la fecha tentativa de entrega del pedido
+  const fechaEntrega=calcFechaTentativa(fechaStr);
+  return insumos.map(nombre=>{
+    if(nombre==='Maquina')return{nombre,fecha:fechaEntrega};
+    return{nombre,fecha:sumarHabiles(base,nombre==='Caja'?d+1:d)};
+  });
 }
 
 function calcFechaTentativa(fechaStr){
@@ -330,11 +336,14 @@ function calcEstadoAutomatico(pedidoId, tipo, estadoActual){
   const insumosClave=insumos.filter(i=>i==='Insumo'||i==='Capsula'||i==='Envase');
 
   const estados=insumosClave.map(i=>getEstadoInsumo(pedidoId,i));
-  const todosOficina=insumos.filter(i=>getEstadoInsumo(pedidoId,i)!=='noaplica').every(i=>getEstadoInsumo(pedidoId,i)==='oficina');
+  // "Listo para envío": todos los físicos en oficina + máquina finalizada
+  const fisicos=insumos.filter(i=>i!=='Maquina'&&getEstadoInsumo(pedidoId,i)!=='noaplica');
+  const todosFisicosOK=fisicos.every(i=>getEstadoInsumo(pedidoId,i)==='oficina');
+  const maquinaOK=getEstadoInsumo(pedidoId,'Maquina')==='finalizado';
+  const todosOficina=todosFisicosOK&&maquinaOK;
   const algunoCamino=estados.some(s=>s==='camino');
-  const algunoProduccion=estados.some(s=>s==='produccion');
+  const algunoProduccion=estados.some(s=>s==='produccion')||getEstadoInsumo(pedidoId,'Maquina')==='encurso';
   const algunoCompra=estados.some(s=>s==='compra');
-  const todoPendiente=estados.every(s=>s==='pendiente'||s==='noaplica');
 
   if(todosOficina) return 'Listo para envio';
   if(algunoCamino) return 'En camino';
@@ -361,7 +370,10 @@ function calcProgreso(pedidoId,tipo){
   const insumos=getInsumos(tipo);
   const aplicables=insumos.filter(i=>getEstadoInsumo(pedidoId,i)!=='noaplica');
   if(!aplicables.length)return 100;
-  const listos=aplicables.filter(i=>getEstadoInsumo(pedidoId,i)==='oficina').length;
+  const listos=aplicables.filter(i=>{
+    const e=getEstadoInsumo(pedidoId,i);
+    return i==='Maquina'?e==='finalizado':e==='oficina';
+  }).length;
   return Math.round((listos/aplicables.length)*100);
 }
 function getProgressColor(pct){
@@ -387,7 +399,8 @@ function renderTicket(p){
     const dotCls=DOT_CLS[estadoIns]||'dot-pendiente';
     const chipCls=CHIP_CLS[estadoIns]||'chip-pendiente';
     const selectVisible=adminMode?'visible':'';
-    const opts=ESTADOS_INSUMO.map(s=>`<option value="${s}"${s===estadoIns?' selected':''}>${LABELS_INSUMO[s]}</option>`).join('');
+    const estadosDisponibles=nombre==='Maquina'?ESTADOS_MAQUINA:ESTADOS_INSUMO;
+    const opts=estadosDisponibles.map(s=>`<option value="${s}"${s===estadoIns?' selected':''}>${LABELS_INSUMO[s]}</option>`).join('');
     return`<div class="insumo-row">
       <div class="insumo-left">
         <span class="insumo-dot ${dotCls}"></span>
