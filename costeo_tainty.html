@@ -447,29 +447,49 @@ function calcularCompras() {
     const escala = getEscalaCercana(ped.cantidad);
     const factor = ped.cantidad / escala;
     for (const ins of prod.insumos) {
-      const key = ins.nombre + '|||' + ins.proveedor;
-      const cantBase = ins.cantidades[escala] || 0;
-      const cantTotal = cantBase * factor;
-      const costoTotal = cantTotal * ins.costoPorKg;
+      const config = getTipoConfig(ins.tipo);
+      const key = ins.nombre + '|||' + ins.proveedor + '|||' + ins.tipo;
+      let cantTotal = 0, costoTotal = 0, unidad = '';
+
+      if (config === 'kg') {
+        const cantBase = (ins.cantidades && parseFloat(ins.cantidades[escala])) || 0;
+        cantTotal = cantBase * factor;
+        costoTotal = cantTotal * (parseFloat(ins.precioUnitario) || 0);
+        unidad = 'kg';
+      } else if (config === 'und') {
+        const cantBase = (ins.cantidades && parseFloat(ins.cantidades[escala])) || 0;
+        cantTotal = cantBase * factor;
+        costoTotal = cantTotal * (parseFloat(ins.precioUnitario) || 0);
+        unidad = 'und';
+      } else {
+        // fijo: ETIQUETA / CAJA — costo total directo por escala
+        const costoBase = (ins.costos && parseFloat(ins.costos[escala])) || 0;
+        costoTotal = costoBase * factor;
+        cantTotal = ped.cantidad; // unidades del pedido
+        unidad = 'und';
+      }
+
       if (!insumos[key]) {
-        insumos[key] = { nombre: ins.nombre, tipo: ins.tipo, proveedor: ins.proveedor, costoPorKg: ins.costoPorKg, cantidadTotal: 0, costoTotal: 0 };
+        insumos[key] = { nombre: ins.nombre, tipo: ins.tipo, proveedor: ins.proveedor||'', cantidadTotal: 0, costoTotal: 0, unidad };
       }
       insumos[key].cantidadTotal += cantTotal;
       insumos[key].costoTotal += costoTotal;
     }
   }
-  const lista = Object.values(insumos).sort((a,b) => a.proveedor.localeCompare(b.proveedor));
+  const lista = Object.values(insumos).sort((a,b) => (a.proveedor||'').localeCompare(b.proveedor||''));
   const costoGlobal = lista.reduce((s,i) => s+i.costoTotal, 0);
   document.getElementById('compras-resumen').textContent = `${lista.length} insumos · Costo estimado: S/ ${costoGlobal.toLocaleString('es-PE',{minimumFractionDigits:2})}`;
-  document.getElementById('compras-tabla').innerHTML = lista.map(i => `
-    <tr>
+  document.getElementById('compras-tabla').innerHTML = lista.map(i => {
+    const cantStr = i.unidad === 'kg' ? `${i.cantidadTotal.toFixed(3)} kg` : `${Math.round(i.cantidadTotal)} und`;
+    return `<tr>
       <td style="font-size:13px">${i.nombre}</td>
       <td><span style="font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted)">${i.tipo}</span></td>
-      <td class="td-mono">${i.cantidadTotal.toFixed(3)} kg</td>
-      <td class="td-muted">KG</td>
+      <td class="td-mono">${cantStr}</td>
+      <td class="td-muted">${i.unidad.toUpperCase()}</td>
       <td class="td-mono" style="color:var(--green)">S/ ${i.costoTotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
-      <td><span class="proveedor-badge">${i.proveedor}</span></td>
-    </tr>`).join('');
+      <td><span class="proveedor-badge">${i.proveedor||'—'}</span></td>
+    </tr>`;
+  }).join('');
   document.getElementById('compras-result').style.display = 'block';
   document.getElementById('proveedores-result').style.display = 'none';
   window._insumosCalculados = lista;
@@ -543,6 +563,23 @@ function renderCosteoSelects() {
   document.getElementById('sel-costeo-prod').innerHTML = opts;
 }
 
+// Calcula el costo de un insumo a una escala dada (según su tipo)
+function costoInsumoEnEscala(ins, escala) {
+  const config = getTipoConfig(ins.tipo);
+  if (config === 'fijo') {
+    return (ins.costos && parseFloat(ins.costos[escala])) || 0;
+  }
+  const cant = (ins.cantidades && parseFloat(ins.cantidades[escala])) || 0;
+  return cant * (parseFloat(ins.precioUnitario) || 0);
+}
+
+// Cantidad calculada de un insumo a la escala (en su unidad)
+function cantidadInsumoEnEscala(ins, escala) {
+  const config = getTipoConfig(ins.tipo);
+  if (config === 'fijo') return escala; // las etiquetas/cajas se compran 1 por unidad de producto
+  return (ins.cantidades && parseFloat(ins.cantidades[escala])) || 0;
+}
+
 function renderCosteo() {
   const nombre = document.getElementById('sel-costeo-prod').value;
   const div = document.getElementById('costeo-result');
@@ -552,9 +589,9 @@ function renderCosteo() {
   const escalas = [100, 300, 500, 1000];
   const costosPorEscala = escalas.map(e => ({
     escala: e,
-    total: prod.insumos.reduce((s,i) => s + (i.cantidades[e]||0) * i.costoPorKg, 0)
+    total: prod.insumos.reduce((s,i) => s + costoInsumoEnEscala(i, e), 0)
   }));
-  const costoActual = prod.insumos.reduce((s,i) => s + (i.cantidades[escalaActual]||0) * i.costoPorKg, 0);
+  const costoActual = prod.insumos.reduce((s,i) => s + costoInsumoEnEscala(i, escalaActual), 0);
   const costoUnd = escalaActual > 0 ? costoActual / escalaActual : 0;
 
   div.innerHTML = `
@@ -568,17 +605,24 @@ function renderCosteo() {
     <div class="table-wrap">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Tipo</th><th>Insumo</th><th>Proveedor</th><th>Costo/KG</th><th>Cantidad (${escalaActual} und)</th><th>Subtotal</th></tr></thead>
+          <thead><tr><th>Tipo</th><th>Insumo</th><th>Proveedor</th><th>Precio</th><th>Cantidad (${escalaActual} und)</th><th>Subtotal</th></tr></thead>
           <tbody>
             ${prod.insumos.map(i => {
-              const cant = i.cantidades[escalaActual] || 0;
-              const sub = cant * i.costoPorKg;
+              const config = getTipoConfig(i.tipo);
+              const cant = cantidadInsumoEnEscala(i, escalaActual);
+              const sub = costoInsumoEnEscala(i, escalaActual);
+              const precioStr = config === 'kg' ? `S/ ${(parseFloat(i.precioUnitario)||0).toFixed(2)}/kg`
+                : config === 'und' ? `S/ ${(parseFloat(i.precioUnitario)||0).toFixed(2)}/und`
+                : '—';
+              const cantStr = config === 'kg' ? `${cant.toFixed(3)} kg`
+                : config === 'und' ? `${Math.round(cant)} und`
+                : '—';
               return `<tr>
                 <td><span style="font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted)">${i.tipo}</span></td>
                 <td style="font-size:13px">${i.nombre}</td>
-                <td><span class="proveedor-badge">${i.proveedor}</span></td>
-                <td class="td-mono">S/ ${i.costoPorKg.toFixed(2)}/kg</td>
-                <td class="td-mono">${cant.toFixed(3)} kg</td>
+                <td><span class="proveedor-badge">${i.proveedor||'—'}</span></td>
+                <td class="td-mono">${precioStr}</td>
+                <td class="td-mono">${cantStr}</td>
                 <td class="td-mono" style="color:var(--green)">S/ ${sub.toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
               </tr>`;
             }).join('')}
@@ -613,7 +657,7 @@ function renderCatalogo() {
   const lista = catalogo.filter(p => !q || p.nombre.toLowerCase().includes(q));
   if (!lista.length) { document.getElementById('catalogo-list').innerHTML = '<div class="empty">No hay productos en el catálogo</div>'; return; }
   document.getElementById('catalogo-list').innerHTML = lista.map((p,pi) => {
-    const costo100 = p.insumos.reduce((s,i)=>s+(i.cantidades[100]||0)*i.costoPorKg,0);
+    const costo100 = p.insumos.reduce((s,i)=>s+costoInsumoEnEscala(i,100),0);
     const tipos = getTiposInsumo(p.nombre);
     return `<div class="prod-accordion">
       <div class="prod-acc-header" onclick="toggleAcc(${pi})">
@@ -637,20 +681,31 @@ function renderCatalogo() {
             if (!ins) return `<div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px dashed var(--border2);font-size:12px;color:var(--hint)">
               <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--surface);color:var(--hint);margin-right:6px">${tipo}</span>Sin configurar
             </div>`;
+            const config = getTipoConfig(ins.tipo);
+            const precioStr = config === 'kg' ? `S/${(parseFloat(ins.precioUnitario)||0).toFixed(2)}/kg`
+              : config === 'und' ? `S/${(parseFloat(ins.precioUnitario)||0).toFixed(2)}/und`
+              : 'precio fijo';
+            const detalleEscalas = [100,300,500,1000].map(e => {
+              if (config === 'fijo') {
+                const v = (ins.costos && parseFloat(ins.costos[e])) || 0;
+                return `<span style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace">x${e}: S/${v.toFixed(2)}</span>`;
+              }
+              const c = (ins.cantidades && parseFloat(ins.cantidades[e])) || 0;
+              const u = config === 'kg' ? 'kg' : 'und';
+              const cStr = config === 'kg' ? c.toFixed(3) : Math.round(c);
+              return `<span style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace">x${e}: ${cStr}${u}</span>`;
+            }).join('');
             return `<div style="padding:10px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border2)">
               <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
                 <div>
                   <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:var(--surface);color:var(--purple);margin-right:6px">${tipo}</span>
                   <span style="font-size:13px;color:var(--text)">${ins.nombre}</span>
                 </div>
-                <span style="font-size:11px;color:var(--blue)">${ins.proveedor}</span>
+                <span style="font-size:11px;color:var(--blue)">${ins.proveedor||'—'}</span>
               </div>
               <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap">
-                <span style="font-size:11px;color:var(--amber);font-family:DM Mono,monospace">S/${ins.costoPorKg.toFixed(2)}/kg</span>
-                <span style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace">x100: ${ins.cantidades[100]||0}kg</span>
-                <span style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace">x300: ${ins.cantidades[300]||0}kg</span>
-                <span style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace">x500: ${ins.cantidades[500]||0}kg</span>
-                <span style="font-size:11px;color:var(--muted);font-family:DM Mono,monospace">x1000: ${ins.cantidades[1000]||0}kg</span>
+                <span style="font-size:11px;color:var(--amber);font-family:DM Mono,monospace">${precioStr}</span>
+                ${detalleEscalas}
               </div>
             </div>`;
           }).join('')}
@@ -670,6 +725,78 @@ function toggleAcc(pi) {
 
 let editorProdIdx = null;
 
+// Estado de items por tipo en el editor
+let editorItems = {};
+
+// Configuración por tipo:
+//   'kg'   = INSUMO/LAINA (precio por kg, cantidad en kg)
+//   'und'  = CAPSULA/ENVASE (precio por und, cantidad en und)
+//   'fijo' = ETIQUETA/CAJA (costo total por escala, sin cantidad)
+function getTipoConfig(tipo) {
+  if (['INSUMO','LAINA'].includes(tipo)) return 'kg';
+  if (['CAPSULA','ENVASE'].includes(tipo)) return 'und';
+  return 'fijo'; // ETIQUETA, CAJA
+}
+
+const ESCALAS = [100, 300, 500, 1000];
+
+function nuevoItemVacio(tipo) {
+  const config = getTipoConfig(tipo);
+  const base = { tipo, nombre:'', proveedor:'' };
+  if (config === 'kg' || config === 'und') {
+    base.precioUnitario = 0;
+    base.cantidades = { 100:0, 300:0, 500:0, 1000:0 };
+  } else {
+    base.costos = { 100:0, 300:0, 500:0, 1000:0 };
+  }
+  return base;
+}
+
+// Migra un item del modelo viejo al nuevo (compatibilidad con datos existentes)
+function migrarItem(ins) {
+  const tipo = ins.tipo;
+  const config = getTipoConfig(tipo);
+  const nuevo = { tipo, nombre: ins.nombre||'', proveedor: ins.proveedor||'' };
+  if (config === 'kg') {
+    nuevo.precioUnitario = parseFloat(ins.precioUnitario ?? ins.costoPorKg) || 0;
+    nuevo.cantidades = ins.cantidades && typeof ins.cantidades === 'object'
+      ? { 100:parseFloat(ins.cantidades[100])||0, 300:parseFloat(ins.cantidades[300])||0, 500:parseFloat(ins.cantidades[500])||0, 1000:parseFloat(ins.cantidades[1000])||0 }
+      : { 100:0, 300:0, 500:0, 1000:0 };
+  } else if (config === 'und') {
+    nuevo.precioUnitario = parseFloat(ins.precioUnitario ?? ins.costoUnd) || 0;
+    // En el modelo viejo de und, cantidades guardaba costos. Si vienen con valores raros,
+    // intentamos reconstruir asumiendo que la cantidad de und = escala (lo más común)
+    if (ins.cantidades && (parseFloat(ins.cantidades[100])||0) > 0 && nuevo.precioUnitario > 0) {
+      // Si parece costo (cantidades[100] = 100*precio), invertir; si parece cantidad, dejar
+      const v = parseFloat(ins.cantidades[100])||0;
+      const pareceCosto = Math.abs(v - 100*nuevo.precioUnitario) < 0.01;
+      if (pareceCosto) {
+        nuevo.cantidades = { 100:100, 300:300, 500:500, 1000:1000 };
+      } else {
+        nuevo.cantidades = { 100:v, 300:parseFloat(ins.cantidades[300])||0, 500:parseFloat(ins.cantidades[500])||0, 1000:parseFloat(ins.cantidades[1000])||0 };
+      }
+    } else {
+      nuevo.cantidades = { 100:100, 300:300, 500:500, 1000:1000 };
+    }
+  } else {
+    // fijo: ETIQUETA/CAJA — costos directos
+    const fuente = ins.costos || ins.cantidades || {};
+    nuevo.costos = { 100:parseFloat(fuente[100])||0, 300:parseFloat(fuente[300])||0, 500:parseFloat(fuente[500])||0, 1000:parseFloat(fuente[1000])||0 };
+  }
+  return nuevo;
+}
+
+function initEditorItems(prod, nombre) {
+  const tipos = getTiposInsumo(nombre);
+  editorItems = {};
+  tipos.forEach(tipo => {
+    const existentes = prod ? prod.insumos.filter(i => i.tipo === tipo) : [];
+    editorItems[tipo] = existentes.length > 0
+      ? existentes.map(migrarItem)
+      : [ nuevoItemVacio(tipo) ];
+  });
+}
+
 function abrirEditorProducto(pi) {
   editorProdIdx = pi;
   const modal = document.getElementById('modal-editor');
@@ -681,7 +808,8 @@ function abrirEditorProducto(pi) {
   nombreInput.value = prod ? prod.nombre : '';
   nombreInput.disabled = prod !== null;
 
-  renderEditorInsumos(prod);
+  initEditorItems(prod, nombreInput.value);
+  renderEditorItems();
   modal.style.opacity = '1';
   modal.style.pointerEvents = 'all';
 }
@@ -693,134 +821,24 @@ function cerrarEditorProducto() {
   editorProdIdx = null;
 }
 
-// Estado de items por tipo en el editor
-let editorItems = {};
-
-function initEditorItems(prod, nombre) {
-  const tipos = getTiposInsumo(nombre);
-  editorItems = {};
-  tipos.forEach(tipo => {
-    const existentes = prod ? prod.insumos.filter(i => i.tipo === tipo) : [];
-    editorItems[tipo] = existentes.length > 0 ? existentes.map(i => ({...i})) : [{ tipo, nombre:'', proveedor:'', costoPorKg:0, costoUnd:0, cantidades:{100:0,300:0,500:0,1000:0} }];
-  });
-}
-
-function getTipoConfig(tipo) {
-  if (['INSUMO','CAPSULA','LAINA'].includes(tipo)) return 'kg';
-  if (['ENVASE','CAJA'].includes(tipo)) return 'und';
-  return 'manual'; // ETIQUETA
-}
-
-function calcCostosKg(kg100, costoKg) {
-  const k = parseFloat(kg100)||0;
-  const c = parseFloat(costoKg)||0;
-  return { 100: k*c, 300: k*3*c, 500: k*5*c, 1000: k*10*c };
-}
-
-function calcCostosUnd(costoUnd) {
-  const u = parseFloat(costoUnd)||0;
-  return { 100: u*100, 300: u*300, 500: u*500, 1000: u*1000 };
-}
-
-function renderEditorInsumos(prod) {
-  const nombre = document.getElementById('editor-nombre').value || (prod ? prod.nombre : '');
-  const tipos = getTiposInsumo(nombre);
-  initEditorItems(prod, nombre);
-  renderEditorItems();
-}
-
 function renderEditorItems() {
   const nombre = document.getElementById('editor-nombre').value;
   const tipos = getTiposInsumo(nombre);
   const div = document.getElementById('editor-insumos');
   const COLORS = {INSUMO:'var(--purple)',CAPSULA:'var(--green)',LAINA:'var(--muted)',ENVASE:'var(--blue)',ETIQUETA:'var(--amber)',CAJA:'var(--amber)'};
+  const UNIDAD_LABEL = {kg:'kg', und:'und'};
 
   div.innerHTML = tipos.map(tipo => {
     const config = getTipoConfig(tipo);
-    const items = editorItems[tipo] || [{}];
+    const items = editorItems[tipo] || [nuevoItemVacio(tipo)];
     const color = COLORS[tipo] || 'var(--muted)';
+    const unidad = config === 'kg' ? 'kg' : config === 'und' ? 'und' : '';
 
-    const itemsHtml = items.map((ins, idx) => {
-      const costos = ins.cantidades || {100:0,300:0,500:0,1000:0};
-      const c100 = costos[100]||0, c300=costos[300]||0, c500=costos[500]||0, c1000=costos[1000]||0;
-
-      if (config === 'kg') {
-        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px" id="item-${tipo}-${idx}">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-            <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
-            <input type="text" value="${ins.nombre||''}" placeholder="Ej: Maltodextrina" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
-            <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
-            <input type="text" value="${ins.proveedor||''}" placeholder="Ej: INVERFOOD" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px">
-            <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">S/ por KG</label>
-            <input type="number" value="${ins.costoPorKg||''}" placeholder="0.00" step="0.01" oninput="updateItemKg('${tipo}',${idx},'costo',this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.3);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
-            <div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">KG x100</label>
-            <input type="number" value="${ins.kg100||''}" placeholder="0" step="0.001" oninput="updateItemKg('${tipo}',${idx},'kg',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--text);outline:none"></div>
-            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x100</label>
-            <input type="number" id="calc-${tipo}-${idx}-100" value="${c100.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},100,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
-            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x300</label>
-            <input type="number" id="calc-${tipo}-${idx}-300" value="${c300.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},300,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
-            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x500</label>
-            <input type="number" id="calc-${tipo}-${idx}-500" value="${c500.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},500,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr;gap:6px">
-            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x1000</label>
-            <input type="number" id="calc-${tipo}-${idx}-1000" value="${c1000.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},1000,this.value)" style="width:200px;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
-          </div>
-          ${items.length>1?`<button onclick="removeItem('${tipo}',${idx})" style="margin-top:8px;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">✕ Eliminar</button>`:''}
-        </div>`;
-      }
-
-      if (config === 'und') {
-        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px" id="item-${tipo}-${idx}">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
-            <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
-            <input type="text" value="${ins.nombre||''}" placeholder="Ej: Envase PET 100ml" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
-            <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
-            <input type="text" value="${ins.proveedor||''}" placeholder="Ej: ANDRAPLAST" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
-            <div><label style="font-size:11px;color:var(--amber);display:block;margin-bottom:3px">S/ por und</label>
-            <input type="number" value="${ins.costoUnd||''}" placeholder="0.00" step="0.01" oninput="updateItemUnd('${tipo}',${idx},this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.3);border-radius:7px;padding:7px 9px;font-family:DM Mono,monospace;font-size:13px;color:var(--amber);outline:none"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
-            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x100</label>
-            <input type="number" id="calc-${tipo}-${idx}-100" value="${c100.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},100,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
-            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x300</label>
-            <input type="number" id="calc-${tipo}-${idx}-300" value="${c300.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},300,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
-            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x500</label>
-            <input type="number" id="calc-${tipo}-${idx}-500" value="${c500.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},500,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
-            <div><label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo x1000</label>
-            <input type="number" id="calc-${tipo}-${idx}-1000" value="${c1000.toFixed(2)}" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},1000,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green);outline:none"></div>
-          </div>
-          ${items.length>1?`<button onclick="removeItem('${tipo}',${idx})" style="margin-top:8px;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">✕ Eliminar</button>`:''}
-        </div>`;
-      }
-
-      // ETIQUETA - manual
-      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
-          <input type="text" value="${ins.nombre||''}" placeholder="Ej: Etiqueta Lamina Brillo" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
-          <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
-          <input type="text" value="${ins.proveedor||''}" placeholder="Ej: PHANTONE" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
-          <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo x100</label>
-          <input type="number" id="calc-${tipo}-${idx}-100" value="${c100||''}" placeholder="0.00" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},100,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
-          <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo x300</label>
-          <input type="number" id="calc-${tipo}-${idx}-300" value="${c300||''}" placeholder="0.00" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},300,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
-          <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo x500</label>
-          <input type="number" id="calc-${tipo}-${idx}-500" value="${c500||''}" placeholder="0.00" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},500,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
-          <div><label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo x1000</label>
-          <input type="number" id="calc-${tipo}-${idx}-1000" value="${c1000||''}" placeholder="0.00" step="0.01" oninput="updateItemCostoDirecto('${tipo}',${idx},1000,this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none"></div>
-        </div>
-        ${items.length>1?`<button onclick="removeItem('${tipo}',${idx})" style="margin-top:8px;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">✕ Eliminar</button>`:''}
-      </div>`;
-    }).join('');
+    const itemsHtml = items.map((ins, idx) => itemHtml(tipo, idx, ins, config, unidad)).join('');
 
     return `<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:1rem;margin-bottom:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:12px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:.06em">${tipo}</div>
+        <div style="font-size:12px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:.06em">${tipo}${unidad?` <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:10px">· ${unidad==='kg'?'precio por kg':'precio por und'}</span>`:` <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:10px">· precio total por escala</span>`}</div>
         <button onclick="addItem('${tipo}')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(124,111,239,.3);background:var(--purple-dim);color:var(--purple);cursor:pointer">+ Agregar otro</button>
       </div>
       ${itemsHtml}
@@ -828,48 +846,137 @@ function renderEditorItems() {
   }).join('');
 }
 
+function itemHtml(tipo, idx, ins, config, unidad) {
+  // Cabecera común: descripción + proveedor
+  const cabecera = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
+      <input type="text" value="${ins.nombre||''}" placeholder="Ej: ${tipo==='INSUMO'?'Maltodextrina':tipo==='CAPSULA'?'Cápsula 00 vegetal':tipo==='ENVASE'?'Envase PET 100ml':tipo==='ETIQUETA'?'Etiqueta lámina brillo':tipo==='CAJA'?'Caja kraft':'Item'}" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+    <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
+      <input type="text" value="${ins.proveedor||''}" placeholder="Ej: INVERFOOD" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+  </div>`;
+
+  const btnEliminar = (editorItems[tipo]||[]).length>1
+    ? `<button onclick="removeItem('${tipo}',${idx})" style="margin-top:8px;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">✕ Eliminar</button>`
+    : '';
+
+  if (config === 'kg' || config === 'und') {
+    // Una sola fila: precio unitario + 4 cantidades + 4 costos calculados
+    const cants = ins.cantidades || {100:0,300:0,500:0,1000:0};
+    const precio = parseFloat(ins.precioUnitario)||0;
+    const costoLabel = config === 'kg' ? 'S/ por kg' : 'S/ por und';
+    const cantLabel = config === 'kg' ? `kg necesarios` : `und necesarias`;
+
+    const inputsCant = ESCALAS.map(e => {
+      const v = parseFloat(cants[e])||0;
+      return `<div>
+        <label style="font-size:10px;color:var(--text);display:block;margin-bottom:3px">${cantLabel} · x${e}</label>
+        <input type="number" value="${v||''}" placeholder="0" step="0.001" id="cant-${tipo}-${idx}-${e}" oninput="updateCantidad('${tipo}',${idx},${e},this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--text);outline:none">
+      </div>`;
+    }).join('');
+
+    const inputsCosto = ESCALAS.map(e => {
+      const c = (parseFloat(cants[e])||0) * precio;
+      return `<div>
+        <label style="font-size:10px;color:var(--green);display:block;margin-bottom:3px">Costo · x${e}</label>
+        <div id="costo-${tipo}-${idx}-${e}" style="background:var(--surface);border:1px solid rgba(62,207,142,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--green)">S/ ${c.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px" id="item-${tipo}-${idx}">
+      ${cabecera}
+      <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px">
+        <div><label style="font-size:11px;color:var(--amber);display:block;margin-bottom:3px">${costoLabel}</label>
+          <input type="number" value="${ins.precioUnitario||''}" placeholder="0.00" step="0.01" oninput="updatePrecio('${tipo}',${idx},this.value)" style="width:200px;background:var(--surface2);border:1px solid rgba(245,166,35,.3);border-radius:7px;padding:7px 9px;font-family:DM Mono,monospace;font-size:13px;color:var(--amber);outline:none"></div>
+      </div>
+      <div style="font-size:10px;color:var(--hint);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Cantidades por escala (escribe una y se autocompletan las demás)</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+        ${inputsCant}
+      </div>
+      <div style="font-size:10px;color:var(--hint);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Costos calculados</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+        ${inputsCosto}
+      </div>
+      ${btnEliminar}
+    </div>`;
+  }
+
+  // FIJO (ETIQUETA / CAJA): solo 4 inputs de costo directo
+  const costos = ins.costos || {100:0,300:0,500:0,1000:0};
+  const inputsCostoFijo = ESCALAS.map(e => {
+    const v = parseFloat(costos[e])||0;
+    return `<div>
+      <label style="font-size:10px;color:var(--amber);display:block;margin-bottom:3px">Costo · x${e}</label>
+      <input type="number" value="${v||''}" placeholder="0.00" step="0.01" oninput="updateCostoFijo('${tipo}',${idx},${e},this.value)" style="width:100%;background:var(--surface2);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:6px 8px;font-family:DM Mono,monospace;font-size:12px;color:var(--amber);outline:none">
+    </div>`;
+  }).join('');
+
+  return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px" id="item-${tipo}-${idx}">
+    ${cabecera}
+    <div style="font-size:10px;color:var(--hint);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Costo total por escala</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+      ${inputsCostoFijo}
+    </div>
+    ${btnEliminar}
+  </div>`;
+}
+
 function updateItem(tipo, idx, field, val) {
   if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
   editorItems[tipo][idx][field] = val;
 }
 
-function updateItemKg(tipo, idx, field, val) {
-  if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
-  const ins = editorItems[tipo][idx];
-  if (field === 'costo') ins.costoPorKg = parseFloat(val)||0;
-  if (field === 'kg') ins.kg100 = parseFloat(val)||0;
-  const kg = ins.kg100||0;
-  const costo = ins.costoPorKg||0;
-  const costos = calcCostosKg(kg, costo);
-  ins.cantidades = costos;
-  // Update UI
-  [100,300,500,1000].forEach(e => {
-    const el = document.getElementById(`calc-${tipo}-${idx}-${e}`);
-    if (el) el.value = costos[e].toFixed(2);
+function updatePrecio(tipo, idx, val) {
+  const it = editorItems[tipo] && editorItems[tipo][idx];
+  if (!it) return;
+  it.precioUnitario = parseFloat(val)||0;
+  refrescarCostos(tipo, idx);
+}
+
+// Cuando se edita una cantidad, autocompleta las otras 3 escalas proporcionalmente
+// y refresca los costos calculados
+function updateCantidad(tipo, idx, escalaBase, val) {
+  const it = editorItems[tipo] && editorItems[tipo][idx];
+  if (!it) return;
+  if (!it.cantidades) it.cantidades = {100:0,300:0,500:0,1000:0};
+  const v = parseFloat(val)||0;
+  it.cantidades[escalaBase] = v;
+  if (v > 0) {
+    ESCALAS.forEach(e => {
+      if (e !== escalaBase) {
+        it.cantidades[e] = +(v * e / escalaBase).toFixed(6);
+        const el = document.getElementById(`cant-${tipo}-${idx}-${e}`);
+        if (el && document.activeElement !== el) {
+          // Mostrar con redondeo razonable
+          const num = it.cantidades[e];
+          el.value = num >= 100 ? num.toFixed(0) : num >= 1 ? num.toFixed(2) : num.toFixed(3);
+        }
+      }
+    });
+  }
+  refrescarCostos(tipo, idx);
+}
+
+function refrescarCostos(tipo, idx) {
+  const it = editorItems[tipo] && editorItems[tipo][idx];
+  if (!it || !it.cantidades) return;
+  const precio = parseFloat(it.precioUnitario)||0;
+  ESCALAS.forEach(e => {
+    const c = (parseFloat(it.cantidades[e])||0) * precio;
+    const el = document.getElementById(`costo-${tipo}-${idx}-${e}`);
+    if (el) el.textContent = 'S/ ' + c.toFixed(2);
   });
 }
 
-function updateItemUnd(tipo, idx, val) {
-  if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
-  const ins = editorItems[tipo][idx];
-  ins.costoUnd = parseFloat(val)||0;
-  const costos = calcCostosUnd(ins.costoUnd);
-  ins.cantidades = costos;
-  [100,300,500,1000].forEach(e => {
-    const el = document.getElementById(`calc-${tipo}-${idx}-${e}`);
-    if (el) el.value = costos[e].toFixed(2);
-  });
-}
-
-function updateItemCostoDirecto(tipo, idx, escala, val) {
-  if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
-  if (!editorItems[tipo][idx].cantidades) editorItems[tipo][idx].cantidades = {100:0,300:0,500:0,1000:0};
-  editorItems[tipo][idx].cantidades[escala] = parseFloat(val)||0;
+function updateCostoFijo(tipo, idx, escala, val) {
+  const it = editorItems[tipo] && editorItems[tipo][idx];
+  if (!it) return;
+  if (!it.costos) it.costos = {100:0,300:0,500:0,1000:0};
+  it.costos[escala] = parseFloat(val)||0;
 }
 
 function addItem(tipo) {
   if (!editorItems[tipo]) editorItems[tipo] = [];
-  editorItems[tipo].push({ tipo, nombre:'', proveedor:'', costoPorKg:0, costoUnd:0, cantidades:{100:0,300:0,500:0,1000:0} });
+  editorItems[tipo].push(nuevoItemVacio(tipo));
   renderEditorItems();
 }
 
@@ -880,11 +987,10 @@ function removeItem(tipo, idx) {
 }
 
 document.getElementById('editor-nombre').addEventListener('input', function() {
-  // Only re-render if the type changes (cap vs non-cap) to avoid resetting form
   const nombre = this.value;
   const tipos = getTiposInsumo(nombre);
   const tiposActuales = Object.keys(editorItems);
-  const mismoTipo = tipos.length === tiposActuales.length && 
+  const mismoTipo = tipos.length === tiposActuales.length &&
     tipos.every((t,i) => t === tiposActuales[i]);
   if (!mismoTipo) {
     initEditorItems(null, nombre);
@@ -904,13 +1010,32 @@ async function guardarProductoSheets() {
     const items = editorItems[tipo] || [];
     items.forEach(ins => {
       if (ins.nombre && ins.nombre.trim()) {
-        insumos.push({
+        const config = getTipoConfig(tipo);
+        const out = {
           tipo,
           nombre: ins.nombre.trim(),
-          proveedor: ins.proveedor||'',
-          costoPorKg: ins.costoPorKg||0,
-          cantidades: ins.cantidades || {100:0,300:0,500:0,1000:0}
-        });
+          proveedor: ins.proveedor||''
+        };
+        if (config === 'kg' || config === 'und') {
+          out.precioUnitario = parseFloat(ins.precioUnitario)||0;
+          out.cantidades = {
+            100: parseFloat(ins.cantidades?.[100])||0,
+            300: parseFloat(ins.cantidades?.[300])||0,
+            500: parseFloat(ins.cantidades?.[500])||0,
+            1000: parseFloat(ins.cantidades?.[1000])||0
+          };
+          // Compatibilidad hacia atrás con el script viejo de Sheets:
+          if (config === 'kg') out.costoPorKg = out.precioUnitario;
+          else out.costoUnd = out.precioUnitario;
+        } else {
+          out.costos = {
+            100: parseFloat(ins.costos?.[100])||0,
+            300: parseFloat(ins.costos?.[300])||0,
+            500: parseFloat(ins.costos?.[500])||0,
+            1000: parseFloat(ins.costos?.[1000])||0
+          };
+        }
+        insumos.push(out);
       }
     });
   }
