@@ -657,20 +657,26 @@ function renderCatalogo() {
   const lista = catalogo.filter(p => !q || p.nombre.toLowerCase().includes(q));
   if (!lista.length) { document.getElementById('catalogo-list').innerHTML = '<div class="empty">No hay productos en el catálogo</div>'; return; }
   document.getElementById('catalogo-list').innerHTML = lista.map((p,pi) => {
-    const costo100 = p.insumos.reduce((s,i)=>s+costoInsumoEnEscala(i,100),0);
+    const costos = [100,300,500,1000].map(e => ({
+      escala: e,
+      total: p.insumos.reduce((s,i)=>s+costoInsumoEnEscala(i,e),0)
+    }));
     const tipos = getTiposInsumo(p.nombre);
     return `<div class="prod-accordion">
       <div class="prod-acc-header" onclick="toggleAcc(${pi})">
-        <div>
+        <div style="flex:1;min-width:0">
           <div class="prod-acc-title">${p.nombre}</div>
-          <div class="prod-acc-meta">
-            <span>${p.insumos.length} insumos</span><span>·</span>
-            <span style="color:var(--amber)">S/ ${costo100.toFixed(2)} x 100und</span>
+          <div class="prod-acc-meta" style="flex-wrap:wrap;gap:6px 10px">
+            <span>${p.insumos.length} insumos</span>
             ${esCap(p.nombre)?'<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--green-dim);color:var(--green)">CAP</span>':''}
           </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+            ${costos.map(c => `<span style="font-size:11px;font-family:DM Mono,monospace;padding:3px 8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);color:var(--amber)">x${c.escala}: S/ ${c.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>`).join('')}
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:6px">
           <button onclick="event.stopPropagation();abrirEditorProducto(${pi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(124,111,239,.3);background:var(--purple-dim);color:var(--purple);cursor:pointer">✏ Editar</button>
+          <button onclick="event.stopPropagation();eliminarProducto(${pi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">🗑 Eliminar</button>
           <span style="color:var(--hint);font-size:18px" id="acc-icon-${pi}">›</span>
         </div>
       </div>
@@ -721,6 +727,37 @@ function toggleAcc(pi) {
   const isOpen = body.classList.contains('open');
   body.classList.toggle('open', !isOpen);
   icon.innerHTML = isOpen ? '›' : '⌄';
+}
+
+async function eliminarProducto(pi) {
+  const prod = catalogo[pi];
+  if (!prod) return;
+  const nombre = prod.nombre;
+  const ok = confirm(`¿Eliminar el producto "${nombre}" del catálogo?\n\nEsto borrará todos sus insumos y se reflejará en Google Sheets. Esta acción no se puede deshacer.`);
+  if (!ok) return;
+
+  mostrarToast('Eliminando ' + nombre + '...');
+  try {
+    const dataObj = { action: 'eliminarProducto', producto: nombre };
+    const payload = encodeURIComponent(JSON.stringify(dataObj));
+    const url = COSTEO_URL + '?data=' + payload + '&t=' + Date.now();
+    const res = await jsonp(url);
+    console.log('Respuesta eliminación:', res);
+    // Quitar del catálogo local independientemente del resultado para reflejar la intención
+    catalogo.splice(pi, 1);
+    localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
+    poblarSelects();
+    renderCatalogo();
+    mostrarToast('✓ Producto eliminado');
+  } catch (e) {
+    console.error('Error al eliminar:', e);
+    // Borrar local de todas formas y avisar al usuario
+    catalogo.splice(pi, 1);
+    localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
+    poblarSelects();
+    renderCatalogo();
+    mostrarToast('Eliminado local (error Sheets: ' + e.message + ')');
+  }
 }
 
 let editorProdIdx = null;
@@ -1024,9 +1061,6 @@ async function guardarProductoSheets() {
             500: parseFloat(ins.cantidades?.[500])||0,
             1000: parseFloat(ins.cantidades?.[1000])||0
           };
-          // Compatibilidad hacia atrás con el script viejo de Sheets:
-          if (config === 'kg') out.costoPorKg = out.precioUnitario;
-          else out.costoUnd = out.precioUnitario;
         } else {
           out.costos = {
             100: parseFloat(ins.costos?.[100])||0,
