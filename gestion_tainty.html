@@ -73,6 +73,30 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
 .est-btn.sel-oficina{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.3)}
 .est-btn.sel-noaplica{background:transparent;color:var(--hint);border-color:var(--hint);text-decoration:line-through}
 .saving-indicator{font-size:11px;color:var(--muted);padding:2px 8px}
+.seccion-insumo{margin-bottom:2rem}
+.seccion-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--border2);border-radius:14px 14px 0 0;border-bottom:none;position:sticky;top:0;z-index:5}
+.seccion-titulo{display:flex;align-items:center;gap:10px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:1px}
+.seccion-icono{font-size:18px}
+.seccion-count{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--border2);padding:3px 10px;border-radius:20px}
+.seccion-stats{display:flex;gap:6px;flex-wrap:wrap}
+.stat-pill{font-family:'DM Mono',monospace;font-size:10px;padding:3px 8px;border-radius:12px;border:1px solid var(--border2);color:var(--muted);background:var(--surface)}
+.stat-pill.has-count{color:var(--text)}
+.stat-pill.s-pendiente.has-count{border-color:rgba(255,255,255,.15)}
+.stat-pill.s-compra.has-count{background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,.3)}
+.stat-pill.s-produccion.has-count{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
+.stat-pill.s-camino.has-count{background:var(--blue-dim);color:var(--blue);border-color:rgba(76,163,232,.3)}
+.stat-pill.s-oficina.has-count{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.3)}
+.seccion-body{background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;overflow:hidden}
+.fila-pedido{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)}
+.fila-pedido:last-child{border:none}
+.fila-pedido:hover{background:var(--surface2)}
+.fila-info{display:flex;align-items:center;gap:10px;min-width:0}
+.fila-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--hint);white-space:nowrap}
+.fila-cliente{font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.fila-prod{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.fila-cant{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+.fila-estado-actual{display:flex;align-items:center;gap:6px;margin-right:8px}
+.seccion-empty{padding:1.5rem;text-align:center;color:var(--hint);font-size:13px}
 .empty{text-align:center;padding:3rem;color:var(--hint)}
 .spinner{width:30px;height:30px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin:2rem auto;display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -83,6 +107,11 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
   .estado-btns{flex-wrap:wrap;gap:4px}
   .est-btn{font-size:10px;padding:3px 7px}
   .ticket-header{flex-direction:column;align-items:flex-start}
+  .fila-pedido{grid-template-columns:1fr;gap:8px;padding:12px 14px}
+  .fila-info{flex-wrap:wrap;gap:6px}
+  .fila-cliente,.fila-prod{max-width:100%}
+  .seccion-header{padding:12px 14px;flex-wrap:wrap}
+  .seccion-titulo{font-size:13px}
 .topbar{padding:.75rem 1rem}.main{padding:1rem}.estado-btns{gap:4px}.est-btn{font-size:10px;padding:3px 8px}}
 </style>
 </head>
@@ -116,11 +145,11 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
   <input class="search-input" id="search" placeholder="Buscar pedido, producto o cliente..." oninput="renderLista()">
   <div class="filters" id="filtros">
     <button class="ftab active" onclick="setFiltro('todos',this)">Todos</button>
-    <button class="ftab" onclick="setFiltro('recibido',this)">📬 Recibido</button>
-    <button class="ftab" onclick="setFiltro('compras',this)">🛒 Compras</button>
+    <button class="ftab" onclick="setFiltro('recibido',this)">⏳ Pendientes</button>
+    <button class="ftab" onclick="setFiltro('compras',this)">🛒 En compra</button>
     <button class="ftab" onclick="setFiltro('produccion',this)">⚙️ En producción</button>
     <button class="ftab" onclick="setFiltro('camino',this)">🚚 En camino</button>
-    <button class="ftab" onclick="setFiltro('listo',this)">📦 Listo para envío</button>
+    <button class="ftab" onclick="setFiltro('listo',this)">📦 En oficina</button>
   </div>
   <div id="lista-pedidos"><div class="spinner"></div></div>
 </div>
@@ -237,53 +266,103 @@ function calcProgreso(pid,tipo){
   return Math.round(aplic.filter(i=>getEstadoInsumo(pid,i)==='oficina').length/aplic.length*100);
 }
 
+const ICONO_INSUMO={'Insumo':'🧪','Capsula':'💊','Envase':'🫙','Etiqueta':'🏷️','Caja':'📦'};
+const ORDEN_INSUMOS=['Insumo','Capsula','Envase','Etiqueta','Caja'];
+
+// Mapea el filtro superior (estado del pedido) al estado de insumo equivalente
+const FILTRO_A_ESTADO={'recibido':'pendiente','compras':'compra','produccion':'produccion','camino':'camino','listo':'oficina'};
+
 function renderLista(){
   const q=(document.getElementById('search').value||'').toLowerCase();
-  let lista=pedidos.filter(p=>{
-    const est=calcEstadoAuto(p.numPedido,getTipo(p.producto));
-    if(filtroActual!=='todos'&&est!==filtroActual)return false;
-    if(q)return(p.numPedido||'').toLowerCase().includes(q)||(p.cliente||'').toLowerCase().includes(q)||(p.producto||'').toLowerCase().includes(q);
-    return true;
+
+  // Filtrado por búsqueda (no por estado, eso se hace por sección)
+  const lista=pedidos.filter(p=>{
+    if(!q)return true;
+    return(p.numPedido||'').toLowerCase().includes(q)
+      ||(p.cliente||'').toLowerCase().includes(q)
+      ||(p.producto||'').toLowerCase().includes(q);
   });
 
-  if(!lista.length){document.getElementById('lista-pedidos').innerHTML='<div class="empty">No hay pedidos en esta categoría</div>';return;}
+  if(!lista.length){
+    document.getElementById('lista-pedidos').innerHTML='<div class="empty">No hay pedidos que coincidan con la búsqueda</div>';
+    return;
+  }
 
-  document.getElementById('lista-pedidos').innerHTML=lista.map(p=>{
-    const tipo=getTipo(p.producto);
-    const insumos=getInsumos(tipo);
-    const estKey=calcEstadoAuto(p.numPedido,tipo);
-    const estInfo=getEstadoInfo(estKey);
-    const pct=calcProgreso(p.numPedido,tipo);
-    const pcColor=pct===100?'var(--green)':pct>0?'var(--blue)':'var(--hint)';
+  const estadoFiltro=FILTRO_A_ESTADO[filtroActual]||null;
 
-    const insumosHtml=insumos.map(ins=>{
-      const est=getEstadoInsumo(p.numPedido,ins);
-      const btns=ESTADOS.map(s=>{
-        const isSel=est===s;
-        return`<button class="est-btn${isSel?' sel-'+s:''}" onclick="cambiarEstado('${p.numPedido}','${ins}','${s}')">${LABELS[s]}</button>`;
+  // Construir cada sección de insumo
+  const seccionesHtml=ORDEN_INSUMOS.map(insumo=>{
+    // Pedidos que aplican a este insumo (las cápsulas solo aplican a tipo 'cap')
+    const pedidosSeccion=lista.filter(p=>{
+      const insumosDelPedido=getInsumos(getTipo(p.producto));
+      return insumosDelPedido.includes(insumo);
+    });
+
+    if(!pedidosSeccion.length)return'';
+
+    // Conteo de estados para los pills de la cabecera
+    const conteo={pendiente:0,compra:0,produccion:0,camino:0,oficina:0};
+    pedidosSeccion.forEach(p=>{
+      const e=getEstadoInsumo(p.numPedido,insumo);
+      if(e in conteo)conteo[e]++;
+    });
+
+    // Aplicar filtro de estado si corresponde
+    let pedidosFiltrados=pedidosSeccion;
+    if(estadoFiltro){
+      pedidosFiltrados=pedidosSeccion.filter(p=>getEstadoInsumo(p.numPedido,insumo)===estadoFiltro);
+    }
+
+    // Render de las filas
+    let bodyHtml;
+    if(!pedidosFiltrados.length){
+      bodyHtml='<div class="seccion-empty">Sin pedidos en este estado</div>';
+    }else{
+      bodyHtml=pedidosFiltrados.map(p=>{
+        const est=getEstadoInsumo(p.numPedido,insumo);
+        const btns=ESTADOS.map(s=>{
+          const isSel=est===s;
+          return`<button class="est-btn${isSel?' sel-'+s:''}" onclick="cambiarEstado('${p.numPedido}','${insumo}','${s}')">${LABELS[s]}</button>`;
+        }).join('');
+        return`<div class="fila-pedido">
+          <div class="fila-info">
+            <span class="fila-num">${p.numPedido||''}</span>
+            <span class="fila-cliente">${p.cliente||''}</span>
+            <span class="fila-prod">· ${p.producto||''}</span>
+            <span class="fila-cant">${parseInt(p.cantidad||0).toLocaleString()} und</span>
+          </div>
+          <div class="fila-estado-actual">
+            <span class="insumo-dot ${DOT[est]||'dot-pendiente'}"></span>
+            <div class="estado-btns">${btns}</div>
+            <span class="saving-indicator" id="si-${p.numPedido}-${insumo}"></span>
+          </div>
+        </div>`;
       }).join('');
-      return`<div class="insumo-row">
-        <div class="insumo-label"><span class="insumo-dot ${DOT[est]||'dot-pendiente'}"></span>${ins}</div>
-        <div class="estado-btns">${btns}</div>
-        <span class="saving-indicator" id="si-${p.numPedido}-${ins}"></span>
-      </div>`;
-    }).join('');
+    }
 
-    return`<div class="ticket">
-      <div class="ticket-header">
-        <div>
-          <div class="ticket-num">${p.numPedido||''} &middot; ${p.cliente||''}</div>
-          <div class="ticket-prod">${p.producto||''}</div>
-          <div class="ticket-meta">${parseInt(p.cantidad||0).toLocaleString()} und &middot; Entrega: ${p.fechaTentativa||'—'}</div>
+    // Pills de estado en la cabecera
+    const pillsHtml=[
+      ['pendiente','⏳',conteo.pendiente],
+      ['compra','🛒',conteo.compra],
+      ['produccion','⚙️',conteo.produccion],
+      ['camino','🚚',conteo.camino],
+      ['oficina','📦',conteo.oficina],
+    ].map(([k,ic,n])=>`<span class="stat-pill s-${k}${n>0?' has-count':''}">${ic} ${n}</span>`).join('');
+
+    return`<div class="seccion-insumo">
+      <div class="seccion-header">
+        <div class="seccion-titulo">
+          <span class="seccion-icono">${ICONO_INSUMO[insumo]||''}</span>
+          ${insumo}
+          <span class="seccion-count">${pedidosFiltrados.length}/${pedidosSeccion.length}</span>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-family:DM Mono,monospace;font-size:12px;color:${pcColor}">${pct}%</span>
-          <span class="ticket-estado ${estInfo.cls}">${estInfo.label}</span>
-        </div>
+        <div class="seccion-stats">${pillsHtml}</div>
       </div>
-      <div class="insumos-grid">${insumosHtml}</div>
+      <div class="seccion-body">${bodyHtml}</div>
     </div>`;
-  }).join('');
+  }).filter(Boolean).join('');
+
+  document.getElementById('lista-pedidos').innerHTML=seccionesHtml;
 }
 
 async function cambiarEstado(pedidoId,insumo,estado){
