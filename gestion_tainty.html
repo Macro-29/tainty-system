@@ -292,6 +292,10 @@ function renderLista(){
     return(p.numPedido||'').toLowerCase().includes(q)
       ||(p.cliente||'').toLowerCase().includes(q)
       ||(p.producto||'').toLowerCase().includes(q);
+  }).sort((a,b)=>{
+    const na=parseInt((a.numPedido||'P0').replace('P',''))||0;
+    const nb=parseInt((b.numPedido||'P0').replace('P',''))||0;
+    return na-nb;
   });
 
   if(!lista.length){
