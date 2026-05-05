@@ -1088,6 +1088,11 @@ async function guardarProductoSheets() {
     const res = await jsonp(url);
     console.log('Respuesta Sheets:', res);
 
+    // Validar que la respuesta del servidor sea exitosa
+    if (res && res.success === false) {
+      throw new Error('Servidor: ' + (res.error || 'error sin mensaje') + (res.stack ? ' | Stack: ' + res.stack : ''));
+    }
+
     // Actualizar catalogo local
     if (prod) {
       prod.nombre = nombre;
