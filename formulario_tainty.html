@@ -271,9 +271,6 @@ textarea { resize: vertical; min-height: 80px; }
 </style>
 </head>
 <body>
-<div style="position:fixed;top:12px;left:12px;z-index:100">
-  <a href="./index.html" style="font-size:12px;padding:6px 14px;border-radius:20px;border:1px solid rgba(0,0,0,0.15);background:rgba(255,255,255,0.9);color:#555;text-decoration:none;display:inline-flex;align-items:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,0.1)">&#8592; Inicio</a>
-</div>
 <div class="page-wrap">
 
   <div class="top-bar">
@@ -302,7 +299,7 @@ textarea { resize: vertical; min-height: 80px; }
         </div>
         <div class="field">
           <label>Vendedor <span class="req">*</span></label>
-          <select id="f-vendedor">
+          <select id="f-vendedor" onchange="onProducto()">
             <option value="">Elige...</option>
             <option>Carlos Esparza</option>
             <option>Miguel Chozo</option>
@@ -311,25 +308,10 @@ textarea { resize: vertical; min-height: 80px; }
       </div>
       <div class="field">
         <label>Cliente <span class="req">*</span></label>
-        <select id="f-cliente" onchange="toggleNuevo()">
-          <option value="">Elige cliente...</option>
-          <option>AARON BONILLA</option><option>ADRIAN</option><option>ALEXIS CHAVEZ</option>
-          <option>ANDY RIVAS</option><option>BRAYAN FIESTAS</option><option>BRGITTE</option>
-          <option>BRIGITTE FIESTAS</option><option>BRYAN FIESTAS</option><option>CAMILA ARAMBURU</option>
-          <option>CRISTIAN</option><option>DANIEL MURGA</option><option>DANIEL SALINAS</option>
-          <option>DIEGO LACHIRA</option><option>DIEGO MENA</option><option>FRANKLYN TICONA</option>
-          <option>GABRIEL RIVAS</option><option>GARI</option><option>HAROLD FIESTAS</option>
-          <option>JAIR BURNEO</option><option>JAROL</option><option>JHONNY FASTZEUS</option>
-          <option>JOSE SOLIS</option><option>LESLI</option><option>LUIS QUISPE</option>
-          <option>MARCELO CARRASCO</option><option>MARIA ECOMMERCE</option><option>MARTIN</option>
-          <option>MAYRA</option><option>MIJAEL</option><option>OLIVER VALLE</option>
-          <option>PIERRE CARDOZA</option><option>RODRIGO FARFAN</option><option>RONALD</option>
-          <option>ROXANNA</option><option>SEBASTIAN ZUÑIGA</option><option>STEFY</option>
-          <option>THIERRY</option><option>VÍCTOR VALENZUELA</option><option>YULISA</option>
-          <option value="NUEVO CLIENTE">+ Nuevo cliente</option>
-        </select>
-        <div class="nuevo-campo" id="nuevo-wrap">
-          <input type="text" id="f-nuevo" placeholder="Nombre completo del nuevo cliente">
+        <input type="text" id="f-cliente" list="clientes-list" placeholder="Escribe o elige cliente..." autocomplete="off" oninput="onClienteInput()" onchange="onClienteInput()">
+        <datalist id="clientes-list"></datalist>
+        <div class="nuevo-campo" id="nuevo-wrap" style="display:none">
+          <div style="font-size:12px;color:var(--amber);margin-bottom:6px">⚠ Cliente nuevo — se agregará al catálogo al guardar</div>
         </div>
       </div>
     </div>
@@ -338,51 +320,9 @@ textarea { resize: vertical; min-height: 80px; }
       <div class="card-title">Producto y cantidad</div>
       <div class="field">
         <label>Producto <span class="req">*</span></label>
-        <select id="f-producto" onchange="onProducto()">
-          <option value="">Elige producto...</option>
-          <option>21 VITAMINS & MINERALS (60cap)</option>
-          <option>ALUMAX (1L)</option><option>ALUMAX (500ml)</option>
-          <option>ANTI-MANCHAS PAC (90cap)</option>
-          <option>AZUL DE METILENO (60ml)</option>
-          <option>BALSAMO BARBA (100ml)</option>
-          <option>BERBERINA + CURCUMA (60ML)</option>
-          <option>BONA CLEAR (60ml)</option><option>BODY-WISE (25ml)</option>
-          <option>BOSSBABE (120ml)</option>
-          <option>CANDIDA CLEANSE (60cap)</option>
-          <option>CLEAR (GEL ALIVIO TOTAL) (100ml)</option>
-          <option>CLEAR TONE (50ml)</option><option>CLORIFILA (60ml)</option>
-          <option>COLLAGEN (240gr)</option><option>COLLAGEN COMPLEX (30ml)</option>
-          <option>CREATINE MONOHYDRATE (240gr)</option><option>CREMA ANTIEDAD (100gr)</option>
-          <option>DEOS (30cap)</option><option>DENTAL (60ml)</option><option>DISSAN (60gr)</option>
-          <option>DR. MELAXIN CEMENRETE (15gr)</option><option>DR. MELAXIN PEEL SHOT (150ml)</option>
-          <option>EBRA (60ml)</option><option>ENFORMAPRO (60cap)</option><option>EVENORA (60ml)</option>
-          <option>EVIL GOODS (100ml)</option><option>FAST DIABETIC (60ml)</option>
-          <option>FLYCLEANSE (500ml)</option><option>GASTRI FIT (100cap)</option>
-          <option>GLOW - SKIN (50gr)</option><option>HAIR GROWTH (120cap)</option>
-          <option>HAPPY CLEANER (60gr)</option><option>HEIGHRT INCREASE (60cap)</option>
-          <option>INOSITOL MULTIVITAMIN (60cap)</option><option>JAYSUING (500gr)</option>
-          <option>JIMERITO BEE HONEY (60ml)</option><option>KALLOS (100ml)</option>
-          <option>LINGO LEAP (30ml)</option><option>LIPOSOMAL NAD+ ULTIMATE (60CAP)</option>
-          <option>LIVER HEALTH AND DETOX (60cap)</option><option>LLUVIA CERO (500gr)</option>
-          <option>LUNG CLEANSING SPARY (30ml)</option><option>MAN X PRO (100ml)</option>
-          <option>MEMORY & MOOD – BRAIN (60cap)</option><option>MENO (60cap)</option>
-          <option>MERODA (100ml)</option><option>MEGARED OMEGA-3 KRILL OIL (60cap)</option>
-          <option>MIGRASTRIL (180ml)</option><option>MULTIVITAMINICO (1L)</option>
-          <option>MULLENIN (60ml)</option><option>NANO - HYDROXYPATITE (100gr)</option>
-          <option>NANO - HYDROXYPATITE AZUL (100gr)</option><option>NIDA (100ml)</option>
-          <option>NOURKRIN (60cap)</option><option>OIL OF OREGANO (90cap)</option>
-          <option>ORANGE (60ml)</option><option>PARA PATROL (30ml)</option>
-          <option>PAWSURE ORAL PET (100ml)</option><option>PET HEMP OIL (60ml)</option>
-          <option>PURE MAGNESIUM (250ML)</option><option>RAIZAL SHAMPOO (200ml)</option>
-          <option>REMOLACHA + CoQ10 + Semilla de Uva (120cap)</option>
-          <option>REMOVAL CLEAN (60ml)</option><option>SELERB NAD+ MEN'S COMPLEX (60CAP)</option>
-          <option>SHAMPOO ROMELLA LUX (250ml)</option><option>SHILAJIT COMPLEX (60cap)</option>
-          <option>SHILAJIT ULTRA (60cap)</option><option>SPRAY GIRLS (120ml)</option>
-          <option>TRULY - ROSADO (100ml)</option><option>TRULY - ROSADO (50ml)</option>
-          <option>VAGINAL PROBIOTIC (30cap)</option><option>VELLO (50ml)</option>
-          <option>VIGORMAX (60cap)</option><option>XOXO SPRAY FOR MAN (5ML)</option>
-          <option>ZIZEN NOOTROPICOS (30cap)</option><option>ZOOONE (90cap)</option>
-        </select>
+        <input type="text" id="f-producto" list="productos-list" placeholder="Escribe o elige producto..." autocomplete="off" oninput="onProductoInput()" onchange="onProducto()">
+        <datalist id="productos-list"></datalist>
+        <div id="prod-nuevo-aviso" style="display:none;font-size:12px;color:var(--amber);margin-top:6px">⚠ Producto nuevo — se agregará al catálogo al guardar</div>
         <div id="tipo-wrap"></div>
       </div>
       <div class="field">
@@ -454,15 +394,70 @@ function getInsumos(tipo) {
     : ['Insumo','Envase','Etiqueta','Caja'];
 }
 
-function toggleNuevo() {
-  const v = document.getElementById('f-cliente').value;
-  document.getElementById('nuevo-wrap').style.display = v === 'NUEVO CLIENTE' ? 'block' : 'none';
+// === ESTADO DE CATÁLOGOS (cargados desde Sheets) ===
+let listaClientes = [];
+let listaProductos = [];
+
+// Llamada JSONP al Apps Script (para evitar problemas de CORS con GET)
+function jsonp(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const cb = 'jsonp_cb_' + Math.random().toString(36).slice(2);
+    const t = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, timeoutMs || 10000);
+    function cleanup() { clearTimeout(t); delete window[cb]; if (s.parentNode) s.parentNode.removeChild(s); }
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    const s = document.createElement('script');
+    s.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cb;
+    s.onerror = () => { cleanup(); reject(new Error('error')); };
+    document.head.appendChild(s);
+  });
+}
+
+async function cargarCatalogos() {
+  try {
+    const [resC, resP] = await Promise.all([
+      jsonp(`${SCRIPT_URL}?action=clientes`),
+      jsonp(`${SCRIPT_URL}?action=productos`)
+    ]);
+    if (resC && resC.success && Array.isArray(resC.data)) {
+      listaClientes = resC.data;
+      renderDatalist('clientes-list', listaClientes);
+    }
+    if (resP && resP.success && Array.isArray(resP.data)) {
+      listaProductos = resP.data;
+      renderDatalist('productos-list', listaProductos);
+    }
+  } catch (e) {
+    console.warn('No se pudo cargar catálogos:', e.message);
+  }
+}
+
+function renderDatalist(id, items) {
+  const dl = document.getElementById(id);
+  if (!dl) return;
+  dl.innerHTML = items.map(v => `<option value="${v.replace(/"/g, '&quot;')}">`).join('');
+}
+
+function onClienteInput() {
+  const v = (document.getElementById('f-cliente').value || '').trim().toUpperCase();
+  document.getElementById('f-cliente').value = v; // forzar mayúsculas
+  const existe = listaClientes.some(c => c.toUpperCase() === v);
+  document.getElementById('nuevo-wrap').style.display = (v && !existe) ? 'block' : 'none';
+}
+
+function onProductoInput() {
+  const v = (document.getElementById('f-producto').value || '').trim();
+  const existe = listaProductos.some(p => p === v);
+  document.getElementById('prod-nuevo-aviso').style.display = (v && !existe) ? 'block' : 'none';
 }
 
 async function onProducto() {
   const prod = document.getElementById('f-producto').value;
+  const vendedor = document.getElementById('f-vendedor').value;
   const tipoWrap = document.getElementById('tipo-wrap');
   const ps = document.getElementById('price-suggest');
+
+  // Mostrar/ocultar aviso de "producto nuevo"
+  onProductoInput();
 
   if (!prod) { tipoWrap.innerHTML = ''; ps.style.display = 'none'; updatePreview(); return; }
 
@@ -472,23 +467,35 @@ async function onProducto() {
   tipoWrap.innerHTML = `<span class="tipo-badge ${cls[tipo]}">${labels[tipo]}</span>`;
 
   ps.style.display = 'none';
-  if (preciosCache[prod] !== undefined) {
-    mostrarPrecio(preciosCache[prod]);
+
+  // Solo buscar precio si tenemos producto y vendedor
+  if (!vendedor) { updatePreview(); return; }
+
+  // Cache key combinada
+  const cacheKey = vendedor + '||' + prod;
+  if (preciosCache[cacheKey] !== undefined) {
+    mostrarPrecio(preciosCache[cacheKey].precio, preciosCache[cacheKey].fuente);
   } else {
     try {
-      const res = await fetch(`${SCRIPT_URL}?action=precio&producto=${encodeURIComponent(prod)}`);
-      const data = await res.json();
-      if (data.precio) {
-        preciosCache[prod] = data.precio;
-        mostrarPrecio(data.precio);
+      const url = `${SCRIPT_URL}?action=precio&producto=${encodeURIComponent(prod)}&vendedor=${encodeURIComponent(vendedor)}`;
+      const data = await jsonp(url);
+      if (data && data.success && data.precio > 0) {
+        preciosCache[cacheKey] = { precio: data.precio, fuente: data.fuente };
+        mostrarPrecio(data.precio, data.fuente);
       }
-    } catch(e) {}
+    } catch(e) { console.warn('Error precio:', e.message); }
   }
   updatePreview();
 }
 
-function mostrarPrecio(precio) {
+function mostrarPrecio(precio, fuente) {
+  const label = fuente === 'vendedor'
+    ? 'Último precio de este vendedor'
+    : 'Último precio registrado (otro vendedor)';
   document.getElementById('ps-val').textContent = 'S/ ' + parseFloat(precio).toFixed(2) + ' por unidad';
+  // Actualizar la etiqueta superior si existe
+  const lbl = document.querySelector('#price-suggest .ps-label');
+  if (lbl) lbl.textContent = label;
   document.getElementById('price-suggest').style.display = 'block';
   const precioInput = document.getElementById('f-precio');
   if (!precioInput.value) precioInput.value = parseFloat(precio).toFixed(2);
@@ -523,10 +530,9 @@ function updatePreview() {
 
 async function estimarNumeroPedido() {
   try {
-    const res = await fetch(`${SCRIPT_URL}?action=ultimo`);
-    const data = await res.json();
-    if (data.ultimo) {
-      const num = parseInt(data.ultimo.replace('P','')) + 1;
+    const data = await jsonp(`${SCRIPT_URL}?action=ultimoNum`);
+    if (data && data.success) {
+      const num = (parseInt(data.ultimo) || 0) + 1;
       return 'P' + String(num).padStart(4,'0');
     }
   } catch(e) {}
@@ -535,9 +541,8 @@ async function estimarNumeroPedido() {
 
 async function submitForm() {
   const fecha = document.getElementById('f-fecha').value;
-  const clienteVal = document.getElementById('f-cliente').value;
-  const nuevoCliente = document.getElementById('f-nuevo').value.trim();
-  const prod = document.getElementById('f-producto').value;
+  const clienteRaw = (document.getElementById('f-cliente').value || '').trim().toUpperCase();
+  const prod = (document.getElementById('f-producto').value || '').trim();
   const cant = document.getElementById('f-cantidad').value;
   const precio = document.getElementById('f-precio').value;
   const abono = document.getElementById('f-abono').value;
@@ -547,42 +552,51 @@ async function submitForm() {
   const errEl = document.getElementById('error-msg');
   errEl.style.display = 'none';
 
-  if (!fecha || !clienteVal || !prod || !cant || !precio || !vendedor) {
+  if (!fecha || !clienteRaw || !prod || !cant || !precio || !vendedor) {
     errEl.textContent = 'Por favor completa todos los campos obligatorios (*)';
     errEl.style.display = 'block';
     return;
   }
-  if (clienteVal === 'NUEVO CLIENTE' && !nuevoCliente) {
-    errEl.textContent = 'Ingresa el nombre del nuevo cliente';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  const cliente = clienteVal === 'NUEVO CLIENTE' ? nuevoCliente.toUpperCase() : clienteVal;
 
   document.getElementById('btn-submit').disabled = true;
   document.getElementById('loading').style.display = 'block';
 
-  const payload = { fecha, cliente, producto: prod, cantidad: cant, precio, abono: abono || 0, vendedor, observaciones: obs };
+  const payload = {
+    action: 'guardarPedido',
+    fecha, cliente: clienteRaw, producto: prod,
+    cantidad: cant, precio, abono: abono || 0,
+    vendedor, observaciones: obs
+  };
 
   try {
-    const form = new FormData();
-    form.append('data', JSON.stringify(payload));
+    // Construir querystring para JSONP
+    const params = Object.keys(payload).map(k =>
+      encodeURIComponent(k) + '=' + encodeURIComponent(payload[k])
+    ).join('&');
+    const url = `${SCRIPT_URL}?${params}&t=${Date.now()}`;
+    const data = await jsonp(url, 15000);
 
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: form,
-      mode: 'no-cors'
-    });
+    if (!data || data.success === false) {
+      throw new Error((data && data.error) || 'Error desconocido del servidor');
+    }
 
-    await new Promise(r => setTimeout(r, 1500));
+    // Refrescar caché local de catálogos por si el cliente/producto era nuevo
+    if (!listaClientes.includes(clienteRaw)) {
+      listaClientes.push(clienteRaw);
+      listaClientes.sort((a, b) => a.localeCompare(b, 'es'));
+      renderDatalist('clientes-list', listaClientes);
+    }
+    if (!listaProductos.includes(prod)) {
+      listaProductos.push(prod);
+      listaProductos.sort((a, b) => a.localeCompare(b, 'es'));
+      renderDatalist('productos-list', listaProductos);
+    }
 
     document.getElementById('loading').style.display = 'none';
-    const nuevoPedido = await estimarNumeroPedido();
     document.getElementById('form-wrap').style.display = 'none';
-    document.getElementById('success-num').textContent = nuevoPedido;
+    document.getElementById('success-num').textContent = data.numPedido || '(registrado)';
     const total = (parseFloat(precio) * parseInt(cant)).toLocaleString('es-PE', {minimumFractionDigits:2});
-    document.getElementById('success-det').textContent = `${prod} · ${parseInt(cant).toLocaleString()} und · S/ ${total} · ${cliente}`;
+    document.getElementById('success-det').textContent = `${prod} · ${parseInt(cant).toLocaleString()} und · S/ ${total} · ${clienteRaw}`;
     document.getElementById('success-card').style.display = 'block';
 
   } catch(err) {
@@ -594,7 +608,7 @@ async function submitForm() {
 }
 
 function resetForm() {
-  ['f-fecha','f-cliente','f-producto','f-cantidad','f-precio','f-abono','f-obs','f-vendedor','f-nuevo'].forEach(id => {
+  ['f-fecha','f-cliente','f-producto','f-cantidad','f-precio','f-abono','f-obs','f-vendedor'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -651,24 +665,15 @@ function abrirPinAdmin() { pinFBuf = ''; initPinDots(); document.getElementById(
 function cerrarPinAdmin() { document.getElementById('pin-admin-overlay').classList.remove('visible'); pinFBuf = ''; }
 
 function getProductos() {
-  const sel = document.getElementById('f-producto');
-  return Array.from(sel.options).slice(1).map(o => o.value).filter(Boolean);
+  return [...listaProductos];
 }
 
 function setProductos(lista) {
-  const sel = document.getElementById('f-producto');
-  const valActual = sel.value;
-  while (sel.options.length > 1) sel.remove(1);
-  lista.sort().forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p; opt.textContent = p;
-    sel.appendChild(opt);
-  });
-  sel.value = valActual;
-  localStorage.setItem('tainty_productos', JSON.stringify(lista));
+  listaProductos = lista.slice().sort((a, b) => a.localeCompare(b, 'es'));
+  renderDatalist('productos-list', listaProductos);
 }
 
-function getTipo(nombre) {
+function getTipoBadge(nombre) {
   const n = (nombre || '').toLowerCase();
   if (/\(.*cap\)/.test(n)) return { label: 'CAP', cls: 'tipo-cap' };
   if (/\(.*gr\)/.test(n)) return { label: 'GR', cls: 'tipo-gr' };
@@ -681,12 +686,10 @@ function renderProdList() {
   const div = document.getElementById('prod-list');
   if (!lista.length) { div.innerHTML = '<div style="text-align:center;padding:1rem;font-size:13px;color:var(--muted)">No hay productos</div>'; return; }
   div.innerHTML = lista.map((p, i) => {
-    const t = getTipo(p);
+    const t = getTipoBadge(p);
     return `<div class="prod-item">
       <span class="prod-item-name">${p}</span>
       <span class="prod-type-badge ${t.cls}">${t.label}</span>
-      <button class="prod-edit-btn" onclick="editarProducto('${p.replace(/'/g,"\'")}')">✏ Editar</button>
-      <button class="prod-del-btn" onclick="eliminarProducto('${p.replace(/'/g,"\'")}')">✕</button>
     </div>`;
   }).join('');
 }
@@ -700,43 +703,32 @@ function abrirAdmin() {
 
 function cerrarAdmin() { document.getElementById('admin-overlay').classList.remove('visible'); }
 
-function agregarProducto() {
+async function agregarProducto() {
   const input = document.getElementById('new-prod-input');
   const nombre = input.value.trim().toUpperCase();
   if (!nombre) return;
   if (!/\(.*\)/.test(nombre)) { alert('El nombre debe incluir la capacidad entre paréntesis. Ej: PRODUCTO (60ml)'); return; }
-  const lista = getProductos();
-  if (lista.includes(nombre)) { alert('Este producto ya existe'); return; }
-  lista.push(nombre);
-  setProductos(lista);
-  input.value = '';
-  renderProdList();
-}
-
-function eliminarProducto(nombre) {
-  if (!confirm('¿Eliminar "' + nombre + '" de la lista?')) return;
-  const lista = getProductos().filter(p => p !== nombre);
-  setProductos(lista);
-  renderProdList();
-}
-
-function editarProducto(nombre) {
-  const nuevo = prompt('Editar nombre del producto:', nombre);
-  if (!nuevo || nuevo.trim() === nombre) return;
-  const nuevoUpper = nuevo.trim().toUpperCase();
-  if (!/\(.*\)/.test(nuevoUpper)) { alert('El nombre debe incluir la capacidad entre paréntesis. Ej: PRODUCTO (60ml)'); return; }
-  const lista = getProductos().map(p => p === nombre ? nuevoUpper : p);
-  setProductos(lista);
-  renderProdList();
-}
-
-// Cargar productos guardados en localStorage si existen
-(function() {
-  const guardados = localStorage.getItem('tainty_productos');
-  if (guardados) {
-    try { setProductos(JSON.parse(guardados)); } catch(e) {}
+  if (listaProductos.includes(nombre)) { alert('Este producto ya existe'); return; }
+  try {
+    const data = await jsonp(`${SCRIPT_URL}?action=agregarProducto&nombre=${encodeURIComponent(nombre)}`);
+    if (data && data.success) {
+      listaProductos.push(nombre);
+      setProductos(listaProductos);
+      input.value = '';
+      renderProdList();
+    } else {
+      alert('Error: ' + (data && data.error || 'no se pudo agregar'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + e.message);
   }
-})();
+}
+
+// La gestión de eliminar/editar productos del catálogo se hace ahora directamente
+// en la hoja PRODUCTOS de Google Sheets para mantener la integridad de los datos
+
+// Cargar catálogos al inicio
+cargarCatalogos();
 </script>
 
 <!-- ADMIN FAB -->
