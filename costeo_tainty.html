@@ -283,7 +283,7 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 
 <script>
 const PIN = '200720';
-const COSTEO_URL = 'https://script.google.com/macros/s/AKfycbyo9YwFQUBAIclp35UPBKaiZY4iDVM-1AKfV_l-i9OyLDclOeL9db7KT75AT-XGczGw/exec';
+const COSTEO_URL = 'https://script.google.com/macros/s/AKfycbyZYFJbmxl82uq-SR66LCmxuXhh_PkGpNAaspdjzYBTrnO0TckU90ZDyzGzXjtRtdwQ/exec';
 const PEDIDOS_URL = 'https://script.google.com/macros/s/AKfycbx1Nh7OzKW8p5D2Xp4iKrVnicIKxZaSUDkaFHxrGAUHZKJ1kRlWmOgOUNeNTzqaSTrWdg/exec';
 const PIN_LEN = 6;
 let pinBuf = '', catalogo = [], pedidosActivos = [], pedidosEnCola = [], escalaActual = 100;
@@ -1083,7 +1083,7 @@ async function guardarProductoSheets() {
     const dataObj = { action: 'guardarProducto', producto: nombre, insumos };
     const payload = encodeURIComponent(JSON.stringify(dataObj));
     console.log('Enviando a Sheets:', dataObj);
-    const url = 'https://script.google.com/macros/s/AKfycbyo9YwFQUBAIclp35UPBKaiZY4iDVM-1AKfV_l-i9OyLDclOeL9db7KT75AT-XGczGw/exec?data=' + payload + '&t=' + Date.now();
+    const url = COSTEO_URL + '?data=' + payload + '&t=' + Date.now();
     console.log('URL length:', url.length);
     const res = await jsonp(url);
     console.log('Respuesta Sheets:', res);
