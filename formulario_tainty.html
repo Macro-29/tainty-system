@@ -41,10 +41,17 @@ body::before{content:'';position:fixed;inset:0;background:url('data:image/jpeg;b
 .page-wrap { max-width: 560px; margin: 0 auto; }
 
 .top-bar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
   margin-bottom: 1.75rem;
 }
-.logo { font-size: 13px; font-weight: 600; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.back-btn {
+  font-size: 12px; padding: 5px 12px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--card); color: var(--muted);
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  transition: all .2s;
+}
+.back-btn:hover { color: var(--purple); border-color: var(--purple); }
+.logo { font-size: 13px; font-weight: 600; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; flex: 1; text-align: center; }
 .logo span { color: var(--purple); }
 .date-chip {
   font-family: 'DM Mono', monospace;
@@ -215,6 +222,11 @@ textarea { resize: vertical; min-height: 80px; }
 .prod-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)}
 .prod-item-name{flex:1;font-size:13px;color:var(--text)}
 .prod-type-badge{font-size:10px;padding:2px 7px;border-radius:10px}
+.prod-action-btn{font-size:13px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--border);background:transparent;cursor:pointer;transition:all .15s;padding:0}
+.prod-action-btn.edit{color:var(--purple)}
+.prod-action-btn.edit:hover{background:rgba(124,111,239,.1);border-color:var(--purple)}
+.prod-action-btn.del{color:#e8524a}
+.prod-action-btn.del:hover{background:rgba(232,82,74,.1);border-color:#e8524a}
 .prod-edit-btn{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
 .prod-edit-btn:hover{border-color:var(--purple);color:var(--purple)}
 .prod-del-btn{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid #fcd4d0;background:#fff5f4;color:var(--red);cursor:pointer}
@@ -224,6 +236,10 @@ textarea { resize: vertical; min-height: 80px; }
 .add-prod-btn{padding:8px 16px;border-radius:var(--radius-sm);border:none;background:var(--purple);color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
 .admin-search{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);margin-bottom:10px}
 .admin-search:focus{outline:none;border-color:var(--purple)}
+.admin-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:14px 0 12px}
+.admin-tab{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;background:transparent;border:none;padding:8px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.admin-tab:hover{color:var(--text)}
+.admin-tab.active{color:var(--purple);border-bottom-color:var(--purple)}
 .admin-close{float:right;background:none;border:none;font-size:18px;color:var(--muted);cursor:pointer;margin-top:-4px}
 
 @media(max-width:560px){
@@ -274,6 +290,7 @@ textarea { resize: vertical; min-height: 80px; }
 <div class="page-wrap">
 
   <div class="top-bar">
+    <a class="back-btn" href="./index.html">&#8592; Inicio</a>
     <div class="logo">Tainty <span>Corp</span></div>
     <div class="date-chip" id="fecha-chip"></div>
   </div>
@@ -685,23 +702,146 @@ function renderProdList() {
   const lista = getProductos().filter(p => !q || p.toLowerCase().includes(q));
   const div = document.getElementById('prod-list');
   if (!lista.length) { div.innerHTML = '<div style="text-align:center;padding:1rem;font-size:13px;color:var(--muted)">No hay productos</div>'; return; }
-  div.innerHTML = lista.map((p, i) => {
+  div.innerHTML = lista.map(p => {
     const t = getTipoBadge(p);
     return `<div class="prod-item">
       <span class="prod-item-name">${p}</span>
       <span class="prod-type-badge ${t.cls}">${t.label}</span>
+      <button class="prod-action-btn edit" onclick="editarProducto('${p.replace(/'/g, "\\'")}')">✎</button>
+      <button class="prod-action-btn del" onclick="eliminarProducto('${p.replace(/'/g, "\\'")}')">✕</button>
     </div>`;
   }).join('');
 }
 
+function renderCliList() {
+  const q = (document.getElementById('admin-search-cli').value || '').toLowerCase();
+  const lista = listaClientes.filter(c => !q || c.toLowerCase().includes(q));
+  const div = document.getElementById('cli-list');
+  if (!lista.length) { div.innerHTML = '<div style="text-align:center;padding:1rem;font-size:13px;color:var(--muted)">No hay clientes</div>'; return; }
+  div.innerHTML = lista.map(c => `<div class="prod-item">
+    <span class="prod-item-name">${c}</span>
+    <button class="prod-action-btn edit" onclick="editarCliente('${c.replace(/'/g, "\\'")}')">✎</button>
+    <button class="prod-action-btn del" onclick="eliminarCliente('${c.replace(/'/g, "\\'")}')">✕</button>
+  </div>`).join('');
+}
+
+async function editarProducto(viejo) {
+  const nuevo = prompt('Editar producto:\n(El nombre debe incluir capacidad entre paréntesis)', viejo);
+  if (!nuevo) return;
+  const nuevoUp = nuevo.trim().toUpperCase();
+  if (nuevoUp === viejo.toUpperCase()) return;
+  if (!/\(.*\)/.test(nuevoUp)) { alert('El nombre debe incluir la capacidad. Ej: PRODUCTO (60ml)'); return; }
+  try {
+    const data = await jsonp(`${SCRIPT_URL}?action=editarProducto&viejo=${encodeURIComponent(viejo)}&nuevo=${encodeURIComponent(nuevoUp)}`);
+    if (data && data.success) {
+      // Actualizar lista local
+      const idx = listaProductos.indexOf(viejo);
+      if (idx >= 0) listaProductos[idx] = nuevoUp;
+      listaProductos.sort((a, b) => a.localeCompare(b, 'es'));
+      setProductos(listaProductos);
+      renderProdList();
+      alert(`✓ Producto editado. ${data.pedidosActualizados || 0} pedidos antiguos actualizados.`);
+    } else {
+      alert('Error: ' + (data && data.error || 'no se pudo editar'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + e.message);
+  }
+}
+
+async function eliminarProducto(nombre) {
+  if (!confirm(`¿Eliminar "${nombre}" del catálogo?\n\nLos pedidos antiguos con este producto NO se borran.`)) return;
+  try {
+    const data = await jsonp(`${SCRIPT_URL}?action=eliminarProducto&nombre=${encodeURIComponent(nombre)}`);
+    if (data && data.success) {
+      listaProductos = listaProductos.filter(p => p !== nombre);
+      setProductos(listaProductos);
+      renderProdList();
+    } else {
+      alert('Error: ' + (data && data.error || 'no se pudo eliminar'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + e.message);
+  }
+}
+
+async function editarCliente(viejo) {
+  const nuevo = prompt('Editar cliente:', viejo);
+  if (!nuevo) return;
+  const nuevoUp = nuevo.trim().toUpperCase();
+  if (nuevoUp === viejo.toUpperCase()) return;
+  try {
+    const data = await jsonp(`${SCRIPT_URL}?action=editarCliente&viejo=${encodeURIComponent(viejo)}&nuevo=${encodeURIComponent(nuevoUp)}`);
+    if (data && data.success) {
+      const idx = listaClientes.indexOf(viejo);
+      if (idx >= 0) listaClientes[idx] = nuevoUp;
+      listaClientes.sort((a, b) => a.localeCompare(b, 'es'));
+      renderDatalist('clientes-list', listaClientes);
+      renderCliList();
+      alert(`✓ Cliente editado. ${data.pedidosActualizados || 0} pedidos antiguos actualizados.`);
+    } else {
+      alert('Error: ' + (data && data.error || 'no se pudo editar'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + e.message);
+  }
+}
+
+async function eliminarCliente(nombre) {
+  if (!confirm(`¿Eliminar "${nombre}" del catálogo?\n\nLos pedidos antiguos con este cliente NO se borran.`)) return;
+  try {
+    const data = await jsonp(`${SCRIPT_URL}?action=eliminarCliente&nombre=${encodeURIComponent(nombre)}`);
+    if (data && data.success) {
+      listaClientes = listaClientes.filter(c => c !== nombre);
+      renderDatalist('clientes-list', listaClientes);
+      renderCliList();
+    } else {
+      alert('Error: ' + (data && data.error || 'no se pudo eliminar'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + e.message);
+  }
+}
+
 function abrirAdmin() {
-  renderProdList();
   document.getElementById('admin-overlay').classList.add('visible');
   document.getElementById('new-prod-input').value = '';
   document.getElementById('admin-search').value = '';
+  document.getElementById('new-cli-input').value = '';
+  document.getElementById('admin-search-cli').value = '';
+  switchAdminTab('productos');
 }
 
 function cerrarAdmin() { document.getElementById('admin-overlay').classList.remove('visible'); }
+
+function switchAdminTab(tab) {
+  document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('tab-productos').style.display = tab === 'productos' ? 'block' : 'none';
+  document.getElementById('tab-clientes').style.display = tab === 'clientes' ? 'block' : 'none';
+  if (tab === 'productos') renderProdList();
+  if (tab === 'clientes') renderCliList();
+}
+
+async function agregarCliente() {
+  const input = document.getElementById('new-cli-input');
+  const nombre = input.value.trim().toUpperCase();
+  if (!nombre) return;
+  if (listaClientes.some(c => c.toUpperCase() === nombre)) { alert('Este cliente ya existe'); return; }
+  try {
+    const data = await jsonp(`${SCRIPT_URL}?action=agregarCliente&nombre=${encodeURIComponent(nombre)}`);
+    if (data && data.success) {
+      listaClientes.push(nombre);
+      listaClientes.sort((a, b) => a.localeCompare(b, 'es'));
+      renderDatalist('clientes-list', listaClientes);
+      input.value = '';
+      renderCliList();
+    } else {
+      alert('Error: ' + (data && data.error || 'no se pudo agregar'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + e.message);
+  }
+}
 
 async function agregarProducto() {
   const input = document.getElementById('new-prod-input');
@@ -751,21 +891,41 @@ cargarCatalogos();
   </div>
 </div>
 
-<!-- ADMIN MODAL PRODUCTOS -->
+<!-- ADMIN MODAL PRODUCTOS Y CLIENTES -->
 <div class="admin-overlay" id="admin-overlay">
   <div class="admin-modal">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">
-      <div class="admin-title">&#9881; Gestor de productos</div>
+      <div class="admin-title">&#9881; Gestor de catálogos</div>
       <button class="admin-close" onclick="cerrarAdmin()">&#10005;</button>
     </div>
-    <div class="admin-sub">Agrega, edita o elimina productos del formulario</div>
-    <input class="admin-search" id="admin-search" placeholder="Buscar producto..." oninput="renderProdList()">
-    <div class="prod-list" id="prod-list"></div>
-    <div class="add-prod-form">
-      <input class="add-prod-input" id="new-prod-input" placeholder="Ej: NUEVO PRODUCTO (120ml)" style="flex:2">
-      <button class="add-prod-btn" onclick="agregarProducto()">+ Agregar</button>
+    <div class="admin-sub">Agrega productos y clientes al catálogo. Se sincroniza con Google Sheets.</div>
+
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-tab="productos" onclick="switchAdminTab('productos')">Productos</button>
+      <button class="admin-tab" data-tab="clientes" onclick="switchAdminTab('clientes')">Clientes</button>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">Tipo detectado automaticamente: (ml) liquido &middot; (gr) polvo &middot; (cap) capsula</div>
+
+    <!-- Tab Productos -->
+    <div class="admin-tab-content" id="tab-productos">
+      <input class="admin-search" id="admin-search" placeholder="Buscar producto..." oninput="renderProdList()">
+      <div class="prod-list" id="prod-list"></div>
+      <div class="add-prod-form">
+        <input class="add-prod-input" id="new-prod-input" placeholder="Ej: NUEVO PRODUCTO (120ml)" style="flex:2">
+        <button class="add-prod-btn" onclick="agregarProducto()">+ Agregar</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Tipo detectado automáticamente: (ml) líquido &middot; (gr) polvo &middot; (cap) cápsula</div>
+    </div>
+
+    <!-- Tab Clientes -->
+    <div class="admin-tab-content" id="tab-clientes" style="display:none">
+      <input class="admin-search" id="admin-search-cli" placeholder="Buscar cliente..." oninput="renderCliList()">
+      <div class="prod-list" id="cli-list"></div>
+      <div class="add-prod-form">
+        <input class="add-prod-input" id="new-cli-input" placeholder="Ej: NOMBRE COMPLETO" style="flex:2">
+        <button class="add-prod-btn" onclick="agregarCliente()">+ Agregar</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
