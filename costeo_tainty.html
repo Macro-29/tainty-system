@@ -499,9 +499,17 @@ function mostrarProveedores() {
 function copiarProveedor(prov) {
   const data = (window._proveedoresData || {})[prov];
   if (!data) return;
-  const pedidosStr = pedidosActivos.map(p=>`- ${p.producto} x ${p.cantidad} und`).join('\n');
-  const insumosStr = data.insumos.map(i=>`- ${i.nombre}: ${i.cantidadTotal.toFixed(3)} kg`).join('\n');
-  const texto = `*Pedido Tainty Labs*\nProveedor: ${prov}\n\nPara los pedidos:\n${pedidosStr}\n\nNecesito:\n${insumosStr}\n\nTotal estimado: S/ ${data.total.toFixed(2)}`;
+  const insumosStr = data.insumos.map(i => {
+    const unidad = i.unidad || 'kg';
+    if (unidad === 'kg') {
+      // Insumos a granel: "- Nombre: 1.080 kg"
+      return `- ${i.nombre}: ${i.cantidadTotal.toFixed(3)} kg`;
+    }
+    // Envases / etiquetas / cajas / cápsulas: "- 100 Nombre"
+    const cantidad = Math.round(i.cantidadTotal).toLocaleString('es-PE');
+    return `- ${cantidad} ${i.nombre}`;
+  }).join('\n');
+  const texto = `Buen día, podría cotizarme lo siguiente:\n\n${insumosStr}`;
   navigator.clipboard.writeText(texto).then(() => mostrarToast('¡Copiado para WhatsApp!')).catch(() => mostrarToast('No se pudo copiar', {type:'error',duration:3500}));
 }
 
