@@ -8,29 +8,7 @@
 <link rel="stylesheet" href="./assets/common.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-.pin-overlay{position:fixed;inset:0;background:rgba(13,13,15,.97);z-index:100;display:flex;align-items:center;justify-content:center}
-.pin-overlay.hidden{display:none}
-.pin-card{background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:2.5rem;width:320px;text-align:center;position:relative;z-index:1}
-.pin-logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px}
-.pin-logo span{color:var(--purple)}
-.pin-sub{font-size:13px;color:var(--muted);margin-bottom:2rem}
-.pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:2rem}
-.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all .15s}
-.pin-dot.filled{background:var(--purple);border-color:var(--purple)}
-.pin-dot.error{background:var(--red);border-color:var(--red)}
-.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem}
-.pin-key{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;padding:16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;transition:all .15s}
-.pin-key:hover{background:var(--purple-dim);color:var(--purple)}
-.pin-key:active{transform:scale(.95)}
-.pin-clear{font-size:14px;color:var(--muted);background:none;border:none;cursor:pointer;padding:10px}
-.pin-err{font-size:13px;color:var(--red);height:20px;margin-top:6px}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-.logo{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;letter-spacing:.06em;color:var(--text);text-transform:uppercase}
-.logo span{color:var(--purple)}
 .topbar-right{display:flex;align-items:center;gap:8px}
-.back-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
-.back-btn:hover{color:var(--text)}
-.lock-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer}
 .tabs-nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);position:relative;z-index:9}
 .tab-nav-btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:12px 24px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
 .tab-nav-btn.active{color:var(--purple);border-bottom-color:var(--purple)}
@@ -95,10 +73,8 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 .btn-cancel{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px}
 .btn-save{flex:2;padding:10px;border-radius:10px;border:none;background:var(--purple);color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500}
 .btn-save:disabled{opacity:.4;cursor:not-allowed}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--muted);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
-.toast.visible{opacity:1}
 .spinner{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
-@keyframes spin{to{transform:rotate(360deg)}}
+}
 @media(max-width:640px){.topbar{padding:.75rem 1rem}.tab-content{padding:1rem}.charts-grid{grid-template-columns:1fr}.chart-card.full{grid-column:1}.stats-row{grid-template-columns:1fr 1fr}.modal{margin:1rem;max-width:100%}.controls{flex-direction:column}}
 </style>
 <script src="./assets/config.js"></script>
@@ -265,13 +241,11 @@ function formatFechaCorta(f){
 function abrirModal(numPedido){const p=pagos.find(x=>x.numPedido===numPedido);if(!p)return;pedidoActual=p;const restante=getRestante(p);const sig=getSiguienteAbono(p);document.getElementById('modal-title').textContent='Abono N\u00b0'+sig+' \u2014 '+p.numPedido;document.getElementById('modal-sub').textContent=(p.producto||'')+' \u00b7 '+(p.cliente||'');document.getElementById('modal-restante').textContent='S/ '+restante.toLocaleString('es-PE',{minimumFractionDigits:2});document.getElementById('abono-monto').value=restante.toFixed(2);document.getElementById('abono-obs').value='';const hoy=new Date();document.getElementById('abono-fecha').value=hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');const prev=[[p.abono1,p.fecha1],[p.abono2,p.fecha2],[p.abono3,p.fecha3],[p.abono4,p.fecha4]].filter(([a])=>a&&parseFloat(a)>0);document.getElementById('abonos-previos').innerHTML=prev.length>0?'<div style="font-size:12px;color:var(--muted);margin-bottom:6px;margin-top:4px">Abonos anteriores:</div>'+prev.map(([a,f],i)=>`<div class="abono-row"><span class="abono-num">${i+1}\u00b0</span><span class="abono-monto">S/ ${parseFloat(a).toFixed(2)}</span><span class="abono-fecha">${formatFechaCorta(f)}</span></div>`).join(''):'';document.getElementById('btn-save').disabled=false;document.getElementById('modal-abono').classList.add('visible');}
 function cerrarModal(){document.getElementById('modal-abono').classList.remove('visible');pedidoActual=null;}
 function validarAbono(){const monto=parseFloat(document.getElementById('abono-monto').value)||0;const restante=pedidoActual?getRestante(pedidoActual):0;document.getElementById('btn-save').disabled=monto<=0||monto>restante+0.01;}
-async function guardarAbono(){const monto=parseFloat(document.getElementById('abono-monto').value)||0;const fecha=document.getElementById('abono-fecha').value;const obs=document.getElementById('abono-obs').value;if(!monto||!fecha||!pedidoActual)return;const sig=getSiguienteAbono(pedidoActual);if(!sig){mostrarToast('Maximo 4 abonos');return;}document.getElementById('btn-save').disabled=true;mostrarToast('Guardando...');try{const form=new FormData();form.append('action','registrarAbono');form.append('pedido',pedidoActual.numPedido);form.append('numAbono',sig);form.append('monto',monto);form.append('fecha',fecha);form.append('obs',obs);await fetch(SCRIPT_URL,{method:'POST',body:form,mode:'no-cors'});await new Promise(r=>setTimeout(r,1500));if(sig===1){pedidoActual.abono1=monto;pedidoActual.fecha1=fecha;}else if(sig===2){pedidoActual.abono2=monto;pedidoActual.fecha2=fecha;}else if(sig===3){pedidoActual.abono3=monto;pedidoActual.fecha3=fecha;}else if(sig===4){pedidoActual.abono4=monto;pedidoActual.fecha4=fecha;}cerrarModal();renderStats();renderCharts();renderTabla();mostrarToast('Abono registrado');setTimeout(()=>ocultarToast(),2000);}catch(e){mostrarToast('Error al guardar');document.getElementById('btn-save').disabled=false;setTimeout(()=>ocultarToast(),2000);}}
+async function guardarAbono(){const monto=parseFloat(document.getElementById('abono-monto').value)||0;const fecha=document.getElementById('abono-fecha').value;const obs=document.getElementById('abono-obs').value;if(!monto||!fecha||!pedidoActual)return;const sig=getSiguienteAbono(pedidoActual);if(!sig){mostrarToast('Maximo 4 abonos', {type:'error',duration:3000});return;}document.getElementById('btn-save').disabled=true;mostrarToast('Guardando...', 0);try{const form=new FormData();form.append('action','registrarAbono');form.append('pedido',pedidoActual.numPedido);form.append('numAbono',sig);form.append('monto',monto);form.append('fecha',fecha);form.append('obs',obs);await fetch(SCRIPT_URL,{method:'POST',body:form,mode:'no-cors'});await new Promise(r=>setTimeout(r,1500));if(sig===1){pedidoActual.abono1=monto;pedidoActual.fecha1=fecha;}else if(sig===2){pedidoActual.abono2=monto;pedidoActual.fecha2=fecha;}else if(sig===3){pedidoActual.abono3=monto;pedidoActual.fecha3=fecha;}else if(sig===4){pedidoActual.abono4=monto;pedidoActual.fecha4=fecha;}cerrarModal();renderStats();renderCharts();renderTabla();mostrarToast('Abono registrado', {type:'success',duration:3000});setTimeout(()=>ocultarToast(),2000);}catch(e){mostrarToast('Error al guardar', {type:'error',duration:3500});document.getElementById('btn-save').disabled=false;setTimeout(()=>ocultarToast(),2000);}}
 function abrirModalBuscar(){document.getElementById('buscar-pedido').value='';filtrarBusqueda();document.getElementById('modal-buscar').classList.add('visible');}
 function cerrarModalBuscar(){document.getElementById('modal-buscar').classList.remove('visible');}
 function filtrarBusqueda(){const q=(document.getElementById('buscar-pedido').value||'').toLowerCase();const res=document.getElementById('resultados-busqueda');const pendientes=pagos.filter(p=>getEstadoPago(p)!=='realizado'&&(q===''||(p.numPedido||'').toLowerCase().includes(q)||(p.cliente||'').toLowerCase().includes(q)||(p.producto||'').toLowerCase().includes(q))).slice(0,20);if(!pendientes.length){res.innerHTML='<div style="padding:1rem;text-align:center;color:var(--hint);font-size:13px">No hay resultados</div>';return;}res.innerHTML=pendientes.map(p=>{const r=getRestante(p);const est=getEstadoPago(p);const badgeCls=est==='parcial'?'badge-partial':'badge-pending';return`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 14px;cursor:pointer;margin-bottom:4px" onclick="seleccionarPedido('${p.numPedido}')"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--hint)">${p.numPedido}</div><div style="font-size:13px;font-weight:500">${p.cliente||''}</div><div style="font-size:12px;color:var(--muted)">${p.producto||''}</div></div><div style="text-align:right"><span class="${badgeCls}" style="margin-bottom:4px;display:block">${est==='parcial'?'Parcial':'Pendiente'}</span><div style="font-family:DM Mono,monospace;font-size:12px;color:var(--red)">S/ ${r.toLocaleString('es-PE',{minimumFractionDigits:2})}</div></div></div></div>`; }).join('');}
 function seleccionarPedido(numPedido){cerrarModalBuscar();abrirModal(numPedido);}
-function mostrarToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('visible');}
-function ocultarToast(){document.getElementById('toast').classList.remove('visible');}
 
 </script>
 </body>

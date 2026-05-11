@@ -284,6 +284,10 @@ textarea { resize: vertical; min-height: 80px; }
   .chart-card.full{grid-column:1}
   .tables-grid{grid-template-columns:1fr}
 }
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-width:90vw}
+.toast.visible{opacity:1}
+.toast.error{border-color:var(--red);color:var(--red);background:var(--red-light)}
+.toast.success{border-color:var(--green);color:var(--green);background:var(--green-light)}
 </style>
 <script src="./assets/config.js"></script>
 <script src="./assets/common.js"></script>
@@ -717,7 +721,7 @@ async function editarProducto(viejo) {
   if (!nuevo) return;
   const nuevoUp = nuevo.trim().toUpperCase();
   if (nuevoUp === viejo.toUpperCase()) return;
-  if (!/\(.*\)/.test(nuevoUp)) { alert('El nombre debe incluir la capacidad. Ej: PRODUCTO (60ml)'); return; }
+  if (!/\(.*\)/.test(nuevoUp)) { mostrarToast('El nombre debe incluir la capacidad. Ej: PRODUCTO (60ml)', {type:'error',duration:3500}); return; }
   try {
     const data = await jsonp(`${SCRIPT_URL}?action=editarProducto&viejo=${encodeURIComponent(viejo)}&nuevo=${encodeURIComponent(nuevoUp)}`);
     if (data && data.success) {
@@ -727,12 +731,12 @@ async function editarProducto(viejo) {
       listaProductos.sort((a, b) => a.localeCompare(b, 'es'));
       setProductos(listaProductos);
       renderProdList();
-      alert(`✓ Producto editado. ${data.pedidosActualizados || 0} pedidos antiguos actualizados.`);
+      mostrarToast(`✓ Producto editado. ${data.pedidosActualizados || 0} pedidos antiguos actualizados.`, {type:'success',duration:3000});
     } else {
-      alert('Error: ' + (data && data.error || 'no se pudo editar'));
+      mostrarToast('Error: ' + (data && data.error || 'no se pudo editar'), {type:'error',duration:3500});
     }
   } catch (e) {
-    alert('Error de conexión: ' + e.message);
+    mostrarToast('Error de conexión: ' + e.message, {type:'error',duration:3500});
   }
 }
 
@@ -745,10 +749,10 @@ async function eliminarProducto(nombre) {
       setProductos(listaProductos);
       renderProdList();
     } else {
-      alert('Error: ' + (data && data.error || 'no se pudo eliminar'));
+      mostrarToast('Error: ' + (data && data.error || 'no se pudo eliminar'), {type:'error',duration:3500});
     }
   } catch (e) {
-    alert('Error de conexión: ' + e.message);
+    mostrarToast('Error de conexión: ' + e.message, {type:'error',duration:3500});
   }
 }
 
@@ -765,12 +769,12 @@ async function editarCliente(viejo) {
       listaClientes.sort((a, b) => a.localeCompare(b, 'es'));
       renderDatalist('clientes-list', listaClientes);
       renderCliList();
-      alert(`✓ Cliente editado. ${data.pedidosActualizados || 0} pedidos antiguos actualizados.`);
+      mostrarToast(`✓ Cliente editado. ${data.pedidosActualizados || 0} pedidos antiguos actualizados.`, {type:'success',duration:3000});
     } else {
-      alert('Error: ' + (data && data.error || 'no se pudo editar'));
+      mostrarToast('Error: ' + (data && data.error || 'no se pudo editar'), {type:'error',duration:3500});
     }
   } catch (e) {
-    alert('Error de conexión: ' + e.message);
+    mostrarToast('Error de conexión: ' + e.message, {type:'error',duration:3500});
   }
 }
 
@@ -783,10 +787,10 @@ async function eliminarCliente(nombre) {
       renderDatalist('clientes-list', listaClientes);
       renderCliList();
     } else {
-      alert('Error: ' + (data && data.error || 'no se pudo eliminar'));
+      mostrarToast('Error: ' + (data && data.error || 'no se pudo eliminar'), {type:'error',duration:3500});
     }
   } catch (e) {
-    alert('Error de conexión: ' + e.message);
+    mostrarToast('Error de conexión: ' + e.message, {type:'error',duration:3500});
   }
 }
 
@@ -813,7 +817,7 @@ async function agregarCliente() {
   const input = document.getElementById('new-cli-input');
   const nombre = input.value.trim().toUpperCase();
   if (!nombre) return;
-  if (listaClientes.some(c => c.toUpperCase() === nombre)) { alert('Este cliente ya existe'); return; }
+  if (listaClientes.some(c => c.toUpperCase() === nombre)) { mostrarToast('Este cliente ya existe', {type:'error',duration:3500}); return; }
   try {
     const data = await jsonp(`${SCRIPT_URL}?action=agregarCliente&nombre=${encodeURIComponent(nombre)}`);
     if (data && data.success) {
@@ -823,10 +827,10 @@ async function agregarCliente() {
       input.value = '';
       renderCliList();
     } else {
-      alert('Error: ' + (data && data.error || 'no se pudo agregar'));
+      mostrarToast('Error: ' + (data && data.error || 'no se pudo agregar'), {type:'error',duration:3500});
     }
   } catch (e) {
-    alert('Error de conexión: ' + e.message);
+    mostrarToast('Error de conexión: ' + e.message, {type:'error',duration:3500});
   }
 }
 
@@ -834,8 +838,8 @@ async function agregarProducto() {
   const input = document.getElementById('new-prod-input');
   const nombre = input.value.trim().toUpperCase();
   if (!nombre) return;
-  if (!/\(.*\)/.test(nombre)) { alert('El nombre debe incluir la capacidad entre paréntesis. Ej: PRODUCTO (60ml)'); return; }
-  if (listaProductos.includes(nombre)) { alert('Este producto ya existe'); return; }
+  if (!/\(.*\)/.test(nombre)) { mostrarToast('El nombre debe incluir la capacidad entre paréntesis. Ej: PRODUCTO (60ml)', {type:'error',duration:3500}); return; }
+  if (listaProductos.includes(nombre)) { mostrarToast('Este producto ya existe', {type:'error',duration:3500}); return; }
   try {
     const data = await jsonp(`${SCRIPT_URL}?action=agregarProducto&nombre=${encodeURIComponent(nombre)}`);
     if (data && data.success) {
@@ -844,10 +848,10 @@ async function agregarProducto() {
       input.value = '';
       renderProdList();
     } else {
-      alert('Error: ' + (data && data.error || 'no se pudo agregar'));
+      mostrarToast('Error: ' + (data && data.error || 'no se pudo agregar'), {type:'error',duration:3500});
     }
   } catch (e) {
-    alert('Error de conexión: ' + e.message);
+    mostrarToast('Error de conexión: ' + e.message, {type:'error',duration:3500});
   }
 }
 

@@ -7,29 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./assets/common.css">
 <style>
-.pin-overlay{position:fixed;inset:0;background:rgba(13,13,15,.97);z-index:100;display:flex;align-items:center;justify-content:center}
-.pin-overlay.hidden{display:none}
-.pin-card{background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:2.5rem;width:320px;text-align:center}
-.pin-logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px}
-.pin-logo span{color:var(--purple)}
-.pin-sub{font-size:13px;color:var(--muted);margin-bottom:2rem}
-.pin-dots{display:flex;justify-content:center;gap:12px;margin-bottom:2rem}
-.pin-dot{width:13px;height:13px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all .15s}
-.pin-dot.filled{background:var(--purple);border-color:var(--purple)}
-.pin-dot.error{background:var(--red);border-color:var(--red)}
-.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem}
-.pin-key{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;padding:14px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;transition:all .15s}
-.pin-key:hover{background:var(--purple-dim);color:var(--purple)}
-.pin-key:active{transform:scale(.95)}
-.pin-clear{font-size:14px;color:var(--muted);background:none;border:none;cursor:pointer;padding:10px}
-.pin-err{font-size:13px;color:var(--red);height:20px;margin-top:6px}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-.logo{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;letter-spacing:.06em;color:var(--text);text-transform:uppercase}
-.logo span{color:var(--purple)}
 .topbar-right{display:flex;align-items:center;gap:8px}
-.back-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
-.back-btn:hover{color:var(--text)}
-.lock-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer}
 .refresh-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid rgba(62,207,142,.3);background:var(--green-dim);color:var(--green);cursor:pointer}
 .main{padding:1.5rem;position:relative;z-index:1}
 .filters{display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap}
@@ -98,9 +76,7 @@
 .seccion-empty{padding:1.5rem;text-align:center;color:var(--hint);font-size:13px}
 .empty{text-align:center;padding:3rem;color:var(--hint)}
 .spinner{width:30px;height:30px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin:2rem auto;display:block}
-@keyframes spin{to{transform:rotate(360deg)}}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--muted);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
-.toast.visible{opacity:1}
+}
 @media(max-width:640px){
   .insumo-row{flex-direction:column;align-items:flex-start;gap:6px}
   .estado-btns{flex-wrap:wrap;gap:4px}
@@ -407,7 +383,6 @@ function setFiltro(f,btn){
   renderLista();
 }
 
-function mostrarToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('visible');setTimeout(()=>t.classList.remove('visible'),2000);}
 initDots();
 </script>
 </body>

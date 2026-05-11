@@ -9,10 +9,7 @@
 <style>
 .topbar,.filters,.grid{position:relative;z-index:1}
 
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
 .topbar-left{display:flex;align-items:center;gap:16px}
-.logo{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;letter-spacing:.06em;color:var(--text);text-transform:uppercase}
-.logo span{color:var(--purple)}
 .live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
 .topbar-center{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);text-align:center}
@@ -107,7 +104,7 @@
 .empty-state p{font-size:15px;margin-top:8px}
 .loading-wrap{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:16px}
 .spinner-ring{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+}
 .loading-text{font-size:14px;color:var(--muted)}
 .error-wrap{grid-column:1/-1;background:var(--red-dim);border:1px solid rgba(232,82,74,.2);border-radius:12px;padding:1.5rem;text-align:center}
 .error-wrap p{font-size:14px;color:var(--red);margin-bottom:8px}
@@ -119,21 +116,11 @@
 .modal{background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:2rem;width:320px;text-align:center}
 .modal-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
 .modal-sub{font-size:13px;color:var(--muted);margin-bottom:1.5rem}
-.pin-dots{display:flex;justify-content:center;gap:12px;margin-bottom:1.5rem}
-.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all .15s}
-.pin-dot.filled{background:var(--purple);border-color:var(--purple)}
-.pin-dot.error{background:var(--red);border-color:var(--red)}
-.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem}
-.pin-key{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;padding:14px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;transition:all .15s}
-.pin-key:hover{background:var(--purple-dim);border-color:rgba(124,111,239,.3);color:var(--purple)}
-.pin-key:active{transform:scale(.95)}
-.pin-clear{font-size:13px;color:var(--muted);background:none;border:none;cursor:pointer;padding:8px}
 .pin-error{font-size:13px;color:var(--red);height:18px;margin-top:4px}
 .modal-cancel{font-size:13px;color:var(--hint);background:none;border:none;cursor:pointer;margin-top:8px;padding:6px 16px}
 
 /* SAVING INDICATOR */
-.saving-toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--muted);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
-.saving-toast.visible{opacity:1}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--muted);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
 @media(max-width:640px){
   .ticket-footer{flex-wrap:wrap;gap:6px}
   .ticket-estado-wrap{padding:8px 12px}
@@ -150,7 +137,7 @@
   .grid{grid-template-columns:1fr;padding:.75rem 1rem 1.5rem;gap:10px}
   .ticket-product{font-size:14px}
   .modal{width:90vw;max-width:320px;padding:1.5rem}
-  .saving-toast{bottom:16px;right:16px;left:16px;text-align:center}
+  .toast{bottom:16px;right:16px;left:16px;text-align:center}
   .insumo-nombre{font-size:11px}
   .insumo-fecha{font-size:10px}
   .ticket-estado-select{font-size:12px}
@@ -228,7 +215,7 @@
   </div>
 </div>
 
-<div class="saving-toast" id="saving-toast">Guardando...</div>
+<div class="toast" id="toast"></div>
 
 <script>
 const PIN_CORRECTO='200720';
@@ -479,7 +466,7 @@ function renderGrid(){
 async function cambiarEstado(pedidoId,insumo,estado){
   estadosInsumos[pedidoId+'|'+insumo]=estado;
   renderGrid();
-  mostrarToast('Guardando...');
+  mostrarToast('Guardando...', 0);
   try{
     const form=new FormData();
     form.append('action','setEstado');
@@ -487,10 +474,10 @@ async function cambiarEstado(pedidoId,insumo,estado){
     form.append('insumo',insumo);
     form.append('estado',estado);
     await fetch(SCRIPT_URL,{method:'POST',body:form,mode:'no-cors'});
-    mostrarToast('✓ Guardado');
+    mostrarToast('✓ Guardado', {type:'success',duration:3000});
     setTimeout(()=>ocultarToast(),1500);
   }catch(e){
-    mostrarToast('Error al guardar');
+    mostrarToast('Error al guardar', {type:'error',duration:3500});
     setTimeout(()=>ocultarToast(),2000);
   }
 }
@@ -506,21 +493,14 @@ async function cambiarEstadoTicket(pedidoId, nuevoEstado, selectEl){
     form.append('pedido',pedidoId);
     form.append('estado',nuevoEstado);
     await fetch(SCRIPT_URL,{method:'POST',body:form,mode:'no-cors'});
-    mostrarToast('✓ Estado actualizado');
+    mostrarToast('✓ Estado actualizado', {type:'success',duration:3000});
     setTimeout(()=>{ocultarToast();renderGrid();},1500);
   }catch(e){
-    mostrarToast('Error al guardar');
+    mostrarToast('Error al guardar', {type:'error',duration:3500});
     setTimeout(()=>ocultarToast(),2000);
   }
 }
 
-function mostrarToast(msg){
-  const t=document.getElementById('saving-toast');
-  t.textContent=msg;t.classList.add('visible');
-}
-function ocultarToast(){
-  document.getElementById('saving-toast').classList.remove('visible');
-}
 
 async function cargarPedidos(){
   try{

@@ -10,35 +10,12 @@
 <style>
 .pin-overlay,.loading-overlay,.topbar,.main{position:relative;z-index:1}
 
-/* PIN */
-.pin-overlay{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;align-items:center;justify-content:center}
-.pin-overlay.hidden{display:none}
-.pin-card{background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:2.5rem;width:340px;text-align:center}
-.pin-logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text);margin-bottom:6px}
-.pin-logo span{color:var(--purple)}
-.pin-sub{font-size:14px;color:var(--muted);margin-bottom:2rem}
-.pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:2rem}
-.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all .15s}
-.pin-dot.filled{background:var(--purple);border-color:var(--purple)}
-.pin-dot.error{background:var(--red);border-color:var(--red)}
-.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem}
-.pin-key{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;padding:16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;transition:all .15s}
-.pin-key:hover{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
-.pin-key:active{transform:scale(.95)}
-.pin-clear{font-size:14px;color:var(--muted);background:none;border:none;cursor:pointer;padding:10px}
-.pin-err{font-size:13px;color:var(--red);height:20px;margin-top:6px}
-
 /* TOPBAR */
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-.logo{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;letter-spacing:.06em;color:var(--text);text-transform:uppercase}
-.logo span{color:var(--purple)}
 .topbar-right{display:flex;align-items:center;gap:10px}
 .month-nav{display:flex;align-items:center;gap:8px}
 .nav-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .nav-btn:hover{color:var(--text);border-color:rgba(255,255,255,.2)}
 .month-label{font-family:'DM Mono',monospace;font-size:13px;color:var(--text);min-width:120px;text-align:center}
-.lock-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer}
-
 /* MAIN */
 .main{padding:1.5rem}
 
@@ -76,7 +53,7 @@
 .loading-overlay{position:fixed;inset:0;background:var(--bg);z-index:50;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px}
 .loading-overlay.hidden{display:none}
 .spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+}
 .loading-text{font-size:14px;color:var(--muted)}
 
 @media(max-width:700px){
@@ -249,7 +226,7 @@ function bloquear(){pinBuf='';updDots();document.getElementById('pin-overlay').c
 
 // JSONP
 async function cargarDatos(){
-  document.getElementById('loading').classList.remove('hidden');
+  mostrarLoading('Cargando analytics...');
   try{
     const res=await jsonp(`${SCRIPT_URL}?action=analytics&t=${Date.now()}`);
     if(res.success&&res.rows){
@@ -262,9 +239,9 @@ async function cargarDatos(){
       renderDashboard();
     }
   }catch(e){
-    alert('Error al conectar con Google Sheets');
+    mostrarToast('Error al conectar: ' + (e.message || 'sin detalle'), {type:'error',duration:3500});
   }
-  document.getElementById('loading').classList.add('hidden');
+  ocultarLoading();
 }
 
 function getMesAnterior(){
