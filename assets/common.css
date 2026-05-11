@@ -293,3 +293,95 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 }
 .loading-overlay.hidden{display:none}
 .loading-text{font-size:14px;color:var(--muted)}
+
+/* =========================================================
+   Responsive — mobile baseline
+   Applies to all shared components. Page-specific styles
+   can still override via their own @media in <style>.
+   ========================================================= */
+@media (max-width: 640px){
+  /* Topbar adapts: smaller padding, allow wrap, smaller logo. */
+  .topbar{
+    padding:.75rem 1rem;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .logo{font-size:14px;letter-spacing:.04em}
+  .topbar-right{
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .back-btn,.lock-btn{
+    font-size:11px;
+    padding:4px 10px;
+  }
+
+  /* PIN card scales down on small screens. */
+  .pin-card{
+    padding:1.75rem;
+    width:88vw;max-width:340px;
+  }
+  .pin-key{padding:14px;font-size:18px}
+
+  /* Tabs scroll horizontally if they overflow. */
+  .tabs-nav{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .tabs-nav::-webkit-scrollbar{display:none}
+  .tab-nav-btn{
+    padding:10px 16px;
+    font-size:12px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .tab-content{padding:1rem}
+
+  /* Modals: safe margins via overlay padding, modal fills available width. */
+  .modal-overlay{padding:.75rem}
+  .modal{
+    max-width:100%;
+    padding:1.25rem;
+    border-radius:16px;
+  }
+  .modal-title{font-size:15px}
+
+  /* Tables: smaller font and padding (rely on parent's .table-scroll for overflow). */
+  th{padding:8px 10px;font-size:10px}
+  td{padding:8px 10px;font-size:12px}
+
+  /* Form controls: full width and consistent sizing. */
+  .search-wrap{width:100%}
+  .search-input{font-size:13px}
+  .sel{font-size:12px;padding:8px 10px}
+
+  /* Stat cards: tighter padding, slightly smaller numbers. */
+  .stat-card{padding:1rem}
+  .stat-val{font-size:18px}
+
+  /* Chart canvases: shorter on phones. */
+  .chart-wrap{height:200px}
+  .chart-card{padding:1rem}
+  .chart-title{font-size:13px}
+
+  /* Toast: stretch with margin so it never overflows. */
+  .toast{
+    bottom:16px;right:16px;left:16px;
+    text-align:center;
+  }
+}
+
+/* Extra-small phones (iPhone SE, narrow Android). */
+@media (max-width: 400px){
+  .topbar{padding:.6rem .75rem}
+  .logo{font-size:13px}
+  .back-btn,.lock-btn{font-size:10px;padding:3px 8px}
+  .tab-content{padding:.75rem}
+  .modal-overlay{padding:.5rem}
+  .modal{padding:1rem}
+  .pin-card{padding:1.5rem;width:92vw}
+  .pin-key{padding:12px;font-size:16px}
+  .stat-card{padding:.75rem}
+  .stat-val{font-size:16px}
+  .chart-wrap{height:180px}
+}
