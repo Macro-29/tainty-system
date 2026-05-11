@@ -384,6 +384,23 @@ function setFiltro(f,btn){
 }
 
 initDots();
+
+// Auto-refresh: una vez desbloqueado, refresca cada 60s mientras la pestaña está
+// visible, y también al volver a la pestaña tras estar en background.
+let _autoRefreshTimer = null;
+function isUnlocked(){
+  const ov = document.getElementById('pin-overlay');
+  return ov && ov.classList.contains('hidden');
+}
+function startAutoRefresh(){
+  if(_autoRefreshTimer) return;
+  _autoRefreshTimer = setInterval(()=>{ if(!document.hidden && isUnlocked()) cargarDatos(); }, 60000);
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && isUnlocked()) cargarDatos();
+});
+const _origCargarDatos = cargarDatos;
+cargarDatos = async function(){ await _origCargarDatos.apply(this, arguments); startAutoRefresh(); };
 </script>
 </body>
 </html>

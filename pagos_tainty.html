@@ -98,6 +98,7 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 <div class="topbar">
   <div class="logo">Tainty <span>Labs</span> &middot; Pagos</div>
   <div class="topbar-right">
+    <button class="lock-btn" id="btn-refresh" onclick="cargarPagos()" title="Actualizar datos desde Google Sheets">&#x21bb; Refrescar</button>
     <a class="back-btn" href="./index.html">&#8592; Inicio</a>
     <button class="lock-btn" onclick="bloquear()">&#128274; Salir</button>
   </div>
@@ -246,6 +247,24 @@ function abrirModalBuscar(){document.getElementById('buscar-pedido').value='';fi
 function cerrarModalBuscar(){document.getElementById('modal-buscar').classList.remove('visible');}
 function filtrarBusqueda(){const q=(document.getElementById('buscar-pedido').value||'').toLowerCase();const res=document.getElementById('resultados-busqueda');const pendientes=pagos.filter(p=>getEstadoPago(p)!=='realizado'&&(q===''||(p.numPedido||'').toLowerCase().includes(q)||(p.cliente||'').toLowerCase().includes(q)||(p.producto||'').toLowerCase().includes(q))).slice(0,20);if(!pendientes.length){res.innerHTML='<div style="padding:1rem;text-align:center;color:var(--hint);font-size:13px">No hay resultados</div>';return;}res.innerHTML=pendientes.map(p=>{const r=getRestante(p);const est=getEstadoPago(p);const badgeCls=est==='parcial'?'badge-partial':'badge-pending';return`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 14px;cursor:pointer;margin-bottom:4px" onclick="seleccionarPedido('${p.numPedido}')"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--hint)">${p.numPedido}</div><div style="font-size:13px;font-weight:500">${p.cliente||''}</div><div style="font-size:12px;color:var(--muted)">${p.producto||''}</div></div><div style="text-align:right"><span class="${badgeCls}" style="margin-bottom:4px;display:block">${est==='parcial'?'Parcial':'Pendiente'}</span><div style="font-family:DM Mono,monospace;font-size:12px;color:var(--red)">S/ ${r.toLocaleString('es-PE',{minimumFractionDigits:2})}</div></div></div></div>`; }).join('');}
 function seleccionarPedido(numPedido){cerrarModalBuscar();abrirModal(numPedido);}
+
+// Auto-refresh: una vez desbloqueado (PIN correcto), refresca cada 60s mientras
+// la pestaña está visible, y también al volver a la pestaña tras estar en background.
+let _autoRefreshTimer = null;
+function isUnlocked(){
+  const ov = document.getElementById('pin-overlay');
+  return ov && ov.classList.contains('hidden');
+}
+function startAutoRefresh(){
+  if(_autoRefreshTimer) return;
+  _autoRefreshTimer = setInterval(()=>{ if(!document.hidden && isUnlocked()) cargarPagos(); }, 60000);
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && isUnlocked()) cargarPagos();
+});
+// Cuando se desbloquea por primera vez, cargarPagos() corre; arrancamos el timer entonces.
+const _origCargarPagos = cargarPagos;
+cargarPagos = async function(){ await _origCargarPagos.apply(this, arguments); startAutoRefresh(); };
 
 </script>
 </body>

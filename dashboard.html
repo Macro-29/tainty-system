@@ -415,6 +415,22 @@ function cambiarMes(dir){
 
 Chart.defaults.color='#7a7a8a';
 Chart.defaults.borderColor='rgba(255,255,255,0.05)';
+
+// Auto-refresh: refresca analytics cada 60s y al volver a la pestaña.
+let _autoRefreshTimer = null;
+function isUnlocked(){
+  const ov = document.getElementById('pin-overlay');
+  return ov && ov.classList.contains('hidden');
+}
+function startAutoRefresh(){
+  if(_autoRefreshTimer) return;
+  _autoRefreshTimer = setInterval(()=>{ if(!document.hidden && isUnlocked()) cargarDatos(); }, 60000);
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && isUnlocked()) cargarDatos();
+});
+const _origCargarDatos = cargarDatos;
+cargarDatos = async function(){ await _origCargarDatos.apply(this, arguments); startAutoRefresh(); };
 </script>
 </body>
 </html>
