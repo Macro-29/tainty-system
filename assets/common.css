@@ -81,10 +81,11 @@ body::before{
   background:var(--surface);
   border:1px solid var(--border2);
   border-radius:20px;
-  padding:2.5rem;
-  width:320px;
+  padding:2.5rem 2rem;
+  width:min(320px, 92vw);
   text-align:center;
   position:relative;z-index:1;
+  box-sizing:border-box;
 }
 .pin-logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px}
 .pin-logo span{color:var(--purple)}
@@ -100,14 +101,21 @@ body::before{
 .pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem}
 .pin-key{
   font-family:'Syne',sans-serif;font-size:20px;font-weight:700;
-  padding:16px;border-radius:12px;
+  padding:14px 0;border-radius:12px;
   border:1px solid var(--border2);
   background:var(--surface2);color:var(--text);
   cursor:pointer;transition:all .15s;
+  min-height:48px;
+  -webkit-tap-highlight-color:transparent;
 }
 .pin-key:hover{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
-.pin-key:active{transform:scale(.95)}
-.pin-clear{font-size:14px;color:var(--muted);background:none;border:none;cursor:pointer;padding:10px}
+.pin-key:active{transform:scale(.95);background:var(--purple-dim)}
+.pin-clear{
+  font-size:18px;color:var(--muted);background:none;border:none;cursor:pointer;
+  min-height:48px;
+  -webkit-tap-highlight-color:transparent;
+}
+.pin-clear:active{color:var(--purple)}
 .pin-err{font-size:13px;color:var(--red);height:20px;margin-top:6px}
 
 /* Tabs */
@@ -316,12 +324,11 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
     padding:4px 10px;
   }
 
-  /* PIN card scales down on small screens. */
-  .pin-card{
-    padding:1.75rem;
-    width:88vw;max-width:340px;
-  }
-  .pin-key{padding:14px;font-size:18px}
+  /* PIN card uses min() in base style, so it already scales. Just tighten padding
+     and shrink keys a bit for narrow phones. */
+  .pin-card{padding:1.75rem 1.5rem}
+  .pin-key{padding:14px 0;font-size:18px;min-height:52px}
+  .pin-grid{gap:8px}
 
   /* Tabs scroll horizontally if they overflow. */
   .tabs-nav{
@@ -379,8 +386,12 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
   .tab-content{padding:.75rem}
   .modal-overlay{padding:.5rem}
   .modal{padding:1rem}
-  .pin-card{padding:1.5rem;width:92vw}
-  .pin-key{padding:12px;font-size:16px}
+  .pin-card{padding:1.5rem 1.25rem}
+  .pin-key{padding:12px 0;font-size:16px;min-height:46px}
+  .pin-grid{gap:6px}
+  .pin-dots{gap:10px;margin-bottom:1.5rem}
+  .pin-logo{font-size:18px}
+  .pin-sub{font-size:12px;margin-bottom:1.25rem}
   .stat-card{padding:.75rem}
   .stat-val{font-size:16px}
   .chart-wrap{height:180px}
