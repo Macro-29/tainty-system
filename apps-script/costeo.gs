@@ -114,17 +114,26 @@ function guardarProducto(e, data) {
     }
 
     const producto = data.producto.toString().trim();
-    const productoUp = producto.toUpperCase();
+    const objetivoNorm = normalizarNombre_(producto);
 
-    // (C) Borrar filas previas — case-insensitive
+    // (C) Borrar filas previas con el mismo nombre (comparación normalizada:
+    //     ignora mayúsculas, espacios duplicados, acentos y caracteres
+    //     invisibles como nbsp/zero-width). Si lo escribieron a mano en el
+    //     sheet con un casing o espacio distinto, igual lo detecta.
     const allData = sheet.getDataRange().getValues();
     let filasBorradas = 0;
+    const noMatcheados = [];
     for (let i = allData.length - 1; i >= 1; i--) {
-      if ((allData[i][0] || '').toString().trim().toUpperCase() === productoUp) {
+      const enHoja = (allData[i][0] || '').toString();
+      if (normalizarNombre_(enHoja) === objetivoNorm) {
         sheet.deleteRow(i + 1);
         filasBorradas++;
+      } else if (enHoja && noMatcheados.length < 3) {
+        // Recolectar algunas muestras para diagnosticar si no se borró nada
+        noMatcheados.push(JSON.stringify(enHoja));
       }
     }
+    console.log('guardarProducto delete:', producto, '· borradas:', filasBorradas, '· objetivo norm:', JSON.stringify(objetivoNorm));
 
     // Construir filas en memoria (no escribir todavía).
     const filas = data.insumos
@@ -222,10 +231,10 @@ function eliminarProducto(e, data) {
     if (!sheet) return respuestaJsonp(e, { success: false, error: 'Hoja no encontrada' });
 
     const allData = sheet.getDataRange().getValues();
-    const objetivo = data.producto.toString().trim().toUpperCase();
+    const objetivoNorm = normalizarNombre_(data.producto);
     let filasBorradas = 0;
     for (let i = allData.length - 1; i >= 1; i--) {
-      if ((allData[i][0] || '').toString().trim().toUpperCase() === objetivo) {
+      if (normalizarNombre_(allData[i][0] || '') === objetivoNorm) {
         sheet.deleteRow(i + 1);
         filasBorradas++;
       }
@@ -342,6 +351,29 @@ function ping(e) {
 function getCosteoSheet_() {
   const ss = SpreadsheetApp.openById(COSTEO_ID);
   return ss.getSheetByName(COSTEO_SHEET); // null si no existe
+}
+
+/**
+ * Normaliza un nombre de producto para comparación tolerante:
+ * - to string + uppercase
+ * - quita acentos (NFD)
+ * - reemplaza espacios no-rompibles, tabs y zero-width por espacio normal
+ * - colapsa espacios múltiples a uno solo
+ * - trim
+ * Resultado: dos nombres "iguales" por intención humana matchean aunque
+ * difieran en casing, acentos o whitespace invisible.
+ */
+function normalizarNombre_(valor) {
+  if (valor === null || valor === undefined) return '';
+  let s = valor.toString();
+  // Reemplazos de caracteres invisibles comunes
+  s = s.replace(/[ ​‌‍﻿\t]+/g, ' ');
+  // Colapsar espacios múltiples
+  s = s.replace(/\s+/g, ' ');
+  s = s.trim().toUpperCase();
+  // Quitar acentos (NFD: separa la letra base del diacrítico, luego elimina diacríticos)
+  if (s.normalize) s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return s;
 }
 
 function respuestaJsonp(e, obj) {

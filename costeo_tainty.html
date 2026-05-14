@@ -1145,7 +1145,19 @@ async function guardarProductoSheets() {
     localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
     cerrarEditorProducto();
     renderCatalogo();
-    mostrarToast('✓ Guardado en Sheets', {type:'success',duration:3000});
+
+    // Mostrar detalle de filas para que el usuario detecte duplicados rápido.
+    // Si prod existía (edición) y filasBorradas === 0, casi seguro que las filas
+    // viejas se quedaron por un mismatch de nombre → toast en ámbar.
+    const fi = (res && typeof res.filasInsertadas === 'number') ? res.filasInsertadas : insumos.length;
+    const fb = (res && typeof res.filasBorradas === 'number') ? res.filasBorradas : null;
+    let msg = `✓ Guardado · ${fi} filas`;
+    if (fb !== null) msg += ` · borradas ${fb}`;
+    if (prod && fb === 0) {
+      mostrarToast(msg + ' (revisa duplicados en Sheets)', {type:'error', duration:5000});
+    } else {
+      mostrarToast(msg, {type:'success', duration:3000});
+    }
   } catch(e) {
     console.error('Error guardando:', e);
     // Falla en Sheets → marcamos _localOnly para que no se pierda al recargar
