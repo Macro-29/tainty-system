@@ -315,10 +315,21 @@ async function cargarCatalogo() {
 }
 
 function parsearDatos(data) {
+  // Antes de reemplazar el catalogo, rescatar productos local-only de localStorage
+  // (productos cuyo guardado a Sheets falló y solo viven en el navegador).
+  let pendientes = [];
+  try {
+    const raw = localStorage.getItem('tainty_catalogo');
+    if (raw) {
+      const prev = JSON.parse(raw);
+      pendientes = prev.filter(p => p && p._localOnly);
+    }
+  } catch(_){ /* localStorage corrupto: ignorar */ }
+
+  let nuevoCatalogo = [];
   // Nueva estructura: el script ya devuelve el catalogo parseado directamente
   if (Array.isArray(data) && data.length > 0 && data[0].nombre) {
-    // Ya viene parseado desde el nuevo script
-    catalogo = data;
+    nuevoCatalogo = data;
   } else if (Array.isArray(data)) {
     // Estructura antigua de rows - parsear manualmente
     const map = {};
@@ -340,9 +351,20 @@ function parsearDatos(data) {
         cantidades: { 100: kg100, 300: kg300, 500: kg500, 1000: kg1000 }
       });
     }
-    catalogo = Object.values(map).filter(p => p.insumos.length > 0);
+    nuevoCatalogo = Object.values(map).filter(p => p.insumos.length > 0);
   }
+
+  // Reintegrar local-only: si el servidor ya tiene un producto con ese nombre
+  // (porque se sincronizó en otra sesión), borramos la marca local.
+  // Si no, los anteponemos al catalogo para que sigan visibles.
+  const nombresServer = new Set(nuevoCatalogo.map(p => p.nombre));
+  const localOnlyRestantes = pendientes.filter(p => !nombresServer.has(p.nombre));
+  catalogo = [...localOnlyRestantes, ...nuevoCatalogo];
+
   localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
+  if (localOnlyRestantes.length > 0) {
+    console.warn(`${localOnlyRestantes.length} producto(s) pendiente(s) de sincronizar:`, localOnlyRestantes.map(p=>p.nombre));
+  }
   console.log('Catálogo cargado:', catalogo.length, 'productos');
 }
 
@@ -630,10 +652,11 @@ function renderCatalogo() {
       total: p.insumos.reduce((s,i)=>s+costoInsumoEnEscala(i,e),0)
     }));
     const tipos = getTiposInsumo(p.nombre);
-    return `<div class="prod-accordion">
+    const pendiente = p._localOnly;
+    return `<div class="prod-accordion" style="${pendiente?'border-color:var(--amber);background:linear-gradient(180deg,rgba(245,166,35,.04),var(--surface))':''}">
       <div class="prod-acc-header" onclick="toggleAcc(${pi})">
         <div style="flex:1;min-width:0">
-          <div class="prod-acc-title">${p.nombre}</div>
+          <div class="prod-acc-title">${p.nombre}${pendiente?' <span title="Pendiente de sincronizar con Google Sheets" style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,.3);font-weight:500;margin-left:6px;font-family:DM Sans,sans-serif">⚠ No sincronizado</span>':''}</div>
           <div class="prod-acc-meta" style="flex-wrap:wrap;gap:6px 10px">
             <span>${p.insumos.length} insumos</span>
             ${esCap(p.nombre)?'<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--green-dim);color:var(--green)">CAP</span>':''}
@@ -642,7 +665,8 @@ function renderCatalogo() {
             ${costos.map(c => `<span style="font-size:11px;font-family:DM Mono,monospace;padding:3px 8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);color:var(--amber)">x${c.escala}: S/ ${c.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>`).join('')}
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${pendiente?`<button onclick="event.stopPropagation();reintentarSyncProducto(${pi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(245,166,35,.4);background:var(--amber-dim);color:var(--amber);cursor:pointer">↻ Reintentar sync</button>`:''}
           <button onclick="event.stopPropagation();abrirEditorProducto(${pi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(124,111,239,.3);background:var(--purple-dim);color:var(--purple);cursor:pointer">✏ Editar</button>
           <button onclick="event.stopPropagation();eliminarProducto(${pi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">🗑 Eliminar</button>
           <span style="color:var(--hint);font-size:18px" id="acc-icon-${pi}">›</span>
@@ -1061,10 +1085,11 @@ async function guardarProductoSheets() {
       throw new Error('Servidor: ' + (res.error || 'error sin mensaje') + (res.stack ? ' | Stack: ' + res.stack : ''));
     }
 
-    // Actualizar catalogo local
+    // Actualizar catalogo local — sincronizado con Sheets
     if (prod) {
       prod.nombre = nombre;
       prod.insumos = insumos;
+      delete prod._localOnly;
     } else {
       catalogo.push({ nombre, insumos });
       poblarSelects();
@@ -1075,15 +1100,48 @@ async function guardarProductoSheets() {
     mostrarToast('✓ Guardado en Sheets', {type:'success',duration:3000});
   } catch(e) {
     console.error('Error guardando:', e);
-    // Guardar solo local si falla Sheets
-    if (prod) { prod.nombre = nombre; prod.insumos = insumos; }
-    else { catalogo.push({ nombre, insumos }); poblarSelects(); }
+    // Falla en Sheets → marcamos _localOnly para que no se pierda al recargar
+    // y para mostrar un indicador visual + botón de reintentar sincronización.
+    if (prod) {
+      prod.nombre = nombre;
+      prod.insumos = insumos;
+      prod._localOnly = true;
+    } else {
+      catalogo.push({ nombre, insumos, _localOnly: true });
+      poblarSelects();
+    }
     localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
     cerrarEditorProducto();
     renderCatalogo();
-    mostrarToast('Guardado local (error Sheets: ' + e.message + ')', {type:'error',duration:3500});
+    mostrarToast('Guardado local (no sincronizó: ' + e.message + ')', {type:'error',duration:4500});
   }
   document.getElementById('btn-guardar-prod').disabled = false;
+}
+
+/**
+ * Reintenta sincronizar un producto marcado como _localOnly.
+ * Lo envía a Sheets con la misma payload que guardarProductoSheets.
+ */
+async function reintentarSyncProducto(pi) {
+  const prod = catalogo[pi];
+  if (!prod || !prod._localOnly) return;
+  mostrarToast('Sincronizando ' + prod.nombre + '...', 0);
+  try {
+    const dataObj = { action: 'guardarProducto', producto: prod.nombre, insumos: prod.insumos };
+    const payload = encodeURIComponent(JSON.stringify(dataObj));
+    const url = COSTEO_URL + '?data=' + payload + '&t=' + Date.now();
+    const res = await jsonp(url);
+    if (res && res.success === false) {
+      throw new Error(res.error || 'error sin mensaje');
+    }
+    delete prod._localOnly;
+    localStorage.setItem('tainty_catalogo', JSON.stringify(catalogo));
+    renderCatalogo();
+    mostrarToast('✓ ' + prod.nombre + ' sincronizado', {type:'success',duration:2500});
+  } catch(e) {
+    console.error('Retry sync error:', e);
+    mostrarToast('No sincronizó: ' + e.message, {type:'error',duration:4000});
+  }
 }
 
 function abrirNuevoProducto() { abrirEditorProducto(null); }
