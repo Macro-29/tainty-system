@@ -791,7 +791,13 @@ function nuevoItemVacio(tipo) {
   const base = { tipo, nombre:'', proveedor:'' };
   if (config === 'kg' || config === 'und') {
     base.precioUnitario = 0;
-    base.cantidades = { 100:0, 300:0, 500:0, 1000:0 };
+    // ENVASE típicamente es 1:1 con la unidad producida, así que pre-llenamos
+    // con la escala (x100→100, x300→300, etc). Si el usuario tiene una razón
+    // distinta (ej. envase doble), edita un campo y el escalado proporcional
+    // recalcula los demás.
+    base.cantidades = tipo === 'ENVASE'
+      ? { 100:100, 300:300, 500:500, 1000:1000 }
+      : { 100:0, 300:0, 500:0, 1000:0 };
   } else {
     base.costos = { 100:0, 300:0, 500:0, 1000:0 };
   }
@@ -1002,13 +1008,9 @@ function updatePrecio(tipo, idx, val) {
   refrescarCostos(tipo, idx);
 }
 
-// Cuando se edita una cantidad, autocompleta las otras 3 escalas.
-// Reglas:
-// - ENVASE: copia el mismo valor a las cuatro escalas (típicamente se compran
-//   en lotes fijos por orden, no escalan linealmente con el batch).
-// - INSUMO/LAINA/CAPSULA: escalado proporcional (necesidad lineal por unidad
-//   producida).
-// Después refresca los costos calculados de la fila.
+// Cuando se edita una cantidad, autocompleta las otras 3 escalas
+// proporcionalmente (necesidad lineal por unidad producida) y refresca
+// los costos calculados de la fila.
 function updateCantidad(tipo, idx, escalaBase, val) {
   const it = editorItems[tipo] && editorItems[tipo][idx];
   if (!it) return;
@@ -1016,12 +1018,9 @@ function updateCantidad(tipo, idx, escalaBase, val) {
   const v = parseFloat(val)||0;
   it.cantidades[escalaBase] = v;
   if (v > 0) {
-    const sameValue = (tipo === 'ENVASE');
     ESCALAS.forEach(e => {
       if (e !== escalaBase) {
-        it.cantidades[e] = sameValue
-          ? v
-          : +(v * e / escalaBase).toFixed(6);
+        it.cantidades[e] = +(v * e / escalaBase).toFixed(6);
         const el = document.getElementById(`cant-${tipo}-${idx}-${e}`);
         if (el && document.activeElement !== el) {
           // Mostrar con redondeo razonable
