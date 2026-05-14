@@ -524,11 +524,15 @@ function copiarProveedor(prov) {
   const insumosStr = data.insumos.map(i => {
     const unidad = i.unidad || 'kg';
     if (unidad === 'kg') {
-      // Insumos a granel: "- Nombre: 1.080 kg"
-      return `- ${i.nombre}: ${i.cantidadTotal.toFixed(3)} kg`;
+      // Insumos a granel: redondea a 3 decimales y elimina los ceros finales.
+      // 30.000 → "30",  1.080 → "1.08",  0.090 → "0.09",  1.005 → "1.005"
+      const cantidad = parseFloat(i.cantidadTotal.toFixed(3)).toString();
+      return `- ${i.nombre}: ${cantidad} kg`;
     }
-    // Envases / etiquetas / cajas / cápsulas: "- 100 Nombre"
-    const cantidad = Math.round(i.cantidadTotal).toLocaleString('es-PE');
+    // Envases / etiquetas / cajas / cápsulas: "- 1,000 Nombre".
+    // Usamos en-US para que el separador de miles sea coma, no punto
+    // (en es-PE el punto es separador de miles y se confunde con decimales).
+    const cantidad = Math.round(i.cantidadTotal).toLocaleString('en-US');
     return `- ${cantidad} ${i.nombre}`;
   }).join('\n');
   const texto = `Buen día, podría cotizarme lo siguiente:\n\n${insumosStr}`;
