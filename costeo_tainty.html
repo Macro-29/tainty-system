@@ -247,6 +247,9 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
     <!-- Filas de insumos -->
     <div id="editor-insumos"></div>
 
+    <!-- Sugerencias de proveedores existentes (autocomplete nativo) -->
+    <datalist id="proveedores-list"></datalist>
+
     <div style="display:flex;gap:10px;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="cerrarEditorProducto()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;font-size:14px">Cancelar</button>
       <button id="btn-guardar-prod" onclick="guardarProductoSheets()" style="flex:2;padding:10px;border-radius:10px;border:none;background:var(--purple);color:#fff;cursor:pointer;font-family:DM Sans,sans-serif;font-size:14px;font-weight:500">Guardar en Sheets</button>
@@ -851,10 +854,34 @@ function abrirEditorProducto(pi) {
   nombreInput.value = prod ? prod.nombre : '';
   nombreInput.disabled = prod !== null;
 
+  // Poblar la datalist de proveedores con los existentes en el catálogo —
+  // el navegador muestra sugerencias automáticamente al escribir. Si el
+  // usuario tipea un nombre que no está en la lista, se guarda igual y
+  // aparecerá en futuras sesiones.
+  actualizarDatalistProveedores();
+
   initEditorItems(prod, nombreInput.value);
   renderEditorItems();
   modal.style.opacity = '1';
   modal.style.pointerEvents = 'all';
+}
+
+/** Devuelve la lista única y ordenada de proveedores existentes en el catálogo. */
+function getProveedoresUnicos() {
+  const set = new Set();
+  catalogo.forEach(p => (p.insumos||[]).forEach(i => {
+    const prov = (i.proveedor||'').toString().trim();
+    if (prov) set.add(prov);
+  }));
+  return Array.from(set).sort((a,b) => a.localeCompare(b, 'es'));
+}
+
+function actualizarDatalistProveedores() {
+  const dl = document.getElementById('proveedores-list');
+  if (!dl) return;
+  dl.innerHTML = getProveedoresUnicos()
+    .map(p => `<option value="${p.replace(/"/g,'&quot;')}"></option>`)
+    .join('');
 }
 
 function cerrarEditorProducto() {
@@ -895,7 +922,7 @@ function itemHtml(tipo, idx, ins, config, unidad) {
     <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
       <input type="text" value="${ins.nombre||''}" placeholder="Ej: ${tipo==='INSUMO'?'Maltodextrina':tipo==='CAPSULA'?'Cápsula 00 vegetal':tipo==='ENVASE'?'Envase PET 100ml':tipo==='ETIQUETA'?'Etiqueta lámina brillo':tipo==='CAJA'?'Caja kraft':'Item'}" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
     <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
-      <input type="text" value="${ins.proveedor||''}" placeholder="Ej: INVERFOOD" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+      <input type="text" value="${ins.proveedor||''}" placeholder="Ej: INVERFOOD" list="proveedores-list" autocomplete="off" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
   </div>`;
 
   const btnEliminar = (editorItems[tipo]||[]).length>1
@@ -975,8 +1002,13 @@ function updatePrecio(tipo, idx, val) {
   refrescarCostos(tipo, idx);
 }
 
-// Cuando se edita una cantidad, autocompleta las otras 3 escalas proporcionalmente
-// y refresca los costos calculados
+// Cuando se edita una cantidad, autocompleta las otras 3 escalas.
+// Reglas:
+// - ENVASE: copia el mismo valor a las cuatro escalas (típicamente se compran
+//   en lotes fijos por orden, no escalan linealmente con el batch).
+// - INSUMO/LAINA/CAPSULA: escalado proporcional (necesidad lineal por unidad
+//   producida).
+// Después refresca los costos calculados de la fila.
 function updateCantidad(tipo, idx, escalaBase, val) {
   const it = editorItems[tipo] && editorItems[tipo][idx];
   if (!it) return;
@@ -984,9 +1016,12 @@ function updateCantidad(tipo, idx, escalaBase, val) {
   const v = parseFloat(val)||0;
   it.cantidades[escalaBase] = v;
   if (v > 0) {
+    const sameValue = (tipo === 'ENVASE');
     ESCALAS.forEach(e => {
       if (e !== escalaBase) {
-        it.cantidades[e] = +(v * e / escalaBase).toFixed(6);
+        it.cantidades[e] = sameValue
+          ? v
+          : +(v * e / escalaBase).toFixed(6);
         const el = document.getElementById(`cant-${tipo}-${idx}-${e}`);
         if (el && document.activeElement !== el) {
           // Mostrar con redondeo razonable
