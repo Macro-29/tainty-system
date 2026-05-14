@@ -461,20 +461,30 @@ function calcularCompras() {
   const lista = Object.values(insumos).sort((a,b) => (a.proveedor||'').localeCompare(b.proveedor||''));
   const costoGlobal = lista.reduce((s,i) => s+i.costoTotal, 0);
   document.getElementById('compras-resumen').textContent = `${lista.length} insumos · Costo estimado: S/ ${costoGlobal.toLocaleString('es-PE',{minimumFractionDigits:2})}`;
-  document.getElementById('compras-tabla').innerHTML = lista.map(i => {
-    const cantStr = i.unidad === 'kg' ? `${i.cantidadTotal.toFixed(3)} kg` : `${Math.round(i.cantidadTotal)} und`;
-    return `<tr>
+  document.getElementById('compras-tabla').innerHTML = lista.map(i => `<tr>
       <td style="font-size:13px">${i.nombre}</td>
       <td><span style="font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted)">${i.tipo}</span></td>
-      <td class="td-mono">${cantStr}</td>
-      <td class="td-muted">${i.unidad.toUpperCase()}</td>
+      <td class="td-mono">${formatCantidad(i.cantidadTotal, i.unidad)}</td>
+      <td class="td-muted">${(i.unidad||'').toUpperCase()}</td>
       <td class="td-mono" style="color:var(--green)">S/ ${i.costoTotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
       <td><span class="proveedor-badge">${i.proveedor||'—'}</span></td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('');
   document.getElementById('compras-result').style.display = 'block';
   document.getElementById('proveedores-result').style.display = 'none';
   window._insumosCalculados = lista;
+}
+
+/**
+ * Devuelve "12 kg" / "1.08 kg" / "400 und" / "1,000 und".
+ * - Para kg: redondea a 3 decimales y elimina ceros finales.
+ * - Para und: redondea a entero y agrega separador de miles (en-US).
+ */
+function formatCantidad(qty, unidad) {
+  const n = parseFloat(qty) || 0;
+  if (unidad === 'kg') {
+    return parseFloat(n.toFixed(3)).toString() + ' kg';
+  }
+  return Math.round(n).toLocaleString('en-US') + ' und';
 }
 
 function mostrarProveedores() {
@@ -498,7 +508,7 @@ function mostrarProveedores() {
       <div class="prov-body">
         ${data.insumos.map(i => `<div class="prov-item">
           <span class="prov-item-name">${i.nombre}</span>
-          <span class="prov-item-qty">${i.cantidadTotal.toFixed(3)} kg</span>
+          <span class="prov-item-qty">${formatCantidad(i.cantidadTotal, i.unidad)}</span>
           <span class="prov-item-cost">S/ ${i.costoTotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>
         </div>`).join('')}
       </div>
