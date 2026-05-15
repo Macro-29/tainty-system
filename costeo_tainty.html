@@ -423,12 +423,36 @@ function getEscalaCercana(cantidad) {
   return 1000;
 }
 
+/**
+ * Normaliza un nombre de producto para comparación tolerante.
+ * Espejo del normalizarNombre_ del Apps Script:
+ *   - uppercase
+ *   - sin acentos (NFD)
+ *   - sin espacios no-rompibles / zero-width
+ *   - espacios múltiples colapsados, trim
+ * Sirve para que un pedido registrado como "Flycleanse (500ml)" matchee
+ * con el catálogo guardado como "FLYCLEANSE (500ML)".
+ */
+function normalizarNombre(valor) {
+  if (valor === null || valor === undefined) return '';
+  let s = String(valor);
+  s = s.replace(/[ ​-‍﻿\t]+/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim().toUpperCase();
+  if (s.normalize) s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return s;
+}
+
 function calcularCompras() {
   if (!pedidosActivos.length) { document.getElementById('compras-result').style.display = 'none'; return; }
   const insumos = {};
+  const noEncontrados = [];
   for (const ped of pedidosActivos) {
-    const prod = catalogo.find(p => p.nombre === ped.producto);
-    if (!prod || !prod.insumos || prod.insumos.length === 0) continue;
+    const objetivo = normalizarNombre(ped.producto);
+    const prod = catalogo.find(p => normalizarNombre(p.nombre) === objetivo);
+    if (!prod || !prod.insumos || prod.insumos.length === 0) {
+      noEncontrados.push(ped.producto);
+      continue;
+    }
     const escala = getEscalaCercana(ped.cantidad);
     const factor = ped.cantidad / escala;
     for (const ins of prod.insumos) {
@@ -463,7 +487,12 @@ function calcularCompras() {
   }
   const lista = Object.values(insumos).sort((a,b) => (a.proveedor||'').localeCompare(b.proveedor||''));
   const costoGlobal = lista.reduce((s,i) => s+i.costoTotal, 0);
-  document.getElementById('compras-resumen').textContent = `${lista.length} insumos · Costo estimado: S/ ${costoGlobal.toLocaleString('es-PE',{minimumFractionDigits:2})}`;
+  let resumen = `${lista.length} insumos · Costo estimado: S/ ${costoGlobal.toLocaleString('es-PE',{minimumFractionDigits:2})}`;
+  if (noEncontrados.length) {
+    resumen += ` · ⚠ ${noEncontrados.length} pedido(s) sin match en catálogo: ${noEncontrados.join(', ')}`;
+    mostrarToast(`No encontré en el catálogo: ${noEncontrados.join(', ')}`, {type:'error',duration:4500});
+  }
+  document.getElementById('compras-resumen').textContent = resumen;
   document.getElementById('compras-tabla').innerHTML = lista.map(i => `<tr>
       <td style="font-size:13px">${i.nombre}</td>
       <td><span style="font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted)">${i.tipo}</span></td>
