@@ -63,6 +63,9 @@
 .stat-pill.s-produccion.has-count{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
 .stat-pill.s-camino.has-count{background:var(--blue-dim);color:var(--blue);border-color:rgba(76,163,232,.3)}
 .stat-pill.s-oficina.has-count{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.3)}
+.btn-copiar-sec{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(124,111,239,.3);background:var(--purple-dim);color:var(--purple);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.btn-copiar-sec:hover{background:rgba(124,111,239,.25)}
+.btn-copiar-sec:active{transform:scale(.97)}
 .seccion-body{background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;overflow:hidden}
 .fila-pedido{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)}
 .fila-pedido:last-child{border:none}
@@ -140,6 +143,8 @@ const ESTADOS=['pendiente','compra','produccion','camino','oficina','noaplica'];
 const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
 const LABELS={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica','encurso':'⚙️ En curso','finalizado':'✅ Finalizado'};
 const DOT={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
+// Emoji compacto usado en el texto exportable (botón Copiar por sección).
+const ESTADO_EMOJI={'pendiente':'⏳','compra':'🛒','produccion':'⚙️','camino':'🚚','oficina':'✅','noaplica':'➖','encurso':'⚙️','finalizado':'✅'};
 let pinBuf='',pedidos=[],estadosInsumos={},filtroActual='todos';
 
 function initDots(){
@@ -346,13 +351,68 @@ function renderLista(){
           ${insumo}
           <span class="seccion-count">${pedidosFiltrados.length}/${pedidosSeccion.length}</span>
         </div>
-        <div class="seccion-stats">${pillsHtml}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div class="seccion-stats">${pillsHtml}</div>
+          <button class="btn-copiar-sec" onclick="copiarSeccion('${insumo}')" title="Copiar al portapapeles">📋 Copiar</button>
+        </div>
       </div>
       <div class="seccion-body">${bodyHtml}</div>
     </div>`;
   }).filter(Boolean).join('');
 
   document.getElementById('lista-pedidos').innerHTML=seccionesHtml;
+}
+
+/**
+ * Genera el texto exportable de una sección de insumo y lo copia al portapapeles.
+ * Respeta la búsqueda actual y el filtro de estado activo (igual que la UI).
+ * Formato:
+ *   <INSUMO>
+ *   (línea en blanco)
+ *   <emoji-estado><PRODUCTO>\t<CANTIDAD>
+ *   ...
+ */
+function copiarSeccion(insumo){
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const lista=pedidos.filter(p=>{
+    if(!q)return true;
+    return(p.numPedido||'').toLowerCase().includes(q)
+      ||(p.cliente||'').toLowerCase().includes(q)
+      ||(p.producto||'').toLowerCase().includes(q);
+  }).sort((a,b)=>{
+    const na=parseInt((a.numPedido||'P0').replace('P',''))||0;
+    const nb=parseInt((b.numPedido||'P0').replace('P',''))||0;
+    return na-nb;
+  });
+
+  let pedidosSeccion=lista.filter(p=>getInsumos(getTipo(p.producto)).includes(insumo));
+
+  // Si hay filtro de estado activo, aplicar igual que en la UI
+  const esMaquina=insumo==='Maquina';
+  const estadoFiltro=esMaquina?FILTRO_A_ESTADO_MAQ[filtroActual]:FILTRO_A_ESTADO[filtroActual];
+  if(filtroActual!=='todos'&&estadoFiltro){
+    pedidosSeccion=pedidosSeccion.filter(p=>getEstadoInsumo(p.numPedido,insumo)===estadoFiltro);
+  }
+
+  if(!pedidosSeccion.length){
+    mostrarToast('No hay pedidos para copiar en esta sección',{type:'error',duration:2500});
+    return;
+  }
+
+  const lineas=pedidosSeccion.map(p=>{
+    const est=getEstadoInsumo(p.numPedido,insumo);
+    const emoji=ESTADO_EMOJI[est]||'';
+    const cant=parseInt(p.cantidad||0);
+    return`${emoji}${p.producto||''}\t${cant}`;
+  }).join('\n');
+
+  const texto=`${insumo.toUpperCase()}\n\n${lineas}`;
+
+  navigator.clipboard.writeText(texto).then(()=>{
+    mostrarToast(`✓ ${insumo} copiado (${pedidosSeccion.length} pedido${pedidosSeccion.length===1?'':'s'})`,{type:'success',duration:2500});
+  }).catch(()=>{
+    mostrarToast('No se pudo copiar al portapapeles',{type:'error',duration:3500});
+  });
 }
 
 async function cambiarEstado(pedidoId,insumo,estado){
