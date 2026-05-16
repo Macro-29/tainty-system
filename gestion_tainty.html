@@ -399,14 +399,12 @@ function copiarSeccion(insumo){
     return;
   }
 
-  const lineas=pedidosSeccion.map(p=>{
+  const texto=pedidosSeccion.map(p=>{
     const est=getEstadoInsumo(p.numPedido,insumo);
     const emoji=ESTADO_EMOJI[est]||'';
     const cant=parseInt(p.cantidad||0);
     return`${emoji}${p.producto||''}\t${cant}`;
   }).join('\n');
-
-  const texto=`${insumo.toUpperCase()}\n\n${lineas}`;
 
   navigator.clipboard.writeText(texto).then(()=>{
     mostrarToast(`✓ ${insumo} copiado (${pedidosSeccion.length} pedido${pedidosSeccion.length===1?'':'s'})`,{type:'success',duration:2500});
