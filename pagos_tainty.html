@@ -224,7 +224,9 @@ function renderTabla(){
     const badgeCls=est==='realizado'?'badge-done':est==='parcial'?'badge-partial':'badge-pending';
     const badgeTxt=est==='realizado'?'Realizado':est==='parcial'?'Parcial':'Pendiente';
     const abonosHtml=[[p.abono1,p.fecha1],[p.abono2,p.fecha2],[p.abono3,p.fecha3],[p.abono4,p.fecha4]].filter(([a])=>a&&parseFloat(a)>0).map(([a,f],i)=>`<div class="abono-row"><span class="abono-num">${i+1}&deg;</span><span class="abono-monto">S/ ${parseFloat(a).toLocaleString('es-PE',{minimumFractionDigits:2})}</span><span class="abono-fecha">${f||''}</span></div>`).join('');
-    const accion=est==='realizado'?'<span style="font-size:12px;color:var(--green)">Pagado</span>':sig?`<button class="btn-abono" onclick="abrirModal('${p.numPedido}')">+ Abono</button>`:'<span style="font-size:11px;color:var(--hint)">Max</span>';
+    const btnCopiar=`<button class="btn-abono" style="background:var(--surface2);border-color:var(--border2);color:var(--muted)" onclick="copiarPedido('${p.numPedido}')" title="Copiar resumen del pago">&#128203;</button>`;
+    const btnPrincipal=est==='realizado'?'<span style="font-size:12px;color:var(--green)">Pagado</span>':sig?`<button class="btn-abono" onclick="abrirModal('${p.numPedido}')">+ Abono</button>`:'<span style="font-size:11px;color:var(--hint)">Max</span>';
+    const accion=`<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${btnPrincipal}${btnCopiar}</div>`;
     const pc2=pct===100?'var(--green)':pct>0?'var(--amber)':'var(--red)';
     const fechaStr=p.fecha?String(p.fecha).split('T')[0]:'';
     const cantidad=parseInt(p.cantidad||0);
@@ -233,6 +235,40 @@ function renderTabla(){
   }).join('');
 }
 function setFiltro(f,btn){filtroActual=f;document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderTabla();}
+
+/**
+ * Copia al portapapeles un resumen del pago en formato:
+ *   👤 CLIENTE
+ *   📅 DD/MM/YYYY – PRODUCTO (CANT und)
+ *   💵 Total: S/ X.XX
+ *   💸 Abonado N : S/ X.XX
+ *   ⚠️ Pendiente: S/ X.XX   (o ✅ Pagado completo si restante=0)
+ */
+function copiarPedido(numPedido){
+  const p=pagos.find(x=>x.numPedido===numPedido);
+  if(!p){mostrarToast('Pedido no encontrado',{type:'error',duration:2500});return;}
+  const total=parseFloat(p.montoTotal)||0;
+  const restante=getRestante(p);
+  const cant=parseInt(p.cantidad||0).toLocaleString('en-US');
+  const fecha=formatFechaCorta(p.fecha)||'';
+  const money=n=>`S/ ${(parseFloat(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const abonos=[[p.abono1,p.fecha1],[p.abono2,p.fecha2],[p.abono3,p.fecha3],[p.abono4,p.fecha4]]
+    .map(([a,f],i)=>({n:i+1,monto:parseFloat(a)||0,fecha:f}))
+    .filter(x=>x.monto>0);
+  const lineas=[
+    `👤 ${(p.cliente||'').toString().toUpperCase()}`,
+    `📅 ${fecha} – ${p.producto||''} (${cant} und)`,
+    `💵 Total: ${money(total)}`,
+    ...abonos.map(a=>`💸 Abonado ${a.n} : ${money(a.monto)}`),
+    restante>0
+      ? `⚠️ Pendiente: ${money(restante)}`
+      : `✅ Pagado completo`
+  ];
+  const texto=lineas.join('\n');
+  navigator.clipboard.writeText(texto)
+    .then(()=>mostrarToast('Resumen copiado',{type:'success',duration:2000}))
+    .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
+}
 function formatFechaCorta(f){
   if(!f)return'';
   const s=String(f);
