@@ -17,7 +17,7 @@
 
 const COSTEO_ID = '1U9xDfX1wkiSiL8KsJ_Qb9lwGUtmX97VBLfnLwUCEWJs';
 const COSTEO_SHEET = 'COSTO POR PRODUCTO';
-const SCRIPT_VERSION = '2026-05-15';
+const SCRIPT_VERSION = '2026-05-15b';
 
 function getTipoConfig(tipo) {
   if (['INSUMO', 'LAINA'].indexOf(tipo) >= 0) return 'kg';
@@ -173,6 +173,12 @@ function guardarProducto(e, data) {
     // (A) Batch write — una sola llamada en vez de N appendRow
     const startRow = sheet.getLastRow() + 1;
     sheet.getRange(startRow, 1, filas.length, 13).setValues(filas);
+    // Aplicar formato explícito a las celdas recién escritas para evitar que
+    // hereden "S/" de columnas mal formateadas:
+    //   Col 5  (Precio unitario): moneda S/
+    //   Cols 6-9 (Cant 100/300/500/1000): número plain
+    //   Cols 10-13 (Costo 100/300/500/1000): moneda S/
+    aplicarFormatoFilas_(sheet, startRow, filas.length);
     SpreadsheetApp.flush();
 
     const duracion = Date.now() - t0;
@@ -375,6 +381,23 @@ function getCosteoSheet_() {
 }
 
 /**
+ * Aplica el formato numérico correcto a un bloque de filas:
+ *   Col 5      → moneda S/  (precio unitario)
+ *   Cols 6-9   → plain      (cantidades 100/300/500/1000)
+ *   Cols 10-13 → moneda S/  (costos calculados)
+ * Se llama después de cada setValues para evitar que las celdas hereden
+ * formato "S/" de columnas mal pre-formateadas.
+ */
+function aplicarFormatoFilas_(sheet, startRow, numFilas) {
+  if (!numFilas) return;
+  const fmtMoneda = '"S/" #,##0.00';
+  const fmtPlain  = '0.###';
+  sheet.getRange(startRow, 5,  numFilas, 1).setNumberFormat(fmtMoneda);
+  sheet.getRange(startRow, 6,  numFilas, 4).setNumberFormat(fmtPlain);
+  sheet.getRange(startRow, 10, numFilas, 4).setNumberFormat(fmtMoneda);
+}
+
+/**
  * Normaliza un nombre de producto para comparación tolerante:
  * - to string + uppercase
  * - quita acentos (NFD)
@@ -491,4 +514,27 @@ function recalcularCostosExistentes() {
   SpreadsheetApp.flush();
   console.log('Costos recalculados en ' + actualizadas + ' filas');
   return { success: true, actualizadas: actualizadas };
+}
+
+/**
+ * Repara el formato numérico de TODAS las filas de la hoja:
+ *   Col 5      → moneda S/  (Precio unitario)
+ *   Cols 6-9   → plain      (Cant 100/300/500/1000) ← arregla el "S/ 5kg"
+ *   Cols 10-13 → moneda S/  (Costo 100/300/500/1000)
+ * Ejecutar UNA VEZ desde el editor de Apps Script si las filas existentes
+ * tienen el formato "S/" pegado en las columnas de cantidades.
+ */
+function arreglarFormatoTodo() {
+  const sheet = getCosteoSheet_();
+  if (!sheet) throw new Error('Hoja no encontrada: ' + COSTEO_SHEET);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    console.log('Hoja vacía, nada que formatear');
+    return { success: true, filas: 0 };
+  }
+  const numFilas = lastRow - 1; // sin contar la cabecera
+  aplicarFormatoFilas_(sheet, 2, numFilas);
+  SpreadsheetApp.flush();
+  console.log('Formato aplicado a ' + numFilas + ' filas');
+  return { success: true, filas: numFilas };
 }
