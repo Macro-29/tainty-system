@@ -136,6 +136,7 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
     <div class="search-wrap"><span class="search-icon">&#128269;</span><input class="search-input" id="search" placeholder="Buscar cliente, producto o N&#176; pedido..." oninput="renderTabla()"></div>
     <select class="sel" id="filtro-mes" onchange="renderTabla()"><option value="">Todos los meses</option><option>ENERO</option><option>FEBRERO</option><option>MARZO</option><option>ABRIL</option><option>MAYO</option><option>JUNIO</option><option>JULIO</option><option>AGOSTO</option><option>SEPTIEMBRE</option><option>OCTUBRE</option><option>NOVIEMBRE</option><option>DICIEMBRE</option></select>
     <select class="sel" id="filtro-cliente" onchange="renderTabla()"><option value="">Todos los clientes</option></select>
+    <button class="btn-abono" id="btn-copiar-cliente" onclick="copiarTodosCliente()" title="Copiar todos los pedidos del cliente filtrado" style="background:var(--surface);border-color:var(--border2);color:var(--muted);padding:8px 12px">&#128203; Copiar lista</button>
     <div class="filter-tabs">
       <button class="ftab active" onclick="setFiltro('todos',this)">Todos</button>
       <button class="ftab" onclick="setFiltro('pendiente',this)">&#128176; Pendiente</button>
@@ -205,11 +206,14 @@ function renderCharts(){
   const top=Object.entries(deudaCliente).sort((a,b)=>b[1]-a[1]).slice(0,8);
   charts['clientes']=new Chart(document.getElementById('chart-clientes'),{type:'bar',data:{labels:top.map(x=>x[0]),datasets:[{label:'Deuda',data:top.map(x=>x[1]),backgroundColor:'rgba(124,111,239,0.7)',borderRadius:6,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#7a7a8a',callback:v=>'S/'+v.toLocaleString()}},y:{ticks:{color:'#7a7a8a',font:{size:11}}}}}});
 }
-function renderTabla(){
+// Devuelve la lista de pagos respetando todos los filtros activos en la UI
+// (search, mes, cliente y filtro de estado). Usado por renderTabla y por
+// copiarTodosCliente para que el copy refleje exactamente lo que se ve.
+function getListaFiltrada(){
   const q=(document.getElementById('search').value||'').toLowerCase();
   const filtroMes=document.getElementById('filtro-mes').value;
   const filtroCliente=document.getElementById('filtro-cliente').value;
-  let lista=pagos.filter(p=>{
+  return pagos.filter(p=>{
     const est=getEstadoPago(p);
     if(filtroActual!=='todos'&&est!==filtroActual)return false;
     if(filtroMes&&getMesPedido(p)!==filtroMes)return false;
@@ -217,6 +221,11 @@ function renderTabla(){
     if(q)return(p.numPedido||'').toLowerCase().includes(q)||(p.cliente||'').toLowerCase().includes(q)||(p.producto||'').toLowerCase().includes(q);
     return true;
   });
+}
+
+function renderTabla(){
+  const filtroCliente=document.getElementById('filtro-cliente').value;
+  let lista=getListaFiltrada();
   if(!lista.length){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--hint)">No hay resultados</td></tr>';return;}
   document.getElementById('tabla-body').innerHTML=lista.map(p=>{
     const est=getEstadoPago(p);const restante=getRestante(p);const abonado=getTotalAbonado(p);const total=parseFloat(p.montoTotal)||0;
@@ -267,6 +276,57 @@ function copiarPedido(numPedido){
   const texto=lineas.join('\n');
   navigator.clipboard.writeText(texto)
     .then(()=>mostrarToast('Resumen copiado',{type:'success',duration:2000}))
+    .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
+}
+
+/**
+ * Copia al portapapeles todos los pedidos del cliente actualmente filtrado,
+ * respetando también los demás filtros activos (mes, estado, búsqueda).
+ * Formato:
+ *   👤 CLIENTE (N pedidos)
+ *
+ *   📅 12/09/2025 – PSORIASIS (500 und)
+ *   💵 Total: S/ 5,000.00
+ *   💸 Abonado 1 : S/ 4,000.00
+ *   ⚠️ Pendiente: S/ 1,000.00
+ *
+ *   📅 ... (siguiente pedido)
+ *
+ *   💰 TOTAL PENDIENTE: S/ X.XX
+ */
+function copiarTodosCliente(){
+  const filtroCliente=document.getElementById('filtro-cliente').value;
+  if(!filtroCliente){
+    mostrarToast('Selecciona un cliente en el filtro primero',{type:'error',duration:3000});
+    return;
+  }
+  const lista=getListaFiltrada();
+  if(!lista.length){
+    mostrarToast('No hay pedidos para copiar',{type:'error',duration:2500});
+    return;
+  }
+  const money=n=>`S/ ${(parseFloat(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const totalPendiente=lista.reduce((s,p)=>s+getRestante(p),0);
+  const bloques=lista.map(p=>{
+    const total=parseFloat(p.montoTotal)||0;
+    const restante=getRestante(p);
+    const cant=parseInt(p.cantidad||0).toLocaleString('en-US');
+    const fecha=formatFechaCorta(p.fecha)||'';
+    const abonos=[[p.abono1,p.fecha1],[p.abono2,p.fecha2],[p.abono3,p.fecha3],[p.abono4,p.fecha4]]
+      .map(([a,f],i)=>({n:i+1,monto:parseFloat(a)||0}))
+      .filter(x=>x.monto>0);
+    return [
+      `📅 ${fecha} – ${p.producto||''} (${cant} und)`,
+      `💵 Total: ${money(total)}`,
+      ...abonos.map(a=>`💸 Abonado ${a.n} : ${money(a.monto)}`),
+      restante>0 ? `⚠️ Pendiente: ${money(restante)}` : `✅ Pagado completo`
+    ].join('\n');
+  });
+  const header=`👤 ${filtroCliente.toUpperCase()} (${lista.length} pedido${lista.length===1?'':'s'})`;
+  const footer=`💰 TOTAL PENDIENTE: ${money(totalPendiente)}`;
+  const texto=[header,'',...bloques.flatMap(b=>[b,'']),footer].join('\n');
+  navigator.clipboard.writeText(texto)
+    .then(()=>mostrarToast(`${lista.length} pedido(s) copiado(s)`,{type:'success',duration:2500}))
     .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
 }
 function formatFechaCorta(f){
