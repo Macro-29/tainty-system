@@ -123,6 +123,10 @@
 
 <div class="main">
   <input class="search-input" id="search" placeholder="Buscar pedido, producto o cliente..." oninput="renderLista()">
+  <div class="filters" id="modo-orden" style="margin-bottom:.5rem">
+    <button class="ftab active" onclick="setModoOrden('insumo',this)" id="modo-insumo">🧪 Por insumo</button>
+    <button class="ftab" onclick="setModoOrden('producto',this)" id="modo-producto">📦 Por producto</button>
+  </div>
   <div class="filters" id="filtros">
     <button class="ftab active" onclick="setFiltro('todos',this)">Todos</button>
     <button class="ftab" onclick="setFiltro('recibido',this)">⏳ Pendientes</button>
@@ -145,7 +149,7 @@ const LABELS={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion'
 const DOT={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
 // Emoji compacto usado en el texto exportable (botón Copiar por sección).
 const ESTADO_EMOJI={'pendiente':'⏳','compra':'🛒','produccion':'⚙️','camino':'🚚','oficina':'✅','noaplica':'➖','encurso':'⚙️','finalizado':'✅'};
-let pinBuf='',pedidos=[],estadosInsumos={},filtroActual='todos';
+let pinBuf='',pedidos=[],estadosInsumos={},filtroActual='todos',modoOrden='insumo';
 
 function initDots(){
   const w=document.getElementById('pin-dots-wrap');
@@ -249,11 +253,12 @@ const ORDEN_INSUMOS=['Insumo','Capsula','Envase','Etiqueta','Caja','Maquina'];
 const FILTRO_A_ESTADO={'recibido':'pendiente','compras':'compra','produccion':'produccion','camino':'camino','listo':'oficina'};
 const FILTRO_A_ESTADO_MAQ={'recibido':'pendiente','compras':null,'produccion':'encurso','camino':null,'listo':'finalizado'};
 
-function renderLista(){
+// Devuelve la lista de pedidos filtrada por la búsqueda activa y ordenada
+// por número de pedido. NO aplica filtro por estado (eso se hace por sección
+// o por insumo dentro del bloque del producto).
+function getListaBase(){
   const q=(document.getElementById('search').value||'').toLowerCase();
-
-  // Filtrado por búsqueda (no por estado, eso se hace por sección)
-  const lista=pedidos.filter(p=>{
+  return pedidos.filter(p=>{
     if(!q)return true;
     return(p.numPedido||'').toLowerCase().includes(q)
       ||(p.cliente||'').toLowerCase().includes(q)
@@ -263,6 +268,18 @@ function renderLista(){
     const nb=parseInt((b.numPedido||'P0').replace('P',''))||0;
     return na-nb;
   });
+}
+
+function setModoOrden(modo,btn){
+  modoOrden=modo;
+  document.querySelectorAll('#modo-orden .ftab').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderLista();
+}
+
+function renderLista(){
+  if(modoOrden==='producto')return renderListaPorProducto();
+  const lista=getListaBase();
 
   if(!lista.length){
     document.getElementById('lista-pedidos').innerHTML='<div class="empty">No hay pedidos que coincidan con la búsqueda</div>';
@@ -408,6 +425,113 @@ function copiarSeccion(insumo){
 
   navigator.clipboard.writeText(texto).then(()=>{
     mostrarToast(`✓ ${insumo} copiado (${pedidosSeccion.length} pedido${pedidosSeccion.length===1?'':'s'})`,{type:'success',duration:2500});
+  }).catch(()=>{
+    mostrarToast('No se pudo copiar al portapapeles',{type:'error',duration:3500});
+  });
+}
+
+/* =========================================================
+   Modo "Por producto"
+   Cada card es un pedido (producto + cliente + cantidad),
+   y dentro muestra el estado de cada insumo aplicable.
+   ========================================================= */
+
+const ORDEN_INSUMOS_LABELS = {
+  'Insumo':'Insumo', 'Capsula':'Cápsula', 'Envase':'Envase',
+  'Etiqueta':'Etiqueta', 'Caja':'Caja', 'Maquina':'Máquina'
+};
+
+function renderListaPorProducto(){
+  const lista=getListaBase();
+  if(!lista.length){
+    document.getElementById('lista-pedidos').innerHTML='<div class="empty">No hay pedidos que coincidan con la búsqueda</div>';
+    return;
+  }
+
+  // Aplicar filtro de estado a nivel pedido: el pedido aparece si AL MENOS UNO
+  // de sus insumos tiene el estado del filtro.
+  const filtroAplicaInsumo=FILTRO_A_ESTADO[filtroActual];
+  const filtroAplicaMaq=FILTRO_A_ESTADO_MAQ[filtroActual];
+  const listaFiltrada=filtroActual==='todos'?lista:lista.filter(p=>{
+    const insumosP=getInsumos(getTipo(p.producto));
+    return insumosP.some(insumo=>{
+      const esMaq=insumo==='Maquina';
+      const objetivo=esMaq?filtroAplicaMaq:filtroAplicaInsumo;
+      if(!objetivo)return false;
+      return getEstadoInsumo(p.numPedido,insumo)===objetivo;
+    });
+  });
+
+  if(!listaFiltrada.length){
+    document.getElementById('lista-pedidos').innerHTML='<div class="empty">Sin pedidos en este estado</div>';
+    return;
+  }
+
+  document.getElementById('lista-pedidos').innerHTML=listaFiltrada.map(p=>{
+    const insumosP=getInsumos(getTipo(p.producto));
+    const cant=parseInt(p.cantidad||0);
+    const filas=insumosP.map(insumo=>{
+      const esMaq=insumo==='Maquina';
+      const estados=esMaq?ESTADOS_MAQUINA:ESTADOS;
+      const est=getEstadoInsumo(p.numPedido,insumo);
+      const btns=estados.map(s=>{
+        const isSel=est===s;
+        return`<button class="est-btn${isSel?' sel-'+s:''}" onclick="cambiarEstado('${p.numPedido}','${insumo}','${s}')">${LABELS[s]}</button>`;
+      }).join('');
+      return`<div class="fila-pedido">
+        <div class="fila-info" style="min-width:120px">
+          <span class="seccion-icono" style="margin-right:4px">${ICONO_INSUMO[insumo]||''}</span>
+          <span style="font-size:13px;color:var(--text)">${ORDEN_INSUMOS_LABELS[insumo]||insumo}</span>
+        </div>
+        <div class="fila-estado-actual">
+          <span class="insumo-dot ${DOT[est]||'dot-pendiente'}"></span>
+          <div class="estado-btns">${btns}</div>
+          <span class="saving-indicator" id="si-${p.numPedido}-${insumo}"></span>
+        </div>
+      </div>`;
+    }).join('');
+
+    return`<div class="seccion-insumo">
+      <div class="seccion-header">
+        <div class="seccion-titulo" style="flex-direction:column;align-items:flex-start;gap:2px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="ticket-num" style="font-family:DM Mono,monospace;font-size:11px;color:var(--hint)">${p.numPedido||''}</span>
+            <span style="font-family:Syne,sans-serif;font-size:14px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:normal">${p.producto||''}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);font-family:DM Sans,sans-serif;text-transform:none;letter-spacing:normal">
+            ${p.cliente||''} · ${cant.toLocaleString()} und
+          </div>
+        </div>
+        <button class="btn-copiar-sec" onclick="copiarProducto('${p.numPedido}')" title="Copiar estado de este producto">📋 Copiar</button>
+      </div>
+      <div class="seccion-body">${filas}</div>
+    </div>`;
+  }).join('');
+}
+
+/**
+ * Copia al portapapeles el estado de cada insumo de un pedido específico.
+ * Formato:
+ *   P0123 · PRODUCTO (CAP) · 100 und · CLIENTE
+ *   ⏳ Insumo
+ *   🛒 Cápsula
+ *   ⚙️ Envase
+ *   ...
+ */
+function copiarProducto(numPedido){
+  const p=pedidos.find(x=>x.numPedido===numPedido);
+  if(!p){mostrarToast('Pedido no encontrado',{type:'error',duration:2500});return;}
+  const insumosP=getInsumos(getTipo(p.producto));
+  const cant=parseInt(p.cantidad||0).toLocaleString();
+  const head=`${p.numPedido||''} · ${p.producto||''} · ${cant} und${p.cliente?' · '+p.cliente:''}`;
+  const filas=insumosP.map(insumo=>{
+    const est=getEstadoInsumo(p.numPedido,insumo);
+    const emoji=ESTADO_EMOJI[est]||'';
+    return`${emoji} ${ORDEN_INSUMOS_LABELS[insumo]||insumo}`;
+  });
+  const texto=[head,...filas].join('\n');
+  navigator.clipboard.writeText(texto).then(()=>{
+    mostrarToast('✓ Estado de '+p.numPedido+' copiado',{type:'success',duration:2500});
   }).catch(()=>{
     mostrarToast('No se pudo copiar al portapapeles',{type:'error',duration:3500});
   });
