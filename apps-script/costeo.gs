@@ -17,7 +17,7 @@
 
 const COSTEO_ID = '1U9xDfX1wkiSiL8KsJ_Qb9lwGUtmX97VBLfnLwUCEWJs';
 const COSTEO_SHEET = 'COSTO POR PRODUCTO';
-const SCRIPT_VERSION = '2026-05-15b';
+const SCRIPT_VERSION = '2026-05-15c';
 
 function getTipoConfig(tipo) {
   if (['INSUMO', 'LAINA'].indexOf(tipo) >= 0) return 'kg';
@@ -385,16 +385,37 @@ function getCosteoSheet_() {
  *   Col 5      → moneda S/  (precio unitario)
  *   Cols 6-9   → plain      (cantidades 100/300/500/1000)
  *   Cols 10-13 → moneda S/  (costos calculados)
- * Se llama después de cada setValues para evitar que las celdas hereden
- * formato "S/" de columnas mal pre-formateadas.
+ *
+ * Si alguna columna del sheet está configurada como "Texto sin formato"
+ * (Formato → Número → Texto sin formato), setNumberFormat lanza una
+ * excepción. Iteramos columna por columna y absorbemos cada error
+ * individual — así el guardado completo no se cae aunque una columna esté
+ * forzada como texto. El error se logea pero NO se propaga.
  */
 function aplicarFormatoFilas_(sheet, startRow, numFilas) {
   if (!numFilas) return;
   const fmtMoneda = '"S/" #,##0.00';
   const fmtPlain  = '0.###';
-  sheet.getRange(startRow, 5,  numFilas, 1).setNumberFormat(fmtMoneda);
-  sheet.getRange(startRow, 6,  numFilas, 4).setNumberFormat(fmtPlain);
-  sheet.getRange(startRow, 10, numFilas, 4).setNumberFormat(fmtMoneda);
+  const formatos = [
+    { col: 5,  ancho: 1, fmt: fmtMoneda, label: 'Precio' },
+    { col: 6,  ancho: 1, fmt: fmtPlain,  label: 'Cant 100' },
+    { col: 7,  ancho: 1, fmt: fmtPlain,  label: 'Cant 300' },
+    { col: 8,  ancho: 1, fmt: fmtPlain,  label: 'Cant 500' },
+    { col: 9,  ancho: 1, fmt: fmtPlain,  label: 'Cant 1000' },
+    { col: 10, ancho: 1, fmt: fmtMoneda, label: 'Costo 100' },
+    { col: 11, ancho: 1, fmt: fmtMoneda, label: 'Costo 300' },
+    { col: 12, ancho: 1, fmt: fmtMoneda, label: 'Costo 500' },
+    { col: 13, ancho: 1, fmt: fmtMoneda, label: 'Costo 1000' }
+  ];
+  formatos.forEach(f => {
+    try {
+      sheet.getRange(startRow, f.col, numFilas, f.ancho).setNumberFormat(f.fmt);
+    } catch (err) {
+      // Probablemente la columna entera está marcada como "Texto sin formato".
+      // En Sheets: seleccioná la columna → Formato → Número → "Número" para liberarla.
+      console.warn('No se pudo formatear ' + f.label + ' (col ' + f.col + '): ' + err.message);
+    }
+  });
 }
 
 /**
@@ -521,8 +542,13 @@ function recalcularCostosExistentes() {
  *   Col 5      → moneda S/  (Precio unitario)
  *   Cols 6-9   → plain      (Cant 100/300/500/1000) ← arregla el "S/ 5kg"
  *   Cols 10-13 → moneda S/  (Costo 100/300/500/1000)
- * Ejecutar UNA VEZ desde el editor de Apps Script si las filas existentes
- * tienen el formato "S/" pegado en las columnas de cantidades.
+ *
+ * Si alguna columna está marcada como "Texto sin formato", la salta y
+ * sigue con el resto. Para reparar una columna que falla:
+ *   1. Abrí el sheet
+ *   2. Click en el header de la columna (selección completa)
+ *   3. Formato → Número → "Número"
+ *   4. Volvé a ejecutar arreglarFormatoTodo
  */
 function arreglarFormatoTodo() {
   const sheet = getCosteoSheet_();
@@ -532,9 +558,9 @@ function arreglarFormatoTodo() {
     console.log('Hoja vacía, nada que formatear');
     return { success: true, filas: 0 };
   }
-  const numFilas = lastRow - 1; // sin contar la cabecera
+  const numFilas = lastRow - 1;
   aplicarFormatoFilas_(sheet, 2, numFilas);
   SpreadsheetApp.flush();
-  console.log('Formato aplicado a ' + numFilas + ' filas');
+  console.log('Formato aplicado a ' + numFilas + ' filas (revisa "warnings" arriba para columnas saltadas)');
   return { success: true, filas: numFilas };
 }
