@@ -441,6 +441,18 @@ const ORDEN_INSUMOS_LABELS = {
   'Etiqueta':'Etiqueta', 'Caja':'Caja', 'Maquina':'Máquina'
 };
 
+// Texto descriptivo de cada estado (sin emoji), para usar en exports.
+const ESTADO_TEXTO = {
+  'pendiente':'Pendiente',
+  'compra':'En compra',
+  'produccion':'En producción',
+  'camino':'En camino',
+  'oficina':'En oficina',
+  'noaplica':'No aplica',
+  'encurso':'En curso',
+  'finalizado':'Finalizado'
+};
+
 function renderListaPorProducto(){
   const lista=getListaBase();
   if(!lista.length){
@@ -527,7 +539,9 @@ function copiarProducto(numPedido){
   const filas=insumosP.map(insumo=>{
     const est=getEstadoInsumo(p.numPedido,insumo);
     const emoji=ESTADO_EMOJI[est]||'';
-    return`${emoji} ${ORDEN_INSUMOS_LABELS[insumo]||insumo}`;
+    const texto=ESTADO_TEXTO[est]||est||'';
+    const nombre=ORDEN_INSUMOS_LABELS[insumo]||insumo;
+    return texto ? `${emoji} ${nombre} (${texto})` : `${emoji} ${nombre}`;
   });
   const texto=[head,...filas].join('\n');
   navigator.clipboard.writeText(texto).then(()=>{
