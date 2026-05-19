@@ -17,7 +17,7 @@
 
 const COSTEO_ID = '1U9xDfX1wkiSiL8KsJ_Qb9lwGUtmX97VBLfnLwUCEWJs';
 const COSTEO_SHEET = 'COSTO POR PRODUCTO';
-const SCRIPT_VERSION = '2026-05-14';
+const SCRIPT_VERSION = '2026-05-15';
 
 function getTipoConfig(tipo) {
   if (['INSUMO', 'LAINA'].indexOf(tipo) >= 0) return 'kg';
@@ -30,10 +30,9 @@ function getTipoConfig(tipo) {
    ========================================================= */
 
 function doGet(e) {
-  const callback = e && e.parameter && e.parameter.callback;
   try {
     if (e && e.parameter && e.parameter.data) {
-      const data = JSON.parse(decodeURIComponent(e.parameter.data));
+      const data = parsearPayload_(e.parameter.data);
       return dispatchAction(e, data);
     }
     // Sin `data` → leer catalogo. Soporta también ?action=ping para healthcheck.
@@ -52,13 +51,35 @@ function doGet(e) {
 function doPost(e) {
   try {
     let data;
-    if (e.parameter && e.parameter.data) data = JSON.parse(e.parameter.data);
-    else if (e.postData && e.postData.contents) data = JSON.parse(e.postData.contents);
+    if (e.parameter && e.parameter.data) data = parsearPayload_(e.parameter.data);
+    else if (e.postData && e.postData.contents) data = parsearPayload_(e.postData.contents);
     if (!data) return buildCosteoResponse({ success: false, error: 'No data received' });
     return dispatchAction(e, data);
   } catch (err) {
     console.error('doPost error:', err.message, err.stack);
     return buildCosteoResponse({ success: false, error: err.message, stack: err.stack });
+  }
+}
+
+/**
+ * Parsea el payload JSON tolerando si Apps Script ya url-decodificó o no.
+ * Apps Script decodifica e.parameter automáticamente, así que JSON.parse
+ * directo funciona en el caso normal. Si el JSON contiene caracteres
+ * literales tipo "%" (ej. proveedor "ACME 50%"), llamar decodeURIComponent
+ * después rompería con URI malformed — por eso solo se intenta como
+ * fallback cuando el parse directo falla.
+ */
+function parsearPayload_(raw) {
+  if (raw === null || raw === undefined) throw new Error('Payload vacío');
+  if (typeof raw !== 'string') return raw; // ya viene parseado por algún caller
+  try {
+    return JSON.parse(raw);
+  } catch (err1) {
+    try {
+      return JSON.parse(decodeURIComponent(raw));
+    } catch (err2) {
+      throw new Error('No se pudo parsear payload: ' + err1.message);
+    }
   }
 }
 
