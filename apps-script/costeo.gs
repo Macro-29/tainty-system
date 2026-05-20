@@ -17,7 +17,7 @@
 
 const COSTEO_ID = '1U9xDfX1wkiSiL8KsJ_Qb9lwGUtmX97VBLfnLwUCEWJs';
 const COSTEO_SHEET = 'COSTO POR PRODUCTO';
-const SCRIPT_VERSION = '2026-05-15c';
+const SCRIPT_VERSION = '2026-05-15d';
 
 function getTipoConfig(tipo) {
   if (['INSUMO', 'LAINA'].indexOf(tipo) >= 0) return 'kg';
@@ -174,11 +174,14 @@ function guardarProducto(e, data) {
     const startRow = sheet.getLastRow() + 1;
     sheet.getRange(startRow, 1, filas.length, 13).setValues(filas);
     // Aplicar formato explícito a las celdas recién escritas para evitar que
-    // hereden "S/" de columnas mal formateadas:
-    //   Col 5  (Precio unitario): moneda S/
-    //   Cols 6-9 (Cant 100/300/500/1000): número plain
-    //   Cols 10-13 (Costo 100/300/500/1000): moneda S/
-    aplicarFormatoFilas_(sheet, startRow, filas.length);
+    // hereden "S/" de columnas mal formateadas. Si alguna columna está marcada
+    // como "Texto sin formato", setNumberFormat falla — lo absorbemos para que
+    // el save SIEMPRE termine bien aunque el formato visual quede heredado.
+    try {
+      aplicarFormatoFilas_(sheet, startRow, filas.length);
+    } catch (fmtErr) {
+      console.warn('aplicarFormatoFilas_ falló (save no se cancela):', fmtErr.message);
+    }
     SpreadsheetApp.flush();
 
     const duracion = Date.now() - t0;
