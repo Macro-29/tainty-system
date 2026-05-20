@@ -189,7 +189,13 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
         <div class="section-title">Pedido por proveedor</div>
         <div style="font-size:12px;color:var(--muted)">Listo para enviar</div>
       </div>
-      <button class="btn-secondary" onclick="volverAInsumos()">&#8592; Volver</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="filter-tabs" id="orden-proveedores" style="display:inline-flex">
+          <button class="ftab active" id="ord-prov" onclick="setOrdenProveedores('proveedor',this)">📦 Por proveedor</button>
+          <button class="ftab" id="ord-tipo" onclick="setOrdenProveedores('tipo',this)">🧪 Por tipo</button>
+        </div>
+        <button class="btn-secondary" onclick="volverAInsumos()">&#8592; Volver</button>
+      </div>
     </div>
     <div id="proveedores-cards"></div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-top:12px">
@@ -519,22 +525,70 @@ function formatCantidad(qty, unidad) {
   return Math.round(n).toLocaleString('en-US') + ' und';
 }
 
+// Modo de agrupación en la vista "Pedido por proveedor":
+//   'proveedor' → cards por proveedor (default, listo para WhatsApp)
+//   'tipo'      → cards por tipo de insumo (Insumo / Cápsula / Envase / ...)
+let ordenProveedoresActual = 'proveedor';
+
+function setOrdenProveedores(modo, btn) {
+  ordenProveedoresActual = modo;
+  document.querySelectorAll('#orden-proveedores .ftab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  mostrarProveedores();
+}
+
+// Iconos y label por tipo (ya existe getTipoConfig para la unidad)
+const TIPO_META = {
+  'INSUMO':   { ic:'🧪', label:'Insumo' },
+  'LAINA':    { ic:'🧴', label:'Laina' },
+  'CAPSULA':  { ic:'💊', label:'Cápsula' },
+  'ENVASE':   { ic:'📦', label:'Envase' },
+  'ETIQUETA': { ic:'🏷️', label:'Etiqueta' },
+  'CAJA':     { ic:'📥', label:'Caja' }
+};
+const TIPO_ORDEN = ['INSUMO','LAINA','CAPSULA','ENVASE','ETIQUETA','CAJA'];
+
 function mostrarProveedores() {
   const lista = window._insumosCalculados || [];
+  // Reagrupar siempre por proveedor (necesario para el resumen y para los copies).
   const porProv = {};
   lista.forEach(i => {
     if (!porProv[i.proveedor]) porProv[i.proveedor] = { insumos: [], total: 0 };
     porProv[i.proveedor].insumos.push(i);
     porProv[i.proveedor].total += i.costoTotal;
   });
+  window._proveedoresData = porProv;
+
+  if (ordenProveedoresActual === 'tipo') {
+    renderProveedoresPorTipo(lista, porProv);
+  } else {
+    renderProveedoresPorProveedor(porProv);
+  }
+
+  // Resumen de costos (siempre por proveedor — más útil para totalizar)
+  const costoTotal = lista.reduce((s,i)=>s+i.costoTotal, 0);
+  const provEntries = Object.entries(porProv).sort((a,b) => b[1].total - a[1].total);
+  document.getElementById('resumen-costos').innerHTML = provEntries.map(([p,d])=>`
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span style="color:var(--muted)">${p||'—'}</span>
+      <span style="font-family:DM Mono,monospace;color:var(--amber)">S/ ${d.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>
+    </div>`).join('') +
+    `<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;font-weight:600">
+      <span>TOTAL</span><span style="font-family:DM Mono,monospace;color:var(--green)">S/ ${costoTotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>
+    </div>`;
+  document.getElementById('compras-result').style.display = 'none';
+  document.getElementById('proveedores-result').style.display = 'block';
+}
+
+function renderProveedoresPorProveedor(porProv) {
   const provEntries = Object.entries(porProv).sort((a,b) => b[1].total - a[1].total);
   document.getElementById('proveedores-cards').innerHTML = provEntries.map(([prov, data]) => `
     <div class="prov-card">
       <div class="prov-header">
-        <div class="prov-name">&#128230; ${prov}</div>
+        <div class="prov-name">&#128230; ${prov||'—'}</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="prov-total">S/ ${data.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
-          <button class="btn-copy" onclick="copiarProveedor('${prov.replace(/'/g,"\'")}')" >&#128203; Copiar</button>
+          <button class="btn-copy" onclick="copiarProveedor('${(prov||'').replace(/'/g,"\\'")}')" >&#128203; Copiar</button>
         </div>
       </div>
       <div class="prov-body">
@@ -545,6 +599,55 @@ function mostrarProveedores() {
         </div>`).join('')}
       </div>
     </div>`).join('');
+}
+
+function renderProveedoresPorTipo(lista, porProv) {
+  // Agrupar por tipo, y dentro de cada tipo sub-agrupar por proveedor.
+  const porTipo = {};
+  lista.forEach(i => {
+    const t = (i.tipo||'').toUpperCase();
+    if (!porTipo[t]) porTipo[t] = { porProv: {}, total: 0 };
+    if (!porTipo[t].porProv[i.proveedor]) porTipo[t].porProv[i.proveedor] = [];
+    porTipo[t].porProv[i.proveedor].push(i);
+    porTipo[t].total += i.costoTotal;
+  });
+
+  const tiposOrdenados = Object.keys(porTipo).sort((a,b) => {
+    const ia = TIPO_ORDEN.indexOf(a), ib = TIPO_ORDEN.indexOf(b);
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+
+  document.getElementById('proveedores-cards').innerHTML = tiposOrdenados.map(tipo => {
+    const meta = TIPO_META[tipo] || { ic:'•', label: tipo };
+    const data = porTipo[tipo];
+    // Dentro de cada tipo: una sub-sección por proveedor
+    const provEntries = Object.entries(data.porProv).sort((a,b) =>
+      (a[0]||'').localeCompare(b[0]||''));
+    const cuerpo = provEntries.map(([prov, insumos]) => {
+      const subtotal = insumos.reduce((s,i)=>s+i.costoTotal, 0);
+      const itemsHtml = insumos.map(i => `<div class="prov-item">
+        <span class="prov-item-name">${i.nombre}</span>
+        <span class="prov-item-qty">${formatCantidad(i.cantidadTotal, i.unidad)}</span>
+        <span class="prov-item-cost">S/ ${i.costoTotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>
+      </div>`).join('');
+      return `<div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px;background:var(--surface2);border-radius:6px;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:500;color:var(--text)">&#128230; ${prov||'—'}</div>
+          <div style="font-family:DM Mono,monospace;font-size:11px;color:var(--amber)">S/ ${subtotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
+        </div>
+        ${itemsHtml}
+      </div>`;
+    }).join('');
+
+    return `<div class="prov-card">
+      <div class="prov-header">
+        <div class="prov-name">${meta.ic} ${meta.label.toUpperCase()}</div>
+        <div class="prov-total">S/ ${data.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
+      </div>
+      <div class="prov-body">${cuerpo}</div>
+    </div>`;
+  }).join('');
+}
 
   const costoTotal = lista.reduce((s,i)=>s+i.costoTotal,0);
   document.getElementById('resumen-costos').innerHTML = provEntries.map(([p,d])=>`
