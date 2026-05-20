@@ -60,6 +60,11 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 .prov-item-cost{font-family:'DM Mono',monospace;color:var(--green)}
 .btn-copy{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(62,207,142,.3);background:var(--green-dim);color:var(--green);cursor:pointer;transition:all .15s}
 .btn-copy:hover{background:rgba(62,207,142,.2)}
+/* Segmented toggle (Por proveedor / Por tipo) */
+.seg-toggle{display:inline-flex;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:3px;gap:2px}
+.seg-btn{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;padding:6px 12px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-radius:7px;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.seg-btn:hover{color:var(--text)}
+.seg-btn.active{background:var(--purple-dim);color:var(--purple)}
 /* MANUAL PEDIDO */
 .manual-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap}
 .sel{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);cursor:pointer;outline:none;flex:1;min-width:150px}
@@ -190,9 +195,9 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
         <div style="font-size:12px;color:var(--muted)">Listo para enviar</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <div class="filter-tabs" id="orden-proveedores" style="display:inline-flex">
-          <button class="ftab active" id="ord-prov" onclick="setOrdenProveedores('proveedor',this)">📦 Por proveedor</button>
-          <button class="ftab" id="ord-tipo" onclick="setOrdenProveedores('tipo',this)">🧪 Por tipo</button>
+        <div class="seg-toggle" id="orden-proveedores">
+          <button class="seg-btn active" id="ord-prov" onclick="setOrdenProveedores('proveedor',this)">📦 Por proveedor</button>
+          <button class="seg-btn" id="ord-tipo" onclick="setOrdenProveedores('tipo',this)">🧪 Por tipo</button>
         </div>
         <button class="btn-secondary" onclick="volverAInsumos()">&#8592; Volver</button>
       </div>
@@ -630,10 +635,14 @@ function renderProveedoresPorTipo(lista, porProv) {
         <span class="prov-item-qty">${formatCantidad(i.cantidadTotal, i.unidad)}</span>
         <span class="prov-item-cost">S/ ${i.costoTotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>
       </div>`).join('');
+      const provEsc = (prov||'').replace(/'/g,"\\'");
       return `<div style="margin-top:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px;background:var(--surface2);border-radius:6px;margin-bottom:4px">
-          <div style="font-size:12px;font-weight:500;color:var(--text)">&#128230; ${prov||'—'}</div>
-          <div style="font-family:DM Mono,monospace;font-size:11px;color:var(--amber)">S/ ${subtotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--surface2);border-radius:6px;margin-bottom:4px;gap:8px;flex-wrap:wrap">
+          <div style="font-size:12px;font-weight:500;color:var(--text);flex:1;min-width:120px">&#128230; ${prov||'—'}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-family:DM Mono,monospace;font-size:11px;color:var(--amber)">S/ ${subtotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
+            <button class="btn-copy" onclick="copiarProveedor('${provEsc}')" title="Copiar pedido completo del proveedor (todos sus insumos)">&#128203; Copiar</button>
+          </div>
         </div>
         ${itemsHtml}
       </div>`;
