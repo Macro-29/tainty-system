@@ -649,20 +649,6 @@ function renderProveedoresPorTipo(lista, porProv) {
   }).join('');
 }
 
-  const costoTotal = lista.reduce((s,i)=>s+i.costoTotal,0);
-  document.getElementById('resumen-costos').innerHTML = provEntries.map(([p,d])=>`
-    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
-      <span style="color:var(--muted)">${p}</span>
-      <span style="font-family:DM Mono,monospace;color:var(--amber)">S/ ${d.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>
-    </div>`).join('') +
-    `<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;font-weight:600">
-      <span>TOTAL</span><span style="font-family:DM Mono,monospace;color:var(--green)">S/ ${costoTotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>
-    </div>`;
-  document.getElementById('compras-result').style.display = 'none';
-  document.getElementById('proveedores-result').style.display = 'block';
-  window._proveedoresData = porProv;
-}
-
 function copiarProveedor(prov) {
   const data = (window._proveedoresData || {})[prov];
   if (!data) return;
