@@ -260,6 +260,13 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 
     <!-- Sugerencias de proveedores existentes (autocomplete nativo) -->
     <datalist id="proveedores-list"></datalist>
+    <!-- Sugerencias de insumos por tipo (autocomplete del campo "Descripción") -->
+    <datalist id="insumos-INSUMO-list"></datalist>
+    <datalist id="insumos-LAINA-list"></datalist>
+    <datalist id="insumos-CAPSULA-list"></datalist>
+    <datalist id="insumos-ENVASE-list"></datalist>
+    <datalist id="insumos-ETIQUETA-list"></datalist>
+    <datalist id="insumos-CAJA-list"></datalist>
 
     <div style="display:flex;gap:10px;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="cerrarEditorProducto()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;font-size:14px">Cancelar</button>
@@ -987,11 +994,12 @@ function abrirEditorProducto(pi) {
   nombreInput.value = prod ? prod.nombre : '';
   nombreInput.disabled = prod !== null;
 
-  // Poblar la datalist de proveedores con los existentes en el catálogo —
-  // el navegador muestra sugerencias automáticamente al escribir. Si el
-  // usuario tipea un nombre que no está en la lista, se guarda igual y
-  // aparecerá en futuras sesiones.
+  // Poblar las datalists de autocomplete con los valores existentes en
+  // el catálogo — el navegador muestra sugerencias al escribir. Si el
+  // usuario tipea un valor nuevo (no está en la lista) se guarda igual
+  // y aparece en sesiones siguientes.
   actualizarDatalistProveedores();
+  actualizarDatalistsInsumos();
 
   initEditorItems(prod, nombreInput.value);
   renderEditorItems();
@@ -1015,6 +1023,41 @@ function actualizarDatalistProveedores() {
   dl.innerHTML = getProveedoresUnicos()
     .map(p => `<option value="${p.replace(/"/g,'&quot;')}"></option>`)
     .join('');
+}
+
+/**
+ * Devuelve un mapa { TIPO: [nombres únicos ordenados] } juntando todos
+ * los insumos existentes en el catálogo. Para autocomplete del campo
+ * "Descripción" del editor — cada input usa list="insumos-TIPO-list"
+ * así solo sugiere insumos del mismo tipo (no muestra envases cuando
+ * estás llenando una cápsula, etc.).
+ */
+function getInsumosUnicosPorTipo() {
+  const porTipo = {};
+  catalogo.forEach(p => (p.insumos||[]).forEach(i => {
+    const tipo = (i.tipo||'').toString().toUpperCase().trim();
+    const nombre = (i.nombre||'').toString().trim();
+    if (!tipo || !nombre) return;
+    if (!porTipo[tipo]) porTipo[tipo] = new Set();
+    porTipo[tipo].add(nombre);
+  }));
+  const out = {};
+  Object.keys(porTipo).forEach(t => {
+    out[t] = Array.from(porTipo[t]).sort((a,b) => a.localeCompare(b, 'es'));
+  });
+  return out;
+}
+
+function actualizarDatalistsInsumos() {
+  const porTipo = getInsumosUnicosPorTipo();
+  ['INSUMO','LAINA','CAPSULA','ENVASE','ETIQUETA','CAJA'].forEach(tipo => {
+    const dl = document.getElementById('insumos-' + tipo + '-list');
+    if (!dl) return;
+    const lista = porTipo[tipo] || [];
+    dl.innerHTML = lista
+      .map(n => `<option value="${n.replace(/"/g,'&quot;')}"></option>`)
+      .join('');
+  });
 }
 
 function cerrarEditorProducto() {
@@ -1053,7 +1096,7 @@ function itemHtml(tipo, idx, ins, config, unidad) {
   // Cabecera común: descripción + proveedor
   const cabecera = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
     <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
-      <input type="text" value="${ins.nombre||''}" placeholder="Ej: ${tipo==='INSUMO'?'Maltodextrina':tipo==='CAPSULA'?'Cápsula 00 vegetal':tipo==='ENVASE'?'Envase PET 100ml':tipo==='ETIQUETA'?'Etiqueta lámina brillo':tipo==='CAJA'?'Caja kraft':'Item'}" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+      <input type="text" value="${ins.nombre||''}" placeholder="Ej: ${tipo==='INSUMO'?'Maltodextrina':tipo==='CAPSULA'?'Cápsula 00 vegetal':tipo==='ENVASE'?'Envase PET 100ml':tipo==='ETIQUETA'?'Etiqueta lámina brillo':tipo==='CAJA'?'Caja kraft':'Item'}" list="insumos-${tipo}-list" autocomplete="off" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
     <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
       <input type="text" value="${ins.proveedor||''}" placeholder="Ej: INVERFOOD" list="proveedores-list" autocomplete="off" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
   </div>`;
