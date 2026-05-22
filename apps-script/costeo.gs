@@ -17,7 +17,7 @@
 
 const COSTEO_ID = '1U9xDfX1wkiSiL8KsJ_Qb9lwGUtmX97VBLfnLwUCEWJs';
 const COSTEO_SHEET = 'COSTO POR PRODUCTO';
-const SCRIPT_VERSION = '2026-05-15d';
+const SCRIPT_VERSION = '2026-05-15e';
 
 function getTipoConfig(tipo) {
   if (['INSUMO', 'LAINA'].indexOf(tipo) >= 0) return 'kg';
@@ -170,13 +170,24 @@ function guardarProducto(e, data) {
       });
     }
 
-    // (A) Batch write — una sola llamada en vez de N appendRow
+    // (A) Batch write — una sola llamada en vez de N appendRow.
+    // Si alguna columna del sheet está marcada como "Texto sin formato",
+    // hasta setValues puede fallar. Lo intentamos, y si falla, limpiamos
+    // el formato del rango (lo dejamos en "General") y reintentamos.
     const startRow = sheet.getLastRow() + 1;
-    sheet.getRange(startRow, 1, filas.length, 13).setValues(filas);
-    // Aplicar formato explícito a las celdas recién escritas para evitar que
-    // hereden "S/" de columnas mal formateadas. Si alguna columna está marcada
-    // como "Texto sin formato", setNumberFormat falla — lo absorbemos para que
-    // el save SIEMPRE termine bien aunque el formato visual quede heredado.
+    const rango = sheet.getRange(startRow, 1, filas.length, 13);
+    try {
+      rango.setValues(filas);
+    } catch (writeErr) {
+      console.warn('setValues falló, limpiando formato del rango y reintentando:', writeErr.message);
+      try { rango.setNumberFormat('General'); } catch (_) {}
+      try { rango.clearFormat(); } catch (_) {}
+      rango.setValues(filas); // segundo intento. Si vuelve a fallar, el catch externo lo reporta.
+    }
+    // Aplicar formato explícito a las celdas recién escritas. Si alguna
+    // columna está bloqueada como "Texto sin formato", setNumberFormat
+    // falla — lo absorbemos para que el save SIEMPRE termine bien aunque
+    // el formato visual quede heredado.
     try {
       aplicarFormatoFilas_(sheet, startRow, filas.length);
     } catch (fmtErr) {
