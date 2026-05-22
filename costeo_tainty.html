@@ -1155,7 +1155,7 @@ function itemHtml(tipo, idx, ins, config, unidad) {
       ${cabecera}
       <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px">
         <div><label style="font-size:11px;color:var(--amber);display:block;margin-bottom:3px">${costoLabel}</label>
-          <input type="number" value="${ins.precioUnitario||''}" placeholder="0.00" step="0.01" oninput="updatePrecio('${tipo}',${idx},this.value)" style="width:200px;background:var(--surface2);border:1px solid rgba(245,166,35,.3);border-radius:7px;padding:7px 9px;font-family:DM Mono,monospace;font-size:13px;color:var(--amber);outline:none"></div>
+          <input type="number" value="${ins.precioUnitario||''}" placeholder="0.00" step="0.01" id="precio-${tipo}-${idx}" oninput="updatePrecio('${tipo}',${idx},this.value)" style="width:200px;background:var(--surface2);border:1px solid rgba(245,166,35,.3);border-radius:7px;padding:7px 9px;font-family:DM Mono,monospace;font-size:13px;color:var(--amber);outline:none"></div>
       </div>
       <div style="font-size:10px;color:var(--hint);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Cantidades por escala (escribe una y se autocompletan las demás)</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
@@ -1192,6 +1192,49 @@ function itemHtml(tipo, idx, ins, config, unidad) {
 function updateItem(tipo, idx, field, val) {
   if (!editorItems[tipo] || !editorItems[tipo][idx]) return;
   editorItems[tipo][idx][field] = val;
+  // Cuando se completa nombre o proveedor, intentamos autocompletar el precio
+  // unitario buscando en el catálogo una coincidencia exacta de tipo + nombre
+  // + proveedor (normalizados). Solo aplica a tipos con precioUnitario.
+  if (field === 'nombre' || field === 'proveedor') {
+    tryAutoFillPrecio(tipo, idx);
+  }
+}
+
+/**
+ * Si el insumo (idx) del tipo tiene nombre + proveedor llenos y precio en 0,
+ * busca en todo el catálogo otro insumo del mismo TIPO con el MISMO nombre
+ * y MISMO proveedor (comparación normalizada) y copia su precioUnitario.
+ * Solo aplica a INSUMO / LAINA / CAPSULA / ENVASE (tipos con precioUnitario);
+ * ETIQUETA y CAJA usan costos directos y no se ven afectados.
+ */
+function tryAutoFillPrecio(tipo, idx) {
+  if (!['INSUMO','LAINA','CAPSULA','ENVASE'].includes(tipo)) return;
+  const it = editorItems[tipo] && editorItems[tipo][idx];
+  if (!it) return;
+  const nombre = (it.nombre||'').toString().trim();
+  const prov   = (it.proveedor||'').toString().trim();
+  if (!nombre || !prov) return;
+  const precioActual = parseFloat(it.precioUnitario) || 0;
+  if (precioActual > 0) return; // no sobrescribir lo que el usuario ya tipeó
+
+  const objN = normalizarNombre(nombre);
+  const objP = normalizarNombre(prov);
+  for (const prod of catalogo) {
+    for (const ins of (prod.insumos || [])) {
+      if ((ins.tipo||'').toString().toUpperCase() !== tipo) continue;
+      if (normalizarNombre(ins.nombre)    !== objN) continue;
+      if (normalizarNombre(ins.proveedor) !== objP) continue;
+      const p = parseFloat(ins.precioUnitario) || 0;
+      if (p > 0) {
+        it.precioUnitario = p;
+        const inp = document.getElementById('precio-' + tipo + '-' + idx);
+        if (inp && document.activeElement !== inp) inp.value = p.toFixed(2);
+        refrescarCostos(tipo, idx);
+        mostrarToast('Precio autocompletado: S/ ' + p.toFixed(2), {type:'success', duration:1800});
+        return;
+      }
+    }
+  }
 }
 
 function updatePrecio(tipo, idx, val) {
