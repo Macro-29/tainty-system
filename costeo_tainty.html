@@ -258,8 +258,13 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
     <!-- Filas de insumos -->
     <div id="editor-insumos"></div>
 
-    <!-- Sugerencias de proveedores existentes (autocomplete nativo) -->
-    <datalist id="proveedores-list"></datalist>
+    <!-- Sugerencias de proveedores por tipo (autocomplete del campo "Proveedor") -->
+    <datalist id="proveedores-INSUMO-list"></datalist>
+    <datalist id="proveedores-LAINA-list"></datalist>
+    <datalist id="proveedores-CAPSULA-list"></datalist>
+    <datalist id="proveedores-ENVASE-list"></datalist>
+    <datalist id="proveedores-ETIQUETA-list"></datalist>
+    <datalist id="proveedores-CAJA-list"></datalist>
     <!-- Sugerencias de insumos por tipo (autocomplete del campo "Descripción") -->
     <datalist id="insumos-INSUMO-list"></datalist>
     <datalist id="insumos-LAINA-list"></datalist>
@@ -1007,22 +1012,40 @@ function abrirEditorProducto(pi) {
   modal.style.pointerEvents = 'all';
 }
 
-/** Devuelve la lista única y ordenada de proveedores existentes en el catálogo. */
-function getProveedoresUnicos() {
-  const set = new Set();
+/**
+ * Devuelve un mapa { TIPO: [proveedores únicos ordenados] } juntando todos
+ * los proveedores usados en el catálogo por cada tipo de insumo. Para
+ * autocomplete del campo "Proveedor": cada input usa
+ * list="proveedores-TIPO-list" así sugiere solo proveedores que ya
+ * suministran ese tipo (no muestra proveedores de envases cuando estás
+ * llenando un insumo a granel).
+ */
+function getProveedoresUnicosPorTipo() {
+  const porTipo = {};
   catalogo.forEach(p => (p.insumos||[]).forEach(i => {
+    const tipo = (i.tipo||'').toString().toUpperCase().trim();
     const prov = (i.proveedor||'').toString().trim();
-    if (prov) set.add(prov);
+    if (!tipo || !prov) return;
+    if (!porTipo[tipo]) porTipo[tipo] = new Set();
+    porTipo[tipo].add(prov);
   }));
-  return Array.from(set).sort((a,b) => a.localeCompare(b, 'es'));
+  const out = {};
+  Object.keys(porTipo).forEach(t => {
+    out[t] = Array.from(porTipo[t]).sort((a,b) => a.localeCompare(b, 'es'));
+  });
+  return out;
 }
 
 function actualizarDatalistProveedores() {
-  const dl = document.getElementById('proveedores-list');
-  if (!dl) return;
-  dl.innerHTML = getProveedoresUnicos()
-    .map(p => `<option value="${p.replace(/"/g,'&quot;')}"></option>`)
-    .join('');
+  const porTipo = getProveedoresUnicosPorTipo();
+  ['INSUMO','LAINA','CAPSULA','ENVASE','ETIQUETA','CAJA'].forEach(tipo => {
+    const dl = document.getElementById('proveedores-' + tipo + '-list');
+    if (!dl) return;
+    const lista = porTipo[tipo] || [];
+    dl.innerHTML = lista
+      .map(p => `<option value="${p.replace(/"/g,'&quot;')}"></option>`)
+      .join('');
+  });
 }
 
 /**
@@ -1098,7 +1121,7 @@ function itemHtml(tipo, idx, ins, config, unidad) {
     <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Descripción</label>
       <input type="text" value="${ins.nombre||''}" placeholder="Ej: ${tipo==='INSUMO'?'Maltodextrina':tipo==='CAPSULA'?'Cápsula 00 vegetal':tipo==='ENVASE'?'Envase PET 100ml':tipo==='ETIQUETA'?'Etiqueta lámina brillo':tipo==='CAJA'?'Caja kraft':'Item'}" list="insumos-${tipo}-list" autocomplete="off" oninput="updateItem('${tipo}',${idx},'nombre',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
     <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Proveedor</label>
-      <input type="text" value="${ins.proveedor||''}" placeholder="Ej: INVERFOOD" list="proveedores-list" autocomplete="off" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
+      <input type="text" value="${ins.proveedor||''}" placeholder="Ej: INVERFOOD" list="proveedores-${tipo}-list" autocomplete="off" oninput="updateItem('${tipo}',${idx},'proveedor',this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none"></div>
   </div>`;
 
   const btnEliminar = (editorItems[tipo]||[]).length>1
