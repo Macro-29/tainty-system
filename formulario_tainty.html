@@ -353,7 +353,7 @@ textarea { resize: vertical; min-height: 80px; }
       </div>
       <div class="field">
         <label>Cantidad (unidades) <span class="req">*</span></label>
-        <input type="number" id="f-cantidad" min="1" placeholder="Ej: 300" oninput="updatePreview()">
+        <input type="number" id="f-cantidad" min="1" placeholder="Ej: 300" oninput="onCantidad()">
       </div>
     </div>
 
@@ -461,14 +461,14 @@ function onProductoInput() {
   document.getElementById('prod-nuevo-aviso').style.display = (v && !existe) ? 'block' : 'none';
 }
 
+// Llamado al cambiar producto o vendedor. Refresca tipo-badge y dispara
+// la sugerencia de precio en función de (producto, vendedor, cantidad).
 async function onProducto() {
-  const prod = document.getElementById('f-producto').value;
-  const vendedor = document.getElementById('f-vendedor').value;
   const tipoWrap = document.getElementById('tipo-wrap');
   const ps = document.getElementById('price-suggest');
+  const prod = document.getElementById('f-producto').value;
 
-  // Mostrar/ocultar aviso de "producto nuevo"
-  onProductoInput();
+  onProductoInput(); // aviso "producto nuevo"
 
   if (!prod) { tipoWrap.innerHTML = ''; ps.style.display = 'none'; updatePreview(); return; }
 
@@ -477,34 +477,70 @@ async function onProducto() {
   const cls = { ml: 'tipo-ml', gr: 'tipo-gr', cap: 'tipo-cap' };
   tipoWrap.innerHTML = `<span class="tipo-badge ${cls[tipo]}">${labels[tipo]}</span>`;
 
+  await sugerirPrecio();
+}
+
+// Llamado al cambiar la cantidad. Re-dispara la sugerencia de precio
+// porque el precio puede variar por escala (más unidades = mejor precio).
+async function onCantidad() {
+  await sugerirPrecio();
+  updatePreview();
+}
+
+/**
+ * Busca el último precio para (producto, vendedor, cantidad).
+ *
+ * Estrategia con fallback (la maneja el server):
+ *   1. Match exacto: mismo producto + vendedor + cantidad → fuente='vendedor_cantidad'
+ *   2. Mismo producto + vendedor (cualquier cantidad)       → fuente='vendedor'
+ *   3. Mismo producto (cualquier vendedor)                  → fuente='otro_vendedor'
+ *
+ * El cliente envía cantidad y el server elige el mejor match disponible.
+ * Si el server aún no soporta cantidad, simplemente devuelve niveles 2/3
+ * como antes (compatibilidad total).
+ */
+async function sugerirPrecio() {
+  const ps = document.getElementById('price-suggest');
+  const prod = document.getElementById('f-producto').value;
+  const vendedor = document.getElementById('f-vendedor').value;
+  const cantInput = document.getElementById('f-cantidad').value;
+  const cantidad = parseInt(cantInput) || 0;
+
   ps.style.display = 'none';
+  if (!prod || !vendedor) { updatePreview(); return; }
 
-  // Solo buscar precio si tenemos producto y vendedor
-  if (!vendedor) { updatePreview(); return; }
-
-  // Cache key combinada
-  const cacheKey = vendedor + '||' + prod;
+  // Cache por (vendedor, producto, cantidad). Cantidad 0 = "sin cantidad"
+  const cacheKey = vendedor + '||' + prod + '||' + cantidad;
   if (preciosCache[cacheKey] !== undefined) {
-    mostrarPrecio(preciosCache[cacheKey].precio, preciosCache[cacheKey].fuente);
-  } else {
-    try {
-      const url = `${SCRIPT_URL}?action=precio&producto=${encodeURIComponent(prod)}&vendedor=${encodeURIComponent(vendedor)}`;
-      const data = await jsonp(url);
-      if (data && data.success && data.precio > 0) {
-        preciosCache[cacheKey] = { precio: data.precio, fuente: data.fuente };
-        mostrarPrecio(data.precio, data.fuente);
-      }
-    } catch(e) { console.warn('Error precio:', e.message); }
+    const c = preciosCache[cacheKey];
+    if (c.precio > 0) mostrarPrecio(c.precio, c.fuente);
+    updatePreview();
+    return;
   }
+  try {
+    let url = `${SCRIPT_URL}?action=precio&producto=${encodeURIComponent(prod)}&vendedor=${encodeURIComponent(vendedor)}`;
+    if (cantidad > 0) url += `&cantidad=${cantidad}`;
+    const data = await jsonp(url);
+    if (data && data.success && data.precio > 0) {
+      preciosCache[cacheKey] = { precio: data.precio, fuente: data.fuente };
+      mostrarPrecio(data.precio, data.fuente);
+    } else {
+      preciosCache[cacheKey] = { precio: 0, fuente: null };
+    }
+  } catch(e) { console.warn('Error precio:', e.message); }
   updatePreview();
 }
 
 function mostrarPrecio(precio, fuente) {
-  const label = fuente === 'vendedor'
-    ? 'Último precio de este vendedor'
-    : 'Último precio registrado (otro vendedor)';
+  // 'vendedor_cantidad' = match exacto vendedor + cantidad
+  // 'vendedor'          = mismo vendedor, otra cantidad
+  // otro                = otro vendedor (cualquier cantidad)
+  const labelMap = {
+    vendedor_cantidad: 'Último precio de este vendedor para esta cantidad',
+    vendedor: 'Último precio de este vendedor (otra cantidad)'
+  };
+  const label = labelMap[fuente] || 'Último precio registrado (otro vendedor)';
   document.getElementById('ps-val').textContent = 'S/ ' + parseFloat(precio).toFixed(2) + ' por unidad';
-  // Actualizar la etiqueta superior si existe
   const lbl = document.querySelector('#price-suggest .ps-label');
   if (lbl) lbl.textContent = label;
   document.getElementById('price-suggest').style.display = 'block';
