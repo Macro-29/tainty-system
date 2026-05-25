@@ -199,6 +199,7 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
           <button class="seg-btn active" id="ord-prov" onclick="setOrdenProveedores('proveedor',this)">📦 Por proveedor</button>
           <button class="seg-btn" id="ord-tipo" onclick="setOrdenProveedores('tipo',this)">🧪 Por tipo</button>
         </div>
+        <button class="btn-copy" onclick="copiarTodo()" title="Copiar la lista completa: insumos, cápsulas, envases, etiquetas y cajas agrupadas por tipo">&#128203; Copiar todo</button>
         <button class="btn-secondary" onclick="volverAInsumos()">&#8592; Volver</button>
       </div>
     </div>
@@ -689,6 +690,79 @@ function copiarProveedor(prov) {
   }).join('\n');
   const texto = `Buen día, podría cotizarme lo siguiente:\n\n${insumosStr}`;
   navigator.clipboard.writeText(texto).then(() => mostrarToast('¡Copiado para WhatsApp!')).catch(() => mostrarToast('No se pudo copiar', {type:'error',duration:3500}));
+}
+
+/**
+ * Copia la lista COMPLETA de compras (todos los tipos, todos los proveedores)
+ * en un solo texto agrupado por tipo de insumo:
+ *
+ *   📋 LISTA COMPLETA DE COMPRAS
+ *
+ *   🧪 INSUMO
+ *   - Glutatión: 1.08 kg (BIOGRAND)
+ *   - Camu camu: 0.9 kg (BIOGRAND)
+ *
+ *   💊 CÁPSULA
+ *   - Cápsula 00 vegetal: 6,000 und (CAPSUFARMA)
+ *
+ *   📦 ENVASE
+ *   - 400 Envase PET 100ml (INVERSIONES AGO)
+ *
+ *   🏷️ ETIQUETA
+ *   - 400 Laminado Brillo (PHANTONE)
+ *
+ *   📥 CAJA
+ *   - 50 Caja kraft (CAJAS LIMA)
+ *
+ *   💰 Total estimado: S/ 4,250.00
+ *
+ * Útil como checklist interno o para enviar a un único proveedor que
+ * suministre varios tipos.
+ */
+function copiarTodo() {
+  const lista = window._insumosCalculados || [];
+  if (!lista.length) {
+    mostrarToast('No hay insumos para copiar', {type:'error', duration:2500});
+    return;
+  }
+
+  // Agrupar por tipo manteniendo el orden lógico
+  const porTipo = {};
+  lista.forEach(i => {
+    const t = (i.tipo||'OTROS').toUpperCase();
+    if (!porTipo[t]) porTipo[t] = [];
+    porTipo[t].push(i);
+  });
+
+  const tiposOrdenados = Object.keys(porTipo).sort((a,b) => {
+    const ia = TIPO_ORDEN.indexOf(a), ib = TIPO_ORDEN.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const bloques = tiposOrdenados.map(tipo => {
+    const meta = TIPO_META[tipo] || { ic: '•', label: tipo };
+    const items = porTipo[tipo].slice().sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
+    const lineas = items.map(i => {
+      const unidad = i.unidad || 'kg';
+      const prov = i.proveedor ? ` (${i.proveedor})` : '';
+      if (unidad === 'kg') {
+        const cant = parseFloat(i.cantidadTotal.toFixed(3)).toString();
+        return `- ${i.nombre}: ${cant} kg${prov}`;
+      }
+      // und (envase, etiqueta, caja, cápsula): "cantidad Nombre (proveedor)"
+      const cant = Math.round(i.cantidadTotal).toLocaleString('en-US');
+      return `- ${cant} ${i.nombre}${prov}`;
+    }).join('\n');
+    return `${meta.ic} ${meta.label.toUpperCase()}\n${lineas}`;
+  });
+
+  const total = lista.reduce((s,i) => s + (i.costoTotal||0), 0);
+  const totalLine = `💰 Total estimado: S/ ${total.toLocaleString('es-PE',{minimumFractionDigits:2})}`;
+  const texto = `📋 LISTA COMPLETA DE COMPRAS\n\n${bloques.join('\n\n')}\n\n${totalLine}`;
+
+  navigator.clipboard.writeText(texto)
+    .then(() => mostrarToast(`Lista completa copiada (${lista.length} insumos)`, {type:'success', duration:2500}))
+    .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3500}));
 }
 
 function volverAInsumos() {
