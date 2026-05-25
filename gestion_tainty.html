@@ -145,14 +145,15 @@ const PIN='200720';
 const PIN_LEN=6;
 const ESTADOS=['pendiente','compra','produccion','camino','oficina','noaplica'];
 const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
-// Etiquetas no pasan por la fase de compra (vienen del proveedor directo a producción),
-// así que ocultamos el botón "En compra" solo en su sección.
-const ESTADOS_ETIQUETA = ESTADOS.filter(s => s !== 'compra');
+// Etiquetas y cajas no pasan por la fase de compra (vienen del proveedor
+// directo a producción), así que ocultamos el botón "En compra" en sus secciones.
+const INSUMOS_SIN_COMPRA = new Set(['Etiqueta', 'Caja']);
+const ESTADOS_SIN_COMPRA = ESTADOS.filter(s => s !== 'compra');
 
 /** Devuelve los estados disponibles para un insumo según sus particularidades. */
 function estadosDeInsumo(insumo) {
-  if (insumo === 'Maquina')  return ESTADOS_MAQUINA;
-  if (insumo === 'Etiqueta') return ESTADOS_ETIQUETA;
+  if (insumo === 'Maquina')             return ESTADOS_MAQUINA;
+  if (INSUMOS_SIN_COMPRA.has(insumo))   return ESTADOS_SIN_COMPRA;
   return ESTADOS;
 }
 const LABELS={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica','encurso':'⚙️ En curso','finalizado':'✅ Finalizado'};
@@ -357,15 +358,15 @@ function renderLista(){
       }).join('');
     }
 
-    // Pills de estado en la cabecera. Etiqueta omite el pill de compra
-    // porque no aplica a ese insumo (mismo motivo que el botón).
+    // Pills de estado en la cabecera. Etiqueta y Caja omiten el pill de
+    // compra porque ese estado no aplica a esos insumos.
     const pillsConfig = esMaquina
       ? [
           ['pendiente','⏳',conteo.pendiente],
           ['produccion','⚙️',conteo.encurso],
           ['oficina','✅',conteo.finalizado],
         ]
-      : insumo === 'Etiqueta'
+      : INSUMOS_SIN_COMPRA.has(insumo)
       ? [
           ['pendiente','⏳',conteo.pendiente],
           ['produccion','⚙️',conteo.produccion],
