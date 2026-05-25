@@ -304,12 +304,21 @@ function buildResponse(obj) {
  * Recorremos las filas de la última a la primera para que "último precio"
  * sea efectivamente el más reciente.
  */
+/** Normaliza un string para comparar nombres tolerante a casing/acentos/espacios. */
+function normNombre_(s) {
+  if (s === null || s === undefined) return '';
+  let v = s.toString().trim().toUpperCase();
+  if (v.normalize) v = v.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return v.replace(/\s+/g, ' ');
+}
+
 function getPrecioSugerido(nombreProducto, vendedor, cantidad) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
 
-  const vendNorm = vendedor ? vendedor.toString().toLowerCase().trim() : null;
+  const prodNorm = normNombre_(nombreProducto);
+  const vendNorm = vendedor ? normNombre_(vendedor) : null;
   const cantNum = parseInt(cantidad) || 0;
 
   let precioVendedorCantidad = null;
@@ -317,7 +326,9 @@ function getPrecioSugerido(nombreProducto, vendedor, cantidad) {
   let precioGenerico = null;
 
   for (let i = data.length - 1; i >= 1; i--) {
-    if (data[i][4] !== nombreProducto) continue;
+    // Comparación case-insensitive + sin acentos para que matchee aunque
+    // el producto haya quedado guardado con distinto casing en pedidos viejos.
+    if (normNombre_(data[i][4]) !== prodNorm) continue;
     const precio = parseFloat(data[i][7]) || 0;
     if (precio <= 0) continue;
 
@@ -325,7 +336,7 @@ function getPrecioSugerido(nombreProducto, vendedor, cantidad) {
     if (precioGenerico === null) precioGenerico = precio;
 
     if (vendNorm && data[i][6]) {
-      const v = data[i][6].toString().toLowerCase().trim();
+      const v = normNombre_(data[i][6]);
       if (v === vendNorm) {
         // Nivel 2 (vendedor, cualquier cantidad)
         if (precioVendedor === null) precioVendedor = precio;

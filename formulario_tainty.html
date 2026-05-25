@@ -514,6 +514,7 @@ async function sugerirPrecio() {
   if (preciosCache[cacheKey] !== undefined) {
     const c = preciosCache[cacheKey];
     if (c.precio > 0) mostrarPrecio(c.precio, c.fuente);
+    else mostrarSinSugerencia();
     updatePreview();
     return;
   }
@@ -526,8 +527,12 @@ async function sugerirPrecio() {
       mostrarPrecio(data.precio, data.fuente);
     } else {
       preciosCache[cacheKey] = { precio: 0, fuente: null };
+      mostrarSinSugerencia();
     }
-  } catch(e) { console.warn('Error precio:', e.message); }
+  } catch(e) {
+    console.warn('Error precio:', e.message);
+    mostrarSinSugerencia();
+  }
   updatePreview();
 }
 
@@ -543,10 +548,26 @@ function mostrarPrecio(precio, fuente) {
   document.getElementById('ps-val').textContent = 'S/ ' + parseFloat(precio).toFixed(2) + ' por unidad';
   const lbl = document.querySelector('#price-suggest .ps-label');
   if (lbl) lbl.textContent = label;
-  document.getElementById('price-suggest').style.display = 'block';
+  const ps = document.getElementById('price-suggest');
+  ps.style.display = 'block';
+  ps.style.opacity = '1';
   const precioInput = document.getElementById('f-precio');
   if (!precioInput.value) precioInput.value = parseFloat(precio).toFixed(2);
   updatePreview();
+}
+
+/**
+ * Muestra el panel con un mensaje suave indicando que no hay precio
+ * histórico para esta combinación. Antes simplemente se ocultaba el
+ * badge, lo que hacía pensar al usuario que el sistema no respondió.
+ */
+function mostrarSinSugerencia() {
+  const ps = document.getElementById('price-suggest');
+  const lbl = ps.querySelector('.ps-label');
+  if (lbl) lbl.textContent = 'Sin precio histórico para este producto';
+  document.getElementById('ps-val').textContent = 'Ingresa el precio manualmente';
+  ps.style.display = 'block';
+  ps.style.opacity = '0.55';
 }
 
 function updatePreview() {
