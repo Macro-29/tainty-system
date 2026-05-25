@@ -145,6 +145,16 @@ const PIN='200720';
 const PIN_LEN=6;
 const ESTADOS=['pendiente','compra','produccion','camino','oficina','noaplica'];
 const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
+// Etiquetas no pasan por la fase de compra (vienen del proveedor directo a producción),
+// así que ocultamos el botón "En compra" solo en su sección.
+const ESTADOS_ETIQUETA = ESTADOS.filter(s => s !== 'compra');
+
+/** Devuelve los estados disponibles para un insumo según sus particularidades. */
+function estadosDeInsumo(insumo) {
+  if (insumo === 'Maquina')  return ESTADOS_MAQUINA;
+  if (insumo === 'Etiqueta') return ESTADOS_ETIQUETA;
+  return ESTADOS;
+}
 const LABELS={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica','encurso':'⚙️ En curso','finalizado':'✅ Finalizado'};
 const DOT={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
 // Emoji compacto usado en el texto exportable (botón Copiar por sección).
@@ -289,7 +299,7 @@ function renderLista(){
   // Construir cada sección de insumo
   const seccionesHtml=ORDEN_INSUMOS.map(insumo=>{
     const esMaquina=insumo==='Maquina';
-    const estadosSeccion=esMaquina?ESTADOS_MAQUINA:ESTADOS;
+    const estadosSeccion=estadosDeInsumo(insumo);
     const estadoFiltro=esMaquina?FILTRO_A_ESTADO_MAQ[filtroActual]:FILTRO_A_ESTADO[filtroActual];
     const filtroAplicable=filtroActual==='todos'?null:estadoFiltro;
 
@@ -347,18 +357,28 @@ function renderLista(){
       }).join('');
     }
 
-    // Pills de estado en la cabecera
-    const pillsConfig=esMaquina?[
-      ['pendiente','⏳',conteo.pendiente],
-      ['produccion','⚙️',conteo.encurso],
-      ['oficina','✅',conteo.finalizado],
-    ]:[
-      ['pendiente','⏳',conteo.pendiente],
-      ['compra','🛒',conteo.compra],
-      ['produccion','⚙️',conteo.produccion],
-      ['camino','🚚',conteo.camino],
-      ['oficina','📦',conteo.oficina],
-    ];
+    // Pills de estado en la cabecera. Etiqueta omite el pill de compra
+    // porque no aplica a ese insumo (mismo motivo que el botón).
+    const pillsConfig = esMaquina
+      ? [
+          ['pendiente','⏳',conteo.pendiente],
+          ['produccion','⚙️',conteo.encurso],
+          ['oficina','✅',conteo.finalizado],
+        ]
+      : insumo === 'Etiqueta'
+      ? [
+          ['pendiente','⏳',conteo.pendiente],
+          ['produccion','⚙️',conteo.produccion],
+          ['camino','🚚',conteo.camino],
+          ['oficina','📦',conteo.oficina],
+        ]
+      : [
+          ['pendiente','⏳',conteo.pendiente],
+          ['compra','🛒',conteo.compra],
+          ['produccion','⚙️',conteo.produccion],
+          ['camino','🚚',conteo.camino],
+          ['oficina','📦',conteo.oficina],
+        ];
     const pillsHtml=pillsConfig.map(([k,ic,n])=>`<span class="stat-pill s-${k}${n>0?' has-count':''}">${ic} ${n}</span>`).join('');
 
     return`<div class="seccion-insumo">
@@ -483,8 +503,7 @@ function renderListaPorProducto(){
     const insumosP=getInsumos(getTipo(p.producto));
     const cant=parseInt(p.cantidad||0);
     const filas=insumosP.map(insumo=>{
-      const esMaq=insumo==='Maquina';
-      const estados=esMaq?ESTADOS_MAQUINA:ESTADOS;
+      const estados=estadosDeInsumo(insumo);
       const est=getEstadoInsumo(p.numPedido,insumo);
       const btns=estados.map(s=>{
         const isSel=est===s;
