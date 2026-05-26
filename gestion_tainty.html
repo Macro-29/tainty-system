@@ -432,8 +432,18 @@ function copiarSeccion(insumo){
     pedidosSeccion=pedidosSeccion.filter(p=>getEstadoInsumo(p.numPedido,insumo)===estadoFiltro);
   }
 
+  // Excluir lo que ya está finalizado para esta sección — solo nos importa lo
+  // pendiente / en curso. Para insumos físicos: estados 'oficina' (ya llegó)
+  // y 'noaplica' (no se necesita). Para Maquina: 'finalizado' y 'noaplica'.
+  const ESTADOS_EXCLUIR = esMaquina
+    ? new Set(['finalizado','noaplica'])
+    : new Set(['oficina','noaplica']);
+  pedidosSeccion = pedidosSeccion.filter(p =>
+    !ESTADOS_EXCLUIR.has(getEstadoInsumo(p.numPedido, insumo))
+  );
+
   if(!pedidosSeccion.length){
-    mostrarToast('No hay pedidos para copiar en esta sección',{type:'error',duration:2500});
+    mostrarToast('No hay pedidos pendientes para copiar en esta sección',{type:'error',duration:2500});
     return;
   }
 
@@ -556,13 +566,22 @@ function copiarProducto(numPedido){
   const insumosP=getInsumos(getTipo(p.producto));
   const cant=parseInt(p.cantidad||0).toLocaleString();
   const head=`${p.numPedido||''} · ${p.producto||''} · ${cant} und${p.cliente?' · '+p.cliente:''}`;
-  const filas=insumosP.map(insumo=>{
-    const est=getEstadoInsumo(p.numPedido,insumo);
-    const emoji=ESTADO_EMOJI[est]||'';
-    const texto=ESTADO_TEXTO[est]||est||'';
-    const nombre=ORDEN_INSUMOS_LABELS[insumo]||insumo;
-    return texto ? `${emoji} ${nombre} (${texto})` : `${emoji} ${nombre}`;
-  });
+  // Excluir los insumos que ya están en oficina / finalizado / noaplica —
+  // solo nos interesa exportar lo que todavía requiere acción.
+  const ESTADOS_EXCLUIR = new Set(['oficina','finalizado','noaplica']);
+  const filas=insumosP
+    .filter(insumo => !ESTADOS_EXCLUIR.has(getEstadoInsumo(p.numPedido, insumo)))
+    .map(insumo=>{
+      const est=getEstadoInsumo(p.numPedido,insumo);
+      const emoji=ESTADO_EMOJI[est]||'';
+      const texto=ESTADO_TEXTO[est]||est||'';
+      const nombre=ORDEN_INSUMOS_LABELS[insumo]||insumo;
+      return texto ? `${emoji} ${nombre} (${texto})` : `${emoji} ${nombre}`;
+    });
+  if(!filas.length){
+    mostrarToast('Este pedido ya está completo (todo en oficina o no aplica)',{type:'success',duration:3000});
+    return;
+  }
   const texto=[head,...filas].join('\n');
   navigator.clipboard.writeText(texto).then(()=>{
     mostrarToast('✓ Estado de '+p.numPedido+' copiado',{type:'success',duration:2500});
