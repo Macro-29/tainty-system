@@ -319,20 +319,25 @@ function copiarPedido(numPedido){
  *
  *   💰 TOTAL PENDIENTE: S/ X.XX
  */
+/**
+ * Copia al portapapeles los pedidos visibles respetando todos los filtros
+ * activos (estado, mes, búsqueda) y agrupando por cliente.
+ * - Si hay un cliente seleccionado: imprime su bloque tal cual (header
+ *   con cliente + N pedidos, lista de pedidos, total pendiente).
+ * - Si NO hay cliente seleccionado: agrupa todos los pedidos por cliente,
+ *   cada uno como su propio bloque ordenado alfabéticamente, separados
+ *   por una línea, y agrega un TOTAL PENDIENTE global al final.
+ */
 function copiarTodosCliente(){
-  const filtroCliente=document.getElementById('filtro-cliente').value;
-  if(!filtroCliente){
-    mostrarToast('Selecciona un cliente en el filtro primero',{type:'error',duration:3000});
-    return;
-  }
   const lista=getListaFiltrada();
   if(!lista.length){
     mostrarToast('No hay pedidos para copiar',{type:'error',duration:2500});
     return;
   }
   const money=n=>`S/ ${(parseFloat(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  const totalPendiente=lista.reduce((s,p)=>s+getRestante(p),0);
-  const bloques=lista.map(p=>{
+
+  // Construye el bloque de texto de UN pedido (sin la línea del cliente).
+  function bloquePedido(p){
     const total=parseFloat(p.montoTotal)||0;
     const restante=getRestante(p);
     const cant=parseInt(p.cantidad||0).toLocaleString('en-US');
@@ -346,10 +351,45 @@ function copiarTodosCliente(){
       ...abonos.map(a=>`💸 Abonado ${a.n} : ${money(a.monto)}`),
       restante>0 ? `⚠️ Pendiente: ${money(restante)}` : `✅ Pagado completo`
     ].join('\n');
-  });
-  const header=`👤 ${filtroCliente.toUpperCase()} (${lista.length} pedido${lista.length===1?'':'s'})`;
+  }
+
+  // Construye un bloque por cliente: "👤 NOMBRE (N pedidos)" + cada pedido
+  // separado por una línea en blanco.
+  function bloqueCliente(nombre, pedidosCli){
+    const pedidosOrdenados = pedidosCli.slice().sort((a,b) => {
+      // ordenar por fecha si parseable, sino por numPedido
+      const fa = new Date(a.fecha), fb = new Date(b.fecha);
+      if (!isNaN(fa) && !isNaN(fb)) return fa - fb;
+      return (a.numPedido||'').localeCompare(b.numPedido||'');
+    });
+    const header = `👤 ${(nombre||'SIN CLIENTE').toUpperCase()} (${pedidosCli.length} pedido${pedidosCli.length===1?'':'s'})`;
+    const cuerpo = pedidosOrdenados.map(bloquePedido).join('\n\n');
+    return `${header}\n\n${cuerpo}`;
+  }
+
+  const totalPendiente=lista.reduce((s,p)=>s+getRestante(p),0);
   const footer=`💰 TOTAL PENDIENTE: ${money(totalPendiente)}`;
-  const texto=[header,'',...bloques.flatMap(b=>[b,'']),footer].join('\n');
+
+  const filtroCliente=document.getElementById('filtro-cliente').value;
+  let texto;
+  if (filtroCliente){
+    // Caso original — un solo cliente
+    texto = `${bloqueCliente(filtroCliente, lista)}\n\n${footer}`;
+  } else {
+    // Multi-cliente: agrupar y ordenar alfabéticamente
+    const porCliente = {};
+    lista.forEach(p => {
+      const k = (p.cliente||'SIN CLIENTE').toString().trim();
+      if (!porCliente[k]) porCliente[k] = [];
+      porCliente[k].push(p);
+    });
+    const clientesOrdenados = Object.keys(porCliente).sort((a,b) =>
+      a.localeCompare(b, 'es', {sensitivity:'base'}));
+    const SEP = '─'.repeat(30);
+    const bloques = clientesOrdenados.map(c => bloqueCliente(c, porCliente[c]));
+    texto = bloques.join(`\n\n${SEP}\n\n`) + `\n\n${SEP}\n\n${footer}`;
+  }
+
   navigator.clipboard.writeText(texto)
     .then(()=>mostrarToast(`${lista.length} pedido(s) copiado(s)`,{type:'success',duration:2500}))
     .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
