@@ -184,7 +184,24 @@ function updDots(){for(let i=0;i<6;i++){const d=document.getElementById('pd'+i);
 function bloquear(){pinBuf='';updDots();document.getElementById('pin-overlay').classList.remove('hidden');}
 function switchTab(id,btn){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='dashboard')renderCharts();}
 async function cargarPagos(){try{const res=await jsonp(SCRIPT_URL+'?action=pagos&t='+Date.now());if(res.success&&res.pagos){pagos=res.pagos;poblarFiltroClientes();renderStats();renderCharts();renderTabla();}}catch(e){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--red)">Error al conectar.</td></tr>';}}
-function poblarFiltroClientes(){const sel=document.getElementById('filtro-cliente');const clientes=[...new Set(pagos.map(p=>p.cliente).filter(Boolean))].sort();sel.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(c=>`<option>${c}</option>`).join('');}
+// Pobla el dropdown de clientes mostrando SOLO los que tienen al menos un
+// pedido que matchea el filtro de estado actual (todos / pendiente / parcial /
+// realizado). Preserva la selección actual si el cliente sigue disponible;
+// si no, vuelve a "Todos los clientes".
+function poblarFiltroClientes(){
+  const sel=document.getElementById('filtro-cliente');
+  if(!sel)return;
+  const seleccionPrev=sel.value;
+  const pagosFiltrados = filtroActual === 'todos'
+    ? pagos
+    : pagos.filter(p => getEstadoPago(p) === filtroActual);
+  const clientes=[...new Set(pagosFiltrados.map(p=>p.cliente).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(c=>`<option>${c}</option>`).join('');
+  // Mantener la selección si todavía aparece en el nuevo conjunto
+  if(seleccionPrev && clientes.includes(seleccionPrev)){
+    sel.value=seleccionPrev;
+  }
+}
 function getRestante(p){const total=parseFloat(p.montoTotal)||0;const ab=[p.abono1,p.abono2,p.abono3,p.abono4].map(a=>parseFloat(a)||0).reduce((s,a)=>s+a,0);return Math.max(0,total-ab);}
 function getTotalAbonado(p){return[p.abono1,p.abono2,p.abono3,p.abono4].map(a=>parseFloat(a)||0).reduce((s,a)=>s+a,0);}
 function getEstadoPago(p){const r=getRestante(p);if(r<=0)return'realizado';const ab=getTotalAbonado(p);if(ab>0)return'parcial';return'pendiente';}
@@ -243,7 +260,15 @@ function renderTabla(){
     return`<tr><td><span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span></td><td><span class="td-mono" style="color:var(--blue)">${cantidad.toLocaleString()} und</span></td><td><span class="td-mono" style="color:var(--muted)">S/ ${precioUnd.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${pct}%;background:${pc2}"></div></div><span style="font-size:10px;color:var(--hint)">${pct}% abonado</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
   }).join('');
 }
-function setFiltro(f,btn){filtroActual=f;document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderTabla();}
+function setFiltro(f,btn){
+  filtroActual=f;
+  document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  // Repoblar el dropdown de clientes para que solo muestre los clientes que
+  // tienen pedidos en este estado (oculta los que ya no aplican).
+  poblarFiltroClientes();
+  renderTabla();
+}
 
 /**
  * Copia al portapapeles un resumen del pago en formato:
