@@ -446,12 +446,12 @@ function copiarMensajeCliente(numPedido){
     ? fEntrega.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})
     : 'por confirmar';
   const texto=[
-    '¡Hola! 👋 Le compartimos el estado de su pedido:',
+    'Hola 🙋🏼‍♂️ Te comparto el estado de tu pedido',
     '',
     `📋 Pedido: ${p.numPedido||''}`,
     `📦 Producto: ${p.producto||''}`,
     `🔢 Cantidad: ${cant} unidades`,
-    `📅 Entrega aproximada: ${fechaStr}`,
+    `📅 Entrega aproximada: ${fechaStr} por la tarde aproximadamente.`,
     '',
     '¡Gracias por su preferencia! 🙌'
   ].join('\n');
