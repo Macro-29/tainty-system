@@ -402,6 +402,7 @@ function renderTicket(p){
       <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
         <div class="ticket-num" style="margin:0">${p.numPedido||''}</div>
         ${esNuevo(p)?'<span class="nuevo-badge">NUEVO</span>':''}
+        <button onclick="copiarMensajeCliente('${p.numPedido}')" title="Copiar mensaje para el cliente" style="margin-left:auto;font-size:11px;padding:3px 9px;border-radius:7px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);cursor:pointer;white-space:nowrap">&#128203; Cliente</button>
       </div>
       <div class="ticket-product">${p.producto||'—'}</div>
       <div class="ticket-meta">
@@ -428,6 +429,35 @@ function renderTicket(p){
       <select class="ticket-estado-select" onchange="cambiarEstadoTicket('${p.numPedido}',this.value,this)">${estadoOptsTicket}</select>
     </div>
   </div>`;
+}
+
+/**
+ * Copia al portapapeles un mensaje listo para enviar al cliente con:
+ * número de pedido, producto, cantidad y fecha aproximada de entrega.
+ */
+function copiarMensajeCliente(numPedido){
+  const p=pedidos.find(x=>x.numPedido===numPedido);
+  if(!p){mostrarToast('Pedido no encontrado',{type:'error',duration:2500});return;}
+  const cant=parseInt(p.cantidad||0).toLocaleString('es-PE');
+  // Fecha de entrega: usa la tentativa guardada o la calcula desde la fecha del pedido
+  let fEntrega=parseFecha(p.fechaTentativa);
+  if(!fEntrega||isNaN(fEntrega)) fEntrega=calcFechaTentativa(p.fecha);
+  const fechaStr=(fEntrega&&!isNaN(fEntrega))
+    ? fEntrega.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})
+    : 'por confirmar';
+  const texto=[
+    '¡Hola! 👋 Le compartimos el estado de su pedido:',
+    '',
+    `📋 Pedido: ${p.numPedido||''}`,
+    `📦 Producto: ${p.producto||''}`,
+    `🔢 Cantidad: ${cant} unidades`,
+    `📅 Entrega aproximada: ${fechaStr}`,
+    '',
+    '¡Gracias por su preferencia! 🙌'
+  ].join('\n');
+  navigator.clipboard.writeText(texto)
+    .then(()=>mostrarToast('Mensaje para '+(p.cliente||'cliente')+' copiado',{type:'success',duration:2500}))
+    .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
 }
 
 function esNuevo(p){
