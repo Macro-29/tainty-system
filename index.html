@@ -10,10 +10,13 @@
 html,body{height:100%}
 body{overflow-y:scroll;padding:3rem 1rem 4rem}
 .wrap{position:relative;z-index:1;max-width:900px;margin:0 auto}
-.header{text-align:center;margin-bottom:2.5rem}
+.header{text-align:center;margin-bottom:2.5rem;position:relative}
 .logo{font-family:'Syne',sans-serif;font-size:42px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
 .logo span{color:var(--purple)}
 .tagline{font-size:14px;color:var(--muted);margin-top:6px}
+.session-bar{position:absolute;top:0;right:0;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.session-bar button{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer}
+.session-bar button:hover{color:var(--text)}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 .card{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.25rem;text-decoration:none;color:var(--text);transition:all .15s;cursor:pointer}
 .card:hover{border-color:var(--border2);background:var(--surface2);transform:translateY(-1px)}
@@ -25,6 +28,11 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
 .card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px}
 .card-desc{font-size:12px;color:var(--muted);line-height:1.4}
 .card-arrow{font-size:20px;color:var(--hint);flex-shrink:0}
+.card.locked{opacity:.45;pointer-events:none;filter:grayscale(.3)}
+.card.locked .card-arrow::before{content:'🔒 '}
+.card-public-badge{font-size:9px;padding:2px 6px;border-radius:6px;background:var(--green-dim);color:var(--green);margin-left:6px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.guest-hint{text-align:center;font-size:12px;color:var(--hint);margin-top:1.25rem}
+.guest-hint a{color:var(--purple);text-decoration:none}
 @media(max-width:640px){
   body{padding:2rem .75rem 3rem}
   .logo{font-size:28px}
@@ -32,28 +40,66 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
   .card{padding:1rem}
   .card-icon{width:40px;height:40px;font-size:18px}
   .card-title{font-size:14px}
+  .session-bar{position:static;justify-content:center;margin-top:8px}
 }
 @media(min-width:641px) and (max-width:800px){
   .grid{grid-template-columns:repeat(2,1fr)}
 }
 </style>
+<script src="./assets/auth.js"></script>
 </head>
 <body>
+
+<!-- LOGIN OVERLAY -->
+<div class="pin-overlay" id="pin-overlay">
+  <div class="pin-card">
+    <div class="pin-logo">Tainty <span>Labs</span></div>
+    <div class="pin-sub">Ingresa tu PIN para acceder</div>
+    <div class="pin-dots" id="pin-dots-wrap">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+      <div class="pin-dot" id="pd4"></div>
+      <div class="pin-dot" id="pd5"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-key" onclick="pp('1')">1</button>
+      <button class="pin-key" onclick="pp('2')">2</button>
+      <button class="pin-key" onclick="pp('3')">3</button>
+      <button class="pin-key" onclick="pp('4')">4</button>
+      <button class="pin-key" onclick="pp('5')">5</button>
+      <button class="pin-key" onclick="pp('6')">6</button>
+      <button class="pin-key" onclick="pp('7')">7</button>
+      <button class="pin-key" onclick="pp('8')">8</button>
+      <button class="pin-key" onclick="pp('9')">9</button>
+      <button class="pin-clear" onclick="pc()">&#9003;</button>
+      <button class="pin-key" onclick="pp('0')">0</button>
+      <div></div>
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+    <div class="guest-hint">
+      o <a href="./panel_produccion_tainty.html">ingresar al Panel de Producción sin sesión &rarr;</a>
+    </div>
+  </div>
+</div>
+
 <div class="wrap">
   <div class="header">
     <div class="logo">Tainty <span>Labs</span></div>
     <div class="tagline">Sistema de gestión &middot; 2026</div>
+    <div class="session-bar" id="session-bar"></div>
   </div>
-  <div class="grid">
+  <div class="grid" id="grid-modulos">
     <a class="card" href="./panel_produccion_tainty.html">
       <div class="card-icon icon-purple">📺</div>
       <div class="card-body">
-        <div class="card-title">Panel de Producción</div>
+        <div class="card-title">Panel de Producción <span class="card-public-badge">público</span></div>
         <div class="card-desc">Vista en tiempo real de pedidos activos, estados de insumos y cronograma de entregas</div>
       </div>
       <div class="card-arrow">›</div>
     </a>
-<a class="card" href="./formulario_tainty.html">
+    <a class="card needs-login" href="./formulario_tainty.html">
       <div class="card-icon icon-green">📋</div>
       <div class="card-body">
         <div class="card-title">Registro de Pedidos</div>
@@ -61,7 +107,7 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
       </div>
       <div class="card-arrow">›</div>
     </a>
-<a class="card" href="./dashboard.html">
+    <a class="card needs-login" href="./dashboard.html">
       <div class="card-icon icon-amber">📊</div>
       <div class="card-body">
         <div class="card-title">Dashboard Analytics</div>
@@ -69,7 +115,7 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
       </div>
       <div class="card-arrow">›</div>
     </a>
-<a class="card" href="./pagos_tainty.html">
+    <a class="card needs-login" href="./pagos_tainty.html">
       <div class="card-icon" style="background:var(--red-dim)">💳</div>
       <div class="card-body">
         <div class="card-title">Gestión de Pagos</div>
@@ -77,7 +123,7 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
       </div>
       <div class="card-arrow">›</div>
     </a>
-<a class="card" href="./costeo_tainty.html">
+    <a class="card needs-login" href="./costeo_tainty.html">
       <div class="card-icon" style="background:var(--green-dim)">🧮</div>
       <div class="card-body">
         <div class="card-title">Costeo &amp; Compras</div>
@@ -85,7 +131,7 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
       </div>
       <div class="card-arrow">›</div>
     </a>
-<a class="card" href="./gestion_tainty.html">
+    <a class="card needs-login" href="./gestion_tainty.html">
       <div class="card-icon" style="background:var(--purple-dim)">⚙️</div>
       <div class="card-body">
         <div class="card-title">Gestión de Insumos</div>
@@ -95,5 +141,61 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
     </a>
   </div>
 </div>
+
+<script>
+const PIN_LEN = 6;
+let pinBuf = '';
+
+function pp(d) {
+  if (pinBuf.length >= PIN_LEN) return;
+  pinBuf += d;
+  updDots();
+  if (pinBuf.length === PIN_LEN) {
+    setTimeout(() => {
+      if (login(pinBuf)) {
+        document.getElementById('pin-overlay').classList.add('hidden');
+        renderEstadoSesion();
+      } else {
+        document.querySelectorAll('.pin-dot').forEach(d => d.classList.add('error'));
+        document.getElementById('pin-err').textContent = 'PIN incorrecto';
+        setTimeout(() => {
+          pinBuf = '';
+          updDots();
+          document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('error'));
+          document.getElementById('pin-err').textContent = '';
+        }, 800);
+      }
+    }, 100);
+  }
+}
+function pc() { pinBuf = pinBuf.slice(0, -1); updDots(); }
+function updDots() {
+  for (let i = 0; i < PIN_LEN; i++) {
+    const d = document.getElementById('pd' + i);
+    if (d) d.classList.toggle('filled', i < pinBuf.length);
+  }
+}
+
+/**
+ * Renderiza la barra superior con el estado de sesión y bloquea visualmente
+ * los módulos que requieren login si no hay sesión activa.
+ */
+function renderEstadoSesion() {
+  const logged = isLoggedIn();
+  const bar = document.getElementById('session-bar');
+  bar.innerHTML = logged
+    ? `<span style="color:var(--green)">● sesión activa</span><button onclick="cerrarSesion()">Cerrar sesión</button>`
+    : `<span style="color:var(--muted)">● sin sesión</span>`;
+  document.querySelectorAll('.card.needs-login').forEach(c => {
+    c.classList.toggle('locked', !logged);
+  });
+}
+
+// Estado inicial: si ya hay sesión, ocultar el overlay; sino dejarlo visible
+if (isLoggedIn()) {
+  document.getElementById('pin-overlay').classList.add('hidden');
+}
+renderEstadoSesion();
+</script>
 </body>
 </html>

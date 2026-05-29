@@ -106,31 +106,17 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
   .tab-btn{font-size:12px;padding:10px 14px}
 .tab-content{padding:1rem}.costo-grid{grid-template-columns:repeat(2,1fr)}.pedido-grid{grid-template-columns:1fr}.manual-row{flex-direction:column}}
 </style>
+<script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
 <script src="./assets/common.js"></script>
 </head>
 <body>
 
-<div class="pin-overlay" id="pin-overlay">
-  <div class="pin-card">
-    <div class="pin-logo">Tainty <span>Labs</span></div>
-    <div class="pin-sub">Módulo de costeo y compras</div>
-    <div class="pin-dots" id="pin-dots-wrap"></div>
-    <div class="pin-grid">
-      <button class="pin-key" onclick="pp('1')">1</button><button class="pin-key" onclick="pp('2')">2</button><button class="pin-key" onclick="pp('3')">3</button>
-      <button class="pin-key" onclick="pp('4')">4</button><button class="pin-key" onclick="pp('5')">5</button><button class="pin-key" onclick="pp('6')">6</button>
-      <button class="pin-key" onclick="pp('7')">7</button><button class="pin-key" onclick="pp('8')">8</button><button class="pin-key" onclick="pp('9')">9</button>
-      <button class="pin-clear" onclick="pc()">&#9003;</button><button class="pin-key" onclick="pp('0')">0</button><div></div>
-    </div>
-    <div class="pin-err" id="pin-err"></div>
-  </div>
-</div>
-
 <div class="topbar">
   <div class="logo">Tainty <span>Labs</span> &middot; Costeo</div>
   <div class="topbar-right">
     <a class="back-btn" href="./index.html">&#8592; Inicio</a>
-    <button class="lock-btn" onclick="bloquear()">&#128274; Salir</button>
+    <button class="lock-btn" onclick="cerrarSesion()">&#128274; Salir</button>
   </div>
 </div>
 
@@ -284,34 +270,23 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 <div class="toast" id="toast"></div>
 
 <script>
-const PIN = '200720';
-const PIN_LEN = 6;
-let pinBuf = '', catalogo = [], pedidosActivos = [], pedidosEnCola = [], escalaActual = 100;
 
-// PIN
+// Auth gate: si no hay sesion, requireLogin redirige al index.
+if (!requireLogin()) {
+  // El navegador ya esta yendo al index; lo siguiente no se ejecuta.
+} else {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => cargarCatalogo());
+  } else {
+    cargarCatalogo();
+  }
+}
+let catalogo = [], pedidosActivos = [], pedidosEnCola = [], escalaActual = 100;
+
 function initDots() {
   const w = document.getElementById('pin-dots-wrap');
   w.innerHTML = Array.from({length:PIN_LEN}, (_,i) => `<div class="pin-dot" id="pd${i}"></div>`).join('');
 }
-function pp(d) {
-  if (pinBuf.length >= PIN_LEN) return;
-  pinBuf += d; updDots();
-  if (pinBuf.length === PIN_LEN) {
-    setTimeout(() => {
-      if (pinBuf === PIN) {
-        document.getElementById('pin-overlay').classList.add('hidden');
-        cargarCatalogo();
-      } else {
-        for(let i=0;i<PIN_LEN;i++) document.getElementById('pd'+i).classList.add('error');
-        document.getElementById('pin-err').textContent = 'PIN incorrecto';
-        setTimeout(() => { pinBuf=''; updDots(); for(let i=0;i<PIN_LEN;i++) document.getElementById('pd'+i).classList.remove('error'); document.getElementById('pin-err').textContent=''; }, 800);
-      }
-    }, 100);
-  }
-}
-function pc() { pinBuf = pinBuf.slice(0,-1); updDots(); }
-function updDots() { for(let i=0;i<PIN_LEN;i++) { const d=document.getElementById('pd'+i); if(d) d.classList.toggle('filled', i<pinBuf.length); } }
-function bloquear() { pinBuf=''; initDots(); document.getElementById('pin-overlay').classList.remove('hidden'); }
 function switchTab(id,btn) {
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -1617,7 +1592,6 @@ function irACatalogo(nombreProducto) {
   }, 100);
 }
 
-initDots();
 </script>
 </body>
 </html>

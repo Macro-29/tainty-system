@@ -92,32 +92,18 @@
   .seccion-titulo{font-size:13px}
 .topbar{padding:.75rem 1rem}.main{padding:1rem}.estado-btns{gap:4px}.est-btn{font-size:10px;padding:3px 8px}}
 </style>
+<script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
 <script src="./assets/common.js"></script>
 </head>
 <body>
-
-<div class="pin-overlay" id="pin-overlay">
-  <div class="pin-card">
-    <div class="pin-logo">Tainty <span>Labs</span></div>
-    <div class="pin-sub">Gestión de insumos</div>
-    <div class="pin-dots" id="pin-dots-wrap"></div>
-    <div class="pin-grid">
-      <button class="pin-key" onclick="pp('1')">1</button><button class="pin-key" onclick="pp('2')">2</button><button class="pin-key" onclick="pp('3')">3</button>
-      <button class="pin-key" onclick="pp('4')">4</button><button class="pin-key" onclick="pp('5')">5</button><button class="pin-key" onclick="pp('6')">6</button>
-      <button class="pin-key" onclick="pp('7')">7</button><button class="pin-key" onclick="pp('8')">8</button><button class="pin-key" onclick="pp('9')">9</button>
-      <button class="pin-clear" onclick="pc()">&#9003;</button><button class="pin-key" onclick="pp('0')">0</button><div></div>
-    </div>
-    <div class="pin-err" id="pin-err"></div>
-  </div>
-</div>
 
 <div class="topbar">
   <div class="logo">Tainty <span>Labs</span> &middot; Gestión</div>
   <div class="topbar-right">
     <button class="refresh-btn" onclick="cargarDatos()">&#8635; Actualizar</button>
     <a class="back-btn" href="./index.html">&#8592; Inicio</a>
-    <button class="lock-btn" onclick="bloquear()">&#128274; Salir</button>
+    <button class="lock-btn" onclick="cerrarSesion()">&#128274; Salir</button>
   </div>
 </div>
 
@@ -141,8 +127,17 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const PIN='200720';
-const PIN_LEN=6;
+
+// Auth gate: si no hay sesion, requireLogin redirige al index.
+if (!requireLogin()) {
+  // El navegador ya esta yendo al index; lo siguiente no se ejecuta.
+} else {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => cargarDatos());
+  } else {
+    cargarDatos();
+  }
+}
 const ESTADOS=['pendiente','compra','produccion','camino','oficina','noaplica'];
 const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
 // Etiquetas y cajas no pasan por la fase de compra (vienen del proveedor
@@ -160,30 +155,12 @@ const LABELS={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion'
 const DOT={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
 // Emoji compacto usado en el texto exportable (botón Copiar por sección).
 const ESTADO_EMOJI={'pendiente':'⏳','compra':'🛒','produccion':'⚙️','camino':'🚚','oficina':'✅','noaplica':'➖','encurso':'⚙️','finalizado':'✅'};
-let pinBuf='',pedidos=[],estadosInsumos={},filtroActual='todos',modoOrden='insumo';
+let pedidos=[],estadosInsumos={},filtroActual='todos',modoOrden='insumo';
 
 function initDots(){
   const w=document.getElementById('pin-dots-wrap');
   w.innerHTML=Array.from({length:PIN_LEN},(_,i)=>`<div class="pin-dot" id="pd${i}"></div>`).join('');
 }
-function pp(d){
-  if(pinBuf.length>=PIN_LEN)return;
-  pinBuf+=d;updDots();
-  if(pinBuf.length===PIN_LEN){
-    setTimeout(()=>{
-      if(pinBuf===PIN){document.getElementById('pin-overlay').classList.add('hidden');cargarDatos();}
-      else{
-        for(let i=0;i<PIN_LEN;i++)document.getElementById('pd'+i).classList.add('error');
-        document.getElementById('pin-err').textContent='PIN incorrecto';
-        setTimeout(()=>{pinBuf='';updDots();for(let i=0;i<PIN_LEN;i++)document.getElementById('pd'+i).classList.remove('error');document.getElementById('pin-err').textContent='';},800);
-      }
-    },100);
-  }
-}
-function pc(){pinBuf=pinBuf.slice(0,-1);updDots();}
-function updDots(){for(let i=0;i<PIN_LEN;i++){const d=document.getElementById('pd'+i);if(d)d.classList.toggle('filled',i<pinBuf.length);}}
-function bloquear(){pinBuf='';initDots();document.getElementById('pin-overlay').classList.remove('hidden');}
-
 async function cargarDatos(){
   document.getElementById('lista-pedidos').innerHTML='<div class="spinner"></div>';
   try{
@@ -617,8 +594,6 @@ function setFiltro(f,btn){
   btn.classList.add('active');
   renderLista();
 }
-
-initDots();
 
 // Sin auto-refresh ni listener de visibilitychange en este módulo.
 // Cambiar estados de insumos es manual y un refresh inesperado interrumpe

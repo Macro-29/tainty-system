@@ -83,41 +83,11 @@
 }
 
 </style>
+<script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
 <script src="./assets/common.js"></script>
 </head>
 <body>
-
-<!-- PIN -->
-<div class="pin-overlay" id="pin-overlay">
-  <div class="pin-card">
-    <div class="pin-logo">Tainty <span>Labs</span></div>
-    <div class="pin-sub">Ingresa tu PIN para acceder</div>
-    <div class="pin-dots">
-      <div class="pin-dot" id="pd0"></div>
-      <div class="pin-dot" id="pd1"></div>
-      <div class="pin-dot" id="pd2"></div>
-      <div class="pin-dot" id="pd3"></div>
-      <div class="pin-dot" id="pd4"></div>
-      <div class="pin-dot" id="pd5"></div>
-    </div>
-    <div class="pin-grid">
-      <button class="pin-key" onclick="pp('1')">1</button>
-      <button class="pin-key" onclick="pp('2')">2</button>
-      <button class="pin-key" onclick="pp('3')">3</button>
-      <button class="pin-key" onclick="pp('4')">4</button>
-      <button class="pin-key" onclick="pp('5')">5</button>
-      <button class="pin-key" onclick="pp('6')">6</button>
-      <button class="pin-key" onclick="pp('7')">7</button>
-      <button class="pin-key" onclick="pp('8')">8</button>
-      <button class="pin-key" onclick="pp('9')">9</button>
-      <button class="pin-clear" onclick="pc()">⌫</button>
-      <button class="pin-key" onclick="pp('0')">0</button>
-      <div></div>
-    </div>
-    <div class="pin-err" id="pin-err"></div>
-  </div>
-</div>
 
 <!-- LOADING -->
 <div class="loading-overlay hidden" id="loading">
@@ -135,7 +105,7 @@
       <div class="month-label" id="month-label">—</div>
       <button class="nav-btn" onclick="cambiarMes(1)">›</button>
     </div>
-    <button class="lock-btn" onclick="bloquear()">🔒 Salir</button>
+    <button class="lock-btn" onclick="cerrarSesion()">🔒 Salir</button>
   </div>
 </div>
 
@@ -194,35 +164,22 @@
 </div>
 
 <script>
-const PIN='200720';
+
+// Auth gate: si no hay sesion, requireLogin redirige al index.
+if (!requireLogin()) {
+  // El navegador ya esta yendo al index; lo siguiente no se ejecuta.
+} else {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => cargarDatos());
+  } else {
+    cargarDatos();
+  }
+}
 const MESES_ES=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
-let pinBuf='';
 let allRows=[];
 let mesIdx=new Date().getMonth();
 let anioIdx=new Date().getFullYear();
 let charts={};
-
-// PIN
-function pp(d){
-  if(pinBuf.length>=6)return;
-  pinBuf+=d;
-  updDots();
-  if(pinBuf.length===6){
-    setTimeout(()=>{
-      if(pinBuf===PIN){
-        document.getElementById('pin-overlay').classList.add('hidden');
-        cargarDatos();
-      } else {
-        document.querySelectorAll('.pin-dot').forEach(d=>d.classList.add('error'));
-        document.getElementById('pin-err').textContent='PIN incorrecto';
-        setTimeout(()=>{pinBuf='';updDots();document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));document.getElementById('pin-err').textContent='';},800);
-      }
-    },100);
-  }
-}
-function pc(){pinBuf=pinBuf.slice(0,-1);updDots();}
-function updDots(){for(let i=0;i<6;i++){const d=document.getElementById('pd'+i);d.classList.toggle('filled',i<pinBuf.length);d.classList.remove('error');}}
-function bloquear(){pinBuf='';updDots();document.getElementById('pin-overlay').classList.remove('hidden');}
 
 // JSONP
 async function cargarDatos(){
@@ -418,16 +375,12 @@ Chart.defaults.borderColor='rgba(255,255,255,0.05)';
 
 // Auto-refresh: refresca analytics cada 60s y al volver a la pestaña.
 let _autoRefreshTimer = null;
-function isUnlocked(){
-  const ov = document.getElementById('pin-overlay');
-  return ov && ov.classList.contains('hidden');
-}
 function startAutoRefresh(){
   if(_autoRefreshTimer) return;
-  _autoRefreshTimer = setInterval(()=>{ if(!document.hidden && isUnlocked()) cargarDatos(); }, 60000);
+  _autoRefreshTimer = setInterval(()=>{ if(!document.hidden && isLoggedIn()) cargarDatos(); }, 60000);
 }
 document.addEventListener('visibilitychange', ()=>{
-  if(!document.hidden && isUnlocked()) cargarDatos();
+  if(!document.hidden && isLoggedIn()) cargarDatos();
 });
 const _origCargarDatos = cargarDatos;
 cargarDatos = async function(){ await _origCargarDatos.apply(this, arguments); startAutoRefresh(); };

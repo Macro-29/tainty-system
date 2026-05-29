@@ -148,6 +148,7 @@
 }
 
 </style>
+<script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
 <script src="./assets/common.js"></script>
 </head>
@@ -183,42 +184,9 @@
   </div>
 </div>
 
-<!-- PIN MODAL -->
-<div class="modal-overlay" id="pin-modal">
-  <div class="modal">
-    <div class="modal-title">Modo administrador</div>
-    <div class="modal-sub">Ingresa tu PIN para continuar</div>
-    <div class="pin-dots">
-      <div class="pin-dot" id="pd0"></div>
-      <div class="pin-dot" id="pd1"></div>
-      <div class="pin-dot" id="pd2"></div>
-      <div class="pin-dot" id="pd3"></div>
-      <div class="pin-dot" id="pd4"></div>
-      <div class="pin-dot" id="pd5"></div>
-    </div>
-    <div class="pin-grid">
-      <button class="pin-key" onclick="pinPress('1')">1</button>
-      <button class="pin-key" onclick="pinPress('2')">2</button>
-      <button class="pin-key" onclick="pinPress('3')">3</button>
-      <button class="pin-key" onclick="pinPress('4')">4</button>
-      <button class="pin-key" onclick="pinPress('5')">5</button>
-      <button class="pin-key" onclick="pinPress('6')">6</button>
-      <button class="pin-key" onclick="pinPress('7')">7</button>
-      <button class="pin-key" onclick="pinPress('8')">8</button>
-      <button class="pin-key" onclick="pinPress('9')">9</button>
-      <button class="pin-clear" onclick="pinClear()">⌫</button>
-      <button class="pin-key" onclick="pinPress('0')">0</button>
-      <div></div>
-    </div>
-    <div class="pin-error" id="pin-error"></div>
-    <button class="modal-cancel" onclick="cerrarModal()">Cancelar</button>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-const PIN_CORRECTO='200720';
 const ESTADOS_INSUMO=['pendiente','compra','produccion','camino','oficina','noaplica'];
 const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
 const LABELS_INSUMO={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica','encurso':'⚙️ En curso','finalizado':'✅ Finalizado'};
@@ -231,8 +199,6 @@ let pedidos=[];
 let estadosInsumos={};
 let filtroActual='todos';
 let adminMode=false;
-let pinBuffer='';
-
 function getTipo(n){
   n=(n||'').toLowerCase();
   if(/\(.*cap\)/.test(n))return'cap';
@@ -560,55 +526,16 @@ function toggleAdmin(){
     document.getElementById('admin-btn').classList.remove('active');
     renderGrid();
   } else {
-    abrirModal();
-  }
-}
-
-function abrirModal(){
-  pinBuffer='';
-  actualizarDots();
-  document.getElementById('pin-error').textContent='';
-  document.getElementById('pin-modal').classList.add('visible');
-}
-function cerrarModal(){
-  document.getElementById('pin-modal').classList.remove('visible');
-  pinBuffer='';
-  actualizarDots();
-}
-function pinPress(d){
-  if(pinBuffer.length>=6)return;
-  pinBuffer+=d;
-  actualizarDots();
-  if(pinBuffer.length===6){
-    setTimeout(()=>{
-      if(pinBuffer===PIN_CORRECTO){
-        adminMode=true;
-        cerrarModal();
-        document.getElementById('admin-btn').textContent='🔓 Admin';
-        document.getElementById('admin-btn').classList.add('active');
-        renderGrid();
-      } else {
-        document.querySelectorAll('.pin-dot').forEach(d=>d.classList.add('error'));
-        document.getElementById('pin-error').textContent='PIN incorrecto';
-        setTimeout(()=>{
-          pinBuffer='';
-          actualizarDots();
-          document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));
-          document.getElementById('pin-error').textContent='';
-        },800);
-      }
-    },100);
-  }
-}
-function pinClear(){
-  pinBuffer=pinBuffer.slice(0,-1);
-  actualizarDots();
-}
-function actualizarDots(){
-  for(let i=0;i<6;i++){
-    const dot=document.getElementById('pd'+i);
-    dot.classList.toggle('filled',i<pinBuffer.length);
-    dot.classList.remove('error');
+    // Habilitar admin solo si hay sesion activa. Si no hay, redirigir al
+    // index para login (panel es publico para ver, pero admin requiere session).
+    if (typeof isLoggedIn === 'function' && isLoggedIn()) {
+      adminMode=true;
+      document.getElementById('admin-btn').textContent='🔓 Admin';
+      document.getElementById('admin-btn').classList.add('active');
+      renderGrid();
+    } else {
+      window.location.href = './index.html';
+    }
   }
 }
 

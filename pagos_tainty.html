@@ -77,30 +77,17 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 }
 @media(max-width:640px){.topbar{padding:.75rem 1rem}.tab-content{padding:1rem}.charts-grid{grid-template-columns:1fr}.chart-card.full{grid-column:1}.stats-row{grid-template-columns:1fr 1fr}.modal{margin:1rem;max-width:100%}.controls{flex-direction:column}}
 </style>
+<script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
 <script src="./assets/common.js"></script>
 </head>
 <body>
-<div class="pin-overlay" id="pin-overlay">
-  <div class="pin-card">
-    <div class="pin-logo">Tainty <span>Labs</span></div>
-    <div class="pin-sub">Módulo de pagos</div>
-    <div class="pin-dots"><div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div><div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div><div class="pin-dot" id="pd4"></div><div class="pin-dot" id="pd5"></div></div>
-    <div class="pin-grid">
-      <button class="pin-key" onclick="pp('1')">1</button><button class="pin-key" onclick="pp('2')">2</button><button class="pin-key" onclick="pp('3')">3</button>
-      <button class="pin-key" onclick="pp('4')">4</button><button class="pin-key" onclick="pp('5')">5</button><button class="pin-key" onclick="pp('6')">6</button>
-      <button class="pin-key" onclick="pp('7')">7</button><button class="pin-key" onclick="pp('8')">8</button><button class="pin-key" onclick="pp('9')">9</button>
-      <button class="pin-clear" onclick="pc()">&#9003;</button><button class="pin-key" onclick="pp('0')">0</button><div></div>
-    </div>
-    <div class="pin-err" id="pin-err"></div>
-  </div>
-</div>
 <div class="topbar">
   <div class="logo">Tainty <span>Labs</span> &middot; Pagos</div>
   <div class="topbar-right">
     <button class="lock-btn" id="btn-refresh" onclick="cargarPagos()" title="Actualizar datos desde Google Sheets">&#x21bb; Refrescar</button>
     <a class="back-btn" href="./index.html">&#8592; Inicio</a>
-    <button class="lock-btn" onclick="bloquear()">&#128274; Salir</button>
+    <button class="lock-btn" onclick="cerrarSesion()">&#128274; Salir</button>
   </div>
 </div>
 <div class="tabs-nav">
@@ -175,13 +162,19 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 <div class="toast" id="toast"></div>
 <script>
 
-const PIN='200720';
+
+// Auth gate: si no hay sesion, requireLogin redirige al index.
+if (!requireLogin()) {
+  // El navegador ya esta yendo al index; lo siguiente no se ejecuta.
+} else {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => cargarPagos());
+  } else {
+    cargarPagos();
+  }
+}
 const MESES=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
-let pinBuf='',pagos=[],filtroActual='todos',pedidoActual=null,charts={};
-function pp(d){if(pinBuf.length>=6)return;pinBuf+=d;updDots();if(pinBuf.length===6){setTimeout(()=>{if(pinBuf===PIN){document.getElementById('pin-overlay').classList.add('hidden');cargarPagos();}else{document.querySelectorAll('.pin-dot').forEach(d=>d.classList.add('error'));document.getElementById('pin-err').textContent='PIN incorrecto';setTimeout(()=>{pinBuf='';updDots();document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));document.getElementById('pin-err').textContent='';},800);}},100);}}
-function pc(){pinBuf=pinBuf.slice(0,-1);updDots();}
-function updDots(){for(let i=0;i<6;i++){const d=document.getElementById('pd'+i);d.classList.toggle('filled',i<pinBuf.length);d.classList.remove('error');}}
-function bloquear(){pinBuf='';updDots();document.getElementById('pin-overlay').classList.remove('hidden');}
+let pagos=[],filtroActual='todos',pedidoActual=null,charts={};
 function switchTab(id,btn){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='dashboard')renderCharts();}
 async function cargarPagos(){try{const res=await jsonp(SCRIPT_URL+'?action=pagos&t='+Date.now());if(res.success&&res.pagos){pagos=res.pagos;poblarFiltroClientes();renderStats();renderCharts();renderTabla();}}catch(e){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--red)">Error al conectar.</td></tr>';}}
 // Pobla el dropdown de clientes mostrando SOLO los que tienen al menos un
@@ -412,16 +405,12 @@ function seleccionarPedido(numPedido){cerrarModalBuscar();abrirModal(numPedido);
 // Auto-refresh: una vez desbloqueado (PIN correcto), refresca cada 60s mientras
 // la pestaña está visible, y también al volver a la pestaña tras estar en background.
 let _autoRefreshTimer = null;
-function isUnlocked(){
-  const ov = document.getElementById('pin-overlay');
-  return ov && ov.classList.contains('hidden');
-}
 function startAutoRefresh(){
   if(_autoRefreshTimer) return;
-  _autoRefreshTimer = setInterval(()=>{ if(!document.hidden && isUnlocked()) cargarPagos(); }, 60000);
+  _autoRefreshTimer = setInterval(()=>{ if(!document.hidden && isLoggedIn()) cargarPagos(); }, 60000);
 }
 document.addEventListener('visibilitychange', ()=>{
-  if(!document.hidden && isUnlocked()) cargarPagos();
+  if(!document.hidden && isLoggedIn()) cargarPagos();
 });
 // Cuando se desbloquea por primera vez, cargarPagos() corre; arrancamos el timer entonces.
 const _origCargarPagos = cargarPagos;

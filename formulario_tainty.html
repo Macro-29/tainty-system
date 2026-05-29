@@ -292,6 +292,7 @@ textarea { resize: vertical; min-height: 80px; }
 .toast.error{border-color:var(--red);color:var(--red);background:var(--red-light)}
 .toast.success{border-color:var(--green);color:var(--green);background:var(--green-light)}
 </style>
+<script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
 <script src="./assets/common.js"></script>
 </head>
@@ -300,6 +301,7 @@ textarea { resize: vertical; min-height: 80px; }
 
   <div class="top-bar">
     <a class="back-btn" href="./index.html">&#8592; Inicio</a>
+    <button class="back-btn" onclick="cerrarSesion()" style="border-color:rgba(192,57,43,.3);color:var(--red)">&#128274; Salir</button>
     <div class="logo">Tainty <span>Corp</span></div>
     <div class="date-chip" id="fecha-chip"></div>
   </div>
@@ -403,6 +405,11 @@ textarea { resize: vertical; min-height: 80px; }
 </div>
 
 <script>
+
+// Auth gate: si no hay sesion, requireLogin redirige al index.
+if (!requireLogin()) {
+  // El navegador ya esta yendo al index; lo siguiente no se ejecuta.
+}
 const preciosCache = {};
 
 function getTipo(nombre) {
@@ -699,39 +706,6 @@ document.getElementById('fecha-chip').textContent = now.toLocaleDateString('es-P
 document.getElementById('f-fecha').value = fechaHoy();
 
 // ADMIN GESTOR DE PRODUCTOS
-const PIN_ADMIN = '200720';
-let pinFBuf = '';
-const PIN_DOTS_COUNT = 6;
-
-function initPinDots() {
-  const wrap = document.getElementById('pin-f-dots-wrap');
-  wrap.innerHTML = Array.from({length: PIN_DOTS_COUNT}, (_,i) => `<div class="pin-f-dot" id="pfd${i}"></div>`).join('');
-}
-
-function pinF(d) {
-  if (pinFBuf.length >= PIN_DOTS_COUNT) return;
-  pinFBuf += d;
-  updPinFDots();
-  if (pinFBuf.length === PIN_DOTS_COUNT) {
-    setTimeout(() => {
-      if (pinFBuf === PIN_ADMIN) {
-        document.getElementById('pin-admin-overlay').classList.remove('visible');
-        abrirAdmin();
-      } else {
-        for(let i=0;i<PIN_DOTS_COUNT;i++) document.getElementById('pfd'+i).classList.add('error');
-        document.getElementById('pin-f-err').textContent = 'PIN incorrecto';
-        setTimeout(() => { pinFBuf = ''; updPinFDots(); for(let i=0;i<PIN_DOTS_COUNT;i++) document.getElementById('pfd'+i).classList.remove('error'); document.getElementById('pin-f-err').textContent = ''; }, 800);
-      }
-    }, 100);
-  }
-}
-
-function pinFClear() { pinFBuf = pinFBuf.slice(0, -1); updPinFDots(); }
-function updPinFDots() { for(let i=0;i<PIN_DOTS_COUNT;i++) { const d=document.getElementById('pfd'+i); if(d) d.classList.toggle('filled', i < pinFBuf.length); } }
-
-function abrirPinAdmin() { pinFBuf = ''; initPinDots(); document.getElementById('pin-f-err').textContent = ''; document.getElementById('pin-admin-overlay').classList.add('visible'); }
-function cerrarPinAdmin() { document.getElementById('pin-admin-overlay').classList.remove('visible'); pinFBuf = ''; }
-
 function getProductos() {
   return [...listaProductos];
 }
@@ -923,24 +897,7 @@ cargarCatalogos();
 </script>
 
 <!-- ADMIN FAB -->
-<button class="admin-fab" onclick="abrirPinAdmin()" title="Gestionar productos">&#9881;</button>
-
-<!-- PIN ADMIN -->
-<div class="pin-overlay-f" id="pin-admin-overlay">
-  <div class="pin-card-f">
-    <div class="pin-f-title">Modo administrador</div>
-    <div class="pin-f-sub">Ingresa tu PIN para gestionar productos</div>
-    <div class="pin-f-dots" id="pin-f-dots-wrap"></div>
-    <div class="pin-f-grid">
-      <button class="pin-f-key" onclick="pinF('1')">1</button><button class="pin-f-key" onclick="pinF('2')">2</button><button class="pin-f-key" onclick="pinF('3')">3</button>
-      <button class="pin-f-key" onclick="pinF('4')">4</button><button class="pin-f-key" onclick="pinF('5')">5</button><button class="pin-f-key" onclick="pinF('6')">6</button>
-      <button class="pin-f-key" onclick="pinF('7')">7</button><button class="pin-f-key" onclick="pinF('8')">8</button><button class="pin-f-key" onclick="pinF('9')">9</button>
-      <button class="pin-f-clear" onclick="pinFClear()">&#9003;</button><button class="pin-f-key" onclick="pinF('0')">0</button><div></div>
-    </div>
-    <div class="pin-f-err" id="pin-f-err"></div>
-    <button style="margin-top:8px;font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer" onclick="cerrarPinAdmin()">Cancelar</button>
-  </div>
-</div>
+<button class="admin-fab" onclick="abrirAdmin()" title="Gestionar productos">&#9881;</button>
 
 <!-- ADMIN MODAL PRODUCTOS Y CLIENTES -->
 <div class="admin-overlay" id="admin-overlay">
