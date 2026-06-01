@@ -1491,6 +1491,25 @@ async function reintentarSyncProducto(pi) {
 
 function abrirNuevoProducto() { abrirEditorProducto(null); }
 
+/**
+ * Devuelve true si la fecha del pedido (string DD/MM/YYYY o similar) es
+ * "reciente" — usado para resaltar pedidos nuevos en la cola. Reciente
+ * significa hoy o ayer (mañana = ya lo hicieron pero todavía no procesaron).
+ */
+function esPedidoReciente(fechaStr) {
+  if (!fechaStr) return false;
+  const s = String(fechaStr).trim();
+  let d = null;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+  else { const tmp = new Date(s); if (!isNaN(tmp)) d = tmp; }
+  if (!d || isNaN(d)) return false;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  const diff = (hoy - d) / 86400000;
+  return diff >= 0 && diff <= 1; // hoy (0) o ayer (1)
+}
+
 async function cargarPedidosCola() {
   const wrap = document.getElementById('pedidos-cola-wrap');
   const list = document.getElementById('pedidos-cola-list');
@@ -1510,12 +1529,21 @@ async function cargarPedidosCola() {
       }
       list.innerHTML = pedidosEnCola.map((p, i) => {
         const yaAgregado = pedidosActivos.some(pa => pa.numPedido === p.numPedido);
-        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border${yaAgregado?'2':''})" id="cola-item-${i}">
+        const nuevo = !yaAgregado && esPedidoReciente(p.fecha);
+        // Borde/fondo ámbar para pedidos nuevos, sutil destello en el lateral.
+        const styleBase = `display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;`;
+        const styleColor = nuevo
+          ? `background:linear-gradient(90deg,rgba(245,166,35,.12),var(--surface2) 40%);border:1px solid rgba(245,166,35,.4);box-shadow:inset 3px 0 0 var(--amber);`
+          : `background:var(--surface2);border:1px solid var(--border${yaAgregado?'2':''});`;
+        return `<div style="${styleBase}${styleColor}" id="cola-item-${i}">
           <input type="checkbox" id="cola-check-${i}" ${yaAgregado?'checked disabled':''} style="width:16px;height:16px;accent-color:var(--purple)">
           <div style="flex:1;min-width:0">
-            <div style="font-family:DM Mono,monospace;font-size:10px;color:var(--hint)">${p.numPedido} · ${p.cliente||''}</div>
+            <div style="font-family:DM Mono,monospace;font-size:10px;color:var(--hint);display:flex;align-items:center;gap:6px">
+              <span>${p.numPedido} · ${p.cliente||''}</span>
+              ${nuevo ? '<span style="font-family:DM Sans,sans-serif;font-size:9px;font-weight:600;padding:1px 6px;border-radius:6px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,.3);text-transform:uppercase;letter-spacing:.04em">Nuevo</span>' : ''}
+            </div>
             <div style="font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.producto}</div>
-            <div style="font-size:11px;color:var(--muted)">${p.estado||''}</div>
+            <div style="font-size:11px;color:var(--muted)">${p.estado||''}${p.fecha?' · '+p.fecha:''}</div>
           </div>
           <div style="font-family:DM Mono,monospace;font-size:13px;color:var(--amber);white-space:nowrap">${parseInt(p.cantidad||0).toLocaleString()} und</div>
         </div>`;
