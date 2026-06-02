@@ -385,7 +385,10 @@ textarea { resize: vertical; min-height: 80px; }
     </div>
 
     <div class="preview-card" id="preview">
-      <div class="preview-title">Vista previa</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div class="preview-title" style="margin-bottom:0">Vista previa</div>
+        <button type="button" onclick="copiarPreview()" title="Copiar resumen del pedido" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--purple);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px">&#128203; Copiar</button>
+      </div>
       <div id="preview-rows"></div>
       <div class="insumos-list">
         <div class="insumos-title">Insumos requeridos para producción</div>
@@ -601,6 +604,49 @@ function updatePreview() {
 
   document.getElementById('preview-insumos').innerHTML = getInsumos(tipo)
     .map(i => `<span class="insumo-item"><span class="insumo-dot"></span>${i}</span>`).join('');
+}
+
+/**
+ * Copia al portapapeles un resumen del pedido tomando los datos actuales
+ * del formulario. Útil para enviar al cliente o como registro propio.
+ */
+function copiarPreview() {
+  const fecha = document.getElementById('f-fecha').value;
+  const cliente = (document.getElementById('f-cliente').value || '').trim();
+  const vendedor = (document.getElementById('f-vendedor').value || '').trim();
+  const prod = (document.getElementById('f-producto').value || '').trim();
+  const cant = parseInt(document.getElementById('f-cantidad').value);
+  const precio = parseFloat(document.getElementById('f-precio').value);
+  const abono = parseFloat(document.getElementById('f-abono').value) || 0;
+  if (!prod || !cant || !precio) {
+    mostrarToast('Completa producto, cantidad y precio antes de copiar', { type:'error', duration:3000 });
+    return;
+  }
+  const total = precio * cant;
+  const pct = abono > 0 ? Math.round((abono / total) * 100) : 0;
+  const money = n => 'S/ ' + (parseFloat(n)||0).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  // Convertimos la fecha YYYY-MM-DD del input a DD/MM/YYYY para que se lea natural
+  let fechaTxt = '';
+  if (fecha) {
+    const m = String(fecha).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    fechaTxt = m ? `${m[3]}/${m[2]}/${m[1]}` : fecha;
+  }
+  const lineas = [
+    '📋 Resumen del pedido',
+    '',
+    fechaTxt ? `📅 Fecha: ${fechaTxt}` : null,
+    cliente ? `👤 Cliente: ${cliente.toUpperCase()}` : null,
+    `📦 Producto: ${prod}`,
+    `🔢 Cantidad: ${cant.toLocaleString()} und`,
+    `💵 Precio unitario: ${money(precio)}`,
+    `💰 Monto total: ${money(total)}`,
+    abono > 0 ? `💸 Abonado: ${money(abono)} (${pct}%)` : null,
+    vendedor ? `🧑‍💼 Vendedor: ${vendedor}` : null
+  ].filter(Boolean);
+  const texto = lineas.join('\n');
+  navigator.clipboard.writeText(texto)
+    .then(() => mostrarToast('Resumen del pedido copiado', { type:'success', duration:2500 }))
+    .catch(() => mostrarToast('No se pudo copiar', { type:'error', duration:3000 }));
 }
 
 async function estimarNumeroPedido() {
