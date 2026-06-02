@@ -631,12 +631,9 @@ function copiarPreview() {
     fechaTxt = m ? `${m[3]}/${m[2]}/${m[1]}` : fecha;
   }
   const lineas = [
-    '📋 Resumen del pedido',
-    '',
     fechaTxt ? `📅 Fecha: ${fechaTxt}` : null,
     cliente ? `👤 Cliente: ${cliente.toUpperCase()}` : null,
-    `📦 Producto: ${prod}`,
-    `🔢 Cantidad: ${cant.toLocaleString()} und`,
+    `📦 Producto: ${prod} - ${cant.toLocaleString()} und`,
     `💵 Precio unitario: ${money(precio)}`,
     `💰 Monto total: ${money(total)}`,
     abono > 0 ? `💸 Abonado: ${money(abono)} (${pct}%)` : null
