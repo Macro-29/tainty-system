@@ -613,7 +613,6 @@ function updatePreview() {
 function copiarPreview() {
   const fecha = document.getElementById('f-fecha').value;
   const cliente = (document.getElementById('f-cliente').value || '').trim();
-  const vendedor = (document.getElementById('f-vendedor').value || '').trim();
   const prod = (document.getElementById('f-producto').value || '').trim();
   const cant = parseInt(document.getElementById('f-cantidad').value);
   const precio = parseFloat(document.getElementById('f-precio').value);
@@ -640,8 +639,7 @@ function copiarPreview() {
     `🔢 Cantidad: ${cant.toLocaleString()} und`,
     `💵 Precio unitario: ${money(precio)}`,
     `💰 Monto total: ${money(total)}`,
-    abono > 0 ? `💸 Abonado: ${money(abono)} (${pct}%)` : null,
-    vendedor ? `🧑‍💼 Vendedor: ${vendedor}` : null
+    abono > 0 ? `💸 Abonado: ${money(abono)} (${pct}%)` : null
   ].filter(Boolean);
   const texto = lineas.join('\n');
   navigator.clipboard.writeText(texto)
