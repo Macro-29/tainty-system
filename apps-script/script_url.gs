@@ -217,6 +217,20 @@ function doGet(e) {
     const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName('PAGOS');
     const data = sheet.getDataRange().getValues();
+
+    // Construir un mapa numPedido → estado leyendo NUEVO PEDIDO una sola vez.
+    // Así cada pago puede incluir su estado (entregado, en camino, etc.) sin
+    // requerir un segundo request desde el cliente.
+    const estadosPedido = {};
+    const sheetPed = ss.getSheetByName(SHEET_NAME);
+    if (sheetPed) {
+      const dataPed = sheetPed.getDataRange().getValues();
+      for (let i = 1; i < dataPed.length; i++) {
+        const np = dataPed[i][0];
+        if (np) estadosPedido[np] = (dataPed[i][13] || '').toString();
+      }
+    }
+
     const pagos = [];
     for (let i = 1; i < data.length; i++) {
       const r = data[i];
@@ -228,7 +242,8 @@ function doGet(e) {
         abono2:r[9], fecha2:r[10], restante2:r[11],
         abono3:r[12], fecha3:r[13], restante3:r[14],
         abono4:r[15], fecha4:r[16], restante4:r[17],
-        detalle:r[18], observaciones:r[19]
+        detalle:r[18], observaciones:r[19],
+        estado: estadosPedido[r[0]] || ''
       });
     }
     result = { success: true, pagos: pagos };

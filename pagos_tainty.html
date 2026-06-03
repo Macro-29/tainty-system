@@ -198,6 +198,9 @@ function poblarFiltroClientes(){
 function getRestante(p){const total=parseFloat(p.montoTotal)||0;const ab=[p.abono1,p.abono2,p.abono3,p.abono4].map(a=>parseFloat(a)||0).reduce((s,a)=>s+a,0);return Math.max(0,total-ab);}
 function getTotalAbonado(p){return[p.abono1,p.abono2,p.abono3,p.abono4].map(a=>parseFloat(a)||0).reduce((s,a)=>s+a,0);}
 function getEstadoPago(p){const r=getRestante(p);if(r<=0)return'realizado';const ab=getTotalAbonado(p);if(ab>0)return'parcial';return'pendiente';}
+// Marca el pedido como "entregado" si el estado del ticket en NUEVO PEDIDO
+// contiene la palabra entregado (case-insensitive). El server expone p.estado.
+function esEntregado(estado){return (estado||'').toString().toLowerCase().includes('entregado');}
 function getSiguienteAbono(p){if(!p.abono1||parseFloat(p.abono1)===0)return 1;if(!p.abono2||parseFloat(p.abono2)===0)return 2;if(!p.abono3||parseFloat(p.abono3)===0)return 3;if(!p.abono4||parseFloat(p.abono4)===0)return 4;return null;}
 function getMesPedido(p){if(p.mes)return(p.mes||'').toString().toUpperCase().trim();const f=p.fecha?new Date(p.fecha):null;if(f&&!isNaN(f))return MESES[f.getMonth()];return'';}
 function getPagosFiltrados(){const m=document.getElementById('dash-mes')?document.getElementById('dash-mes').value:'';const label=document.getElementById('dash-mes-label');if(label)label.textContent=m?'Mostrando: '+m:'Mostrando todos los meses';if(!m)return pagos;return pagos.filter(p=>getMesPedido(p)===m);}
@@ -250,7 +253,11 @@ function renderTabla(){
     const fechaStr=p.fecha?String(p.fecha).split('T')[0]:'';
     const cantidad=parseInt(p.cantidad||0);
     const precioUnd=cantidad>0&&total>0?(total/cantidad):0;
-    return`<tr><td><span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span></td><td><span class="td-mono" style="color:var(--blue)">${cantidad.toLocaleString()} und</span></td><td><span class="td-mono" style="color:var(--muted)">S/ ${precioUnd.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${pct}%;background:${pc2}"></div></div><span style="font-size:10px;color:var(--hint)">${pct}% abonado</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
+    const entregado = esEntregado(p.estado);
+    const dotEntregado = entregado
+      ? '<span title="Entregado" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:middle;box-shadow:0 0 4px rgba(62,207,142,.5)"></span>'
+      : '';
+    return`<tr><td>${dotEntregado}<span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span></td><td><span class="td-mono" style="color:var(--blue)">${cantidad.toLocaleString()} und</span></td><td><span class="td-mono" style="color:var(--muted)">S/ ${precioUnd.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${pct}%;background:${pc2}"></div></div><span style="font-size:10px;color:var(--hint)">${pct}% abonado</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
   }).join('');
 }
 function setFiltro(f,btn){
