@@ -650,8 +650,8 @@ function renderProveedoresPorTipo(lista, porProv) {
 }
 
 /**
- * Copia al portapapeles todos los insumos del tipo dado, agrupados por
- * proveedor con subtotales y un subtotal del tipo al final.
+ * Copia al portapapeles solo los nombres y cantidades de los insumos del
+ * tipo dado. Sin cabecera de tipo, sin proveedor, sin total.
  */
 function copiarTipo(tipo) {
   const lista = (window._insumosCalculados || []).filter(i => (i.tipo||'').toUpperCase() === tipo);
@@ -660,31 +660,19 @@ function copiarTipo(tipo) {
     return;
   }
   const meta = TIPO_META[tipo] || { ic: '•', label: tipo };
-  // Sub-agrupar por proveedor
-  const porProv = {};
-  lista.forEach(i => {
-    const k = i.proveedor || '—';
-    if (!porProv[k]) porProv[k] = [];
-    porProv[k].push(i);
-  });
-  const provs = Object.keys(porProv).sort((a,b) => a.localeCompare(b, 'es'));
-  const bloques = provs.map(prov => {
-    const items = porProv[prov].slice().sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
-    const lineas = items.map(i => {
-      const unidad = i.unidad || 'kg';
-      if (unidad === 'kg') {
-        const cant = parseFloat(i.cantidadTotal.toFixed(3)).toString();
-        return `- ${i.nombre}: ${cant} kg`;
-      }
-      const cant = Math.round(i.cantidadTotal).toLocaleString('en-US');
-      return `- ${cant} ${i.nombre}`;
-    }).join('\n');
-    return `📦 ${prov}\n${lineas}`;
-  });
-  const subtotal = lista.reduce((s,i) => s + (i.costoTotal||0), 0);
-  const texto = `${meta.ic} ${meta.label.toUpperCase()}\n\n${bloques.join('\n\n')}\n\n💰 Subtotal: S/ ${subtotal.toLocaleString('es-PE',{minimumFractionDigits:2})}`;
+  // Orden alfabético por nombre, sin agrupar por proveedor.
+  const items = lista.slice().sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
+  const texto = items.map(i => {
+    const unidad = i.unidad || 'kg';
+    if (unidad === 'kg') {
+      const cant = parseFloat(i.cantidadTotal.toFixed(3)).toString();
+      return `- ${i.nombre}: ${cant} kg`;
+    }
+    const cant = Math.round(i.cantidadTotal).toLocaleString('en-US');
+    return `- ${cant} ${i.nombre}`;
+  }).join('\n');
   navigator.clipboard.writeText(texto)
-    .then(() => mostrarToast(`${meta.label} copiado (${lista.length} insumos)`, {type:'success', duration:2500}))
+    .then(() => mostrarToast(`${meta.label} copiado (${items.length} insumos)`, {type:'success', duration:2500}))
     .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3000}));
 }
 
