@@ -639,11 +639,53 @@ function renderProveedoresPorTipo(lista, porProv) {
     return `<div class="prov-card">
       <div class="prov-header">
         <div class="prov-name">${meta.ic} ${meta.label.toUpperCase()}</div>
-        <div class="prov-total">S/ ${data.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="prov-total">S/ ${data.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
+          <button class="btn-copy" onclick="copiarTipo('${tipo}')" title="Copiar todos los insumos de ${meta.label.toUpperCase()} agrupados por proveedor">&#128203; Copiar</button>
+        </div>
       </div>
       <div class="prov-body">${cuerpo}</div>
     </div>`;
   }).join('');
+}
+
+/**
+ * Copia al portapapeles todos los insumos del tipo dado, agrupados por
+ * proveedor con subtotales y un subtotal del tipo al final.
+ */
+function copiarTipo(tipo) {
+  const lista = (window._insumosCalculados || []).filter(i => (i.tipo||'').toUpperCase() === tipo);
+  if (!lista.length) {
+    mostrarToast('No hay insumos de ' + tipo + ' para copiar', {type:'error', duration:2500});
+    return;
+  }
+  const meta = TIPO_META[tipo] || { ic: '•', label: tipo };
+  // Sub-agrupar por proveedor
+  const porProv = {};
+  lista.forEach(i => {
+    const k = i.proveedor || '—';
+    if (!porProv[k]) porProv[k] = [];
+    porProv[k].push(i);
+  });
+  const provs = Object.keys(porProv).sort((a,b) => a.localeCompare(b, 'es'));
+  const bloques = provs.map(prov => {
+    const items = porProv[prov].slice().sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
+    const lineas = items.map(i => {
+      const unidad = i.unidad || 'kg';
+      if (unidad === 'kg') {
+        const cant = parseFloat(i.cantidadTotal.toFixed(3)).toString();
+        return `- ${i.nombre}: ${cant} kg`;
+      }
+      const cant = Math.round(i.cantidadTotal).toLocaleString('en-US');
+      return `- ${cant} ${i.nombre}`;
+    }).join('\n');
+    return `📦 ${prov}\n${lineas}`;
+  });
+  const subtotal = lista.reduce((s,i) => s + (i.costoTotal||0), 0);
+  const texto = `${meta.ic} ${meta.label.toUpperCase()}\n\n${bloques.join('\n\n')}\n\n💰 Subtotal: S/ ${subtotal.toLocaleString('es-PE',{minimumFractionDigits:2})}`;
+  navigator.clipboard.writeText(texto)
+    .then(() => mostrarToast(`${meta.label} copiado (${lista.length} insumos)`, {type:'success', duration:2500}))
+    .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3000}));
 }
 
 function copiarProveedor(prov) {
