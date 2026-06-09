@@ -291,6 +291,102 @@ textarea { resize: vertical; min-height: 80px; }
 .toast.visible{opacity:1}
 .toast.error{border-color:var(--red);color:var(--red);background:var(--red-light)}
 .toast.success{border-color:var(--green);color:var(--green);background:var(--green-light)}
+
+/* === Mejoras de diseño e interacción === */
+
+/* Animación de entrada de tarjetas */
+@keyframes fadeInUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+.card, .preview-card { animation: fadeInUp .4s ease both; }
+#form-wrap > .card:nth-child(1){animation-delay:.02s}
+#form-wrap > .card:nth-child(2){animation-delay:.08s}
+#form-wrap > .card:nth-child(3){animation-delay:.14s}
+#form-wrap > .card:nth-child(4){animation-delay:.20s}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+
+/* Barra de progreso del formulario */
+.progress-wrap{margin-bottom:1.25rem}
+.progress-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.progress-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--hint)}
+.progress-count{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted)}
+.progress-track{height:6px;background:var(--border);border-radius:20px;overflow:hidden}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--purple),var(--purple-dark));border-radius:20px;transition:width .35s cubic-bezier(.4,0,.2,1)}
+.progress-fill.done{background:linear-gradient(90deg,var(--green),#1f5e3d)}
+
+/* Estados de validación por campo */
+input.invalid, select.invalid, textarea.invalid{
+  border-color:var(--red); background:var(--red-light);
+  box-shadow:0 0 0 3px rgba(192,57,43,.08);
+}
+.field-error{font-size:12px;color:var(--red);margin-top:5px;display:none;align-items:center;gap:4px}
+.field-error.show{display:flex;animation:fadeInUp .2s ease both}
+@keyframes shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
+.shake{animation:shake .4s cubic-bezier(.36,.07,.19,.97) both}
+
+/* Chips rápidos (cantidad y abono) */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{
+  font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;
+  padding:5px 12px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);background:var(--card);color:var(--muted);
+  transition:all .15s;
+}
+.chip:hover{border-color:var(--purple);color:var(--purple)}
+.chip.active{background:var(--purple-light);border-color:var(--purple);color:var(--purple-dark);font-weight:600}
+
+/* Sugerencia de precio: animación suave */
+.price-suggest{transition:opacity .25s ease, transform .25s ease}
+
+/* Skeleton de carga de catálogos */
+@keyframes shimmer { 0%{background-position:-200px 0} 100%{background-position:calc(200px + 100%) 0} }
+.skeleton{
+  background:linear-gradient(90deg,var(--border) 0%,#eeece8 40%,var(--border) 80%);
+  background-size:200px 100%; animation:shimmer 1.2s ease-in-out infinite;
+  border-radius:var(--radius-sm); color:transparent!important; pointer-events:none;
+}
+.catalog-hint{font-size:11px;color:var(--hint);margin-top:6px;display:none;align-items:center;gap:5px}
+.catalog-hint.show{display:flex}
+.catalog-hint .dot{width:6px;height:6px;border-radius:50%;background:var(--purple);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* Barra de acción fija con total */
+.action-bar{
+  position:sticky; bottom:0; z-index:40;
+  margin:1rem -1rem -1rem; padding:14px 1rem;
+  background:linear-gradient(to top, var(--card) 75%, rgba(255,255,255,0));
+  border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:14px;
+}
+.action-total{flex:1;min-width:0}
+.action-total .at-label{font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:.06em}
+.action-total .at-value{font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:var(--text);line-height:1.1}
+.action-total .at-sub{font-size:11px;color:var(--muted)}
+.action-bar .btn-submit{width:auto;flex-shrink:0;padding:13px 28px}
+@media(max-width:560px){
+  .action-bar{margin:1rem -.75rem -1rem;padding:12px .75rem;border-radius:14px 14px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+  .action-total .at-value{font-size:18px}
+  .action-bar .btn-submit{padding:12px 20px}
+}
+
+/* Check de éxito animado */
+@keyframes pop { 0%{transform:scale(0)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
+.success-card[style*="block"] .success-icon{animation:pop .45s cubic-bezier(.34,1.56,.64,1) both}
+
+/* Modal genérico (reemplaza prompt/confirm) */
+.ui-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;padding:1rem}
+.ui-modal-overlay.visible{opacity:1;pointer-events:all}
+.ui-modal{background:var(--card);border-radius:var(--radius);padding:1.5rem;width:100%;max-width:380px;box-shadow:0 12px 40px rgba(0,0,0,.2);transform:translateY(8px);transition:transform .2s}
+.ui-modal-overlay.visible .ui-modal{transform:translateY(0)}
+.ui-modal-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.ui-modal-msg{font-size:13px;color:var(--muted);margin-bottom:1rem;white-space:pre-line;line-height:1.5}
+.ui-modal-input{width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);margin-bottom:1rem}
+.ui-modal-input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(91,79,207,.1)}
+.ui-modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.ui-modal-btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:9px 18px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--muted);transition:all .15s}
+.ui-modal-btn:hover{color:var(--text)}
+.ui-modal-btn.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+.ui-modal-btn.primary:hover{background:var(--purple-dark)}
+.ui-modal-btn.danger{background:var(--red);border-color:var(--red);color:#fff}
+.ui-modal-btn.danger:hover{background:#a32f22}
 </style>
 <script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
@@ -318,26 +414,38 @@ textarea { resize: vertical; min-height: 80px; }
 
   <div id="form-wrap">
 
+    <div class="progress-wrap">
+      <div class="progress-head">
+        <span class="progress-label">Progreso del pedido</span>
+        <span class="progress-count" id="progress-count">0 de 5</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+
     <div class="card">
       <div class="card-title">Información general</div>
       <div class="two-col">
         <div class="field">
           <label>Fecha <span class="req">*</span></label>
-          <input type="date" id="f-fecha">
+          <input type="date" id="f-fecha" oninput="clearFieldError('f-fecha');updateProgress()">
+          <div class="field-error" id="err-f-fecha">⚠ Selecciona una fecha</div>
         </div>
         <div class="field">
           <label>Vendedor <span class="req">*</span></label>
-          <select id="f-vendedor" onchange="onProducto()">
+          <select id="f-vendedor" onchange="clearFieldError('f-vendedor');onProducto();updateProgress()">
             <option value="">Elige...</option>
             <option>Carlos Esparza</option>
             <option>Miguel Chozo</option>
           </select>
+          <div class="field-error" id="err-f-vendedor">⚠ Elige un vendedor</div>
         </div>
       </div>
       <div class="field">
         <label>Cliente <span class="req">*</span></label>
         <input type="text" id="f-cliente" list="clientes-list" placeholder="Escribe o elige cliente..." autocomplete="off" oninput="onClienteInput()" onchange="onClienteInput()">
         <datalist id="clientes-list"></datalist>
+        <div class="catalog-hint" id="hint-clientes"><span class="dot"></span>Cargando clientes...</div>
+        <div class="field-error" id="err-f-cliente">⚠ Ingresa el cliente</div>
         <div class="nuevo-campo" id="nuevo-wrap" style="display:none">
           <div style="font-size:12px;color:var(--amber);margin-bottom:6px">⚠ Cliente nuevo — se agregará al catálogo al guardar</div>
         </div>
@@ -350,12 +458,21 @@ textarea { resize: vertical; min-height: 80px; }
         <label>Producto <span class="req">*</span></label>
         <input type="text" id="f-producto" list="productos-list" placeholder="Escribe o elige producto..." autocomplete="off" oninput="onProductoInput()" onchange="onProducto()">
         <datalist id="productos-list"></datalist>
+        <div class="catalog-hint" id="hint-productos"><span class="dot"></span>Cargando productos...</div>
         <div id="prod-nuevo-aviso" style="display:none;font-size:12px;color:var(--amber);margin-top:6px">⚠ Producto nuevo — se agregará al catálogo al guardar</div>
+        <div class="field-error" id="err-f-producto">⚠ Ingresa el producto</div>
         <div id="tipo-wrap"></div>
       </div>
       <div class="field">
         <label>Cantidad (unidades) <span class="req">*</span></label>
         <input type="number" id="f-cantidad" min="1" placeholder="Ej: 300" oninput="onCantidad()">
+        <div class="chips" id="chips-cantidad">
+          <span class="chip" onclick="setCantidad(100)">100</span>
+          <span class="chip" onclick="setCantidad(300)">300</span>
+          <span class="chip" onclick="setCantidad(500)">500</span>
+          <span class="chip" onclick="setCantidad(1000)">1000</span>
+        </div>
+        <div class="field-error" id="err-f-cantidad">⚠ Ingresa una cantidad válida</div>
       </div>
     </div>
 
@@ -363,7 +480,8 @@ textarea { resize: vertical; min-height: 80px; }
       <div class="card-title">Precios</div>
       <div class="field">
         <label>Precio de venta por unidad (S/) <span class="req">*</span></label>
-        <input type="number" id="f-precio" step="0.01" min="0" placeholder="S/ 0.00" oninput="updatePreview()">
+        <input type="number" id="f-precio" step="0.01" min="0" placeholder="S/ 0.00" oninput="clearFieldError('f-precio');updatePreview()">
+        <div class="field-error" id="err-f-precio">⚠ Ingresa el precio por unidad</div>
         <div class="price-suggest" id="price-suggest">
           <div class="ps-label">Último precio registrado en Sheets</div>
           <div class="ps-value" id="ps-val"></div>
@@ -373,6 +491,11 @@ textarea { resize: vertical; min-height: 80px; }
       <div class="field">
         <label>Monto abonado (S/)</label>
         <input type="number" id="f-abono" step="0.01" min="0" placeholder="S/ 0.00 (opcional)" oninput="updatePreview()">
+        <div class="chips" id="chips-abono">
+          <span class="chip" onclick="setAbono(0)">Sin abono</span>
+          <span class="chip" onclick="setAbono(50)">50%</span>
+          <span class="chip" onclick="setAbono(100)">100%</span>
+        </div>
       </div>
     </div>
 
@@ -400,9 +523,16 @@ textarea { resize: vertical; min-height: 80px; }
       <span class="spinner"></span> Registrando pedido en Google Sheets...
     </div>
 
-    <button class="btn-submit" id="btn-submit" onclick="submitForm()">
-      Registrar pedido
-    </button>
+    <div class="action-bar">
+      <div class="action-total">
+        <div class="at-label">Monto total</div>
+        <div class="at-value" id="at-value">S/ 0.00</div>
+        <div class="at-sub" id="at-sub">Completa producto, cantidad y precio</div>
+      </div>
+      <button class="btn-submit" id="btn-submit" onclick="submitForm()">
+        Registrar pedido
+      </button>
+    </div>
 
   </div>
 </div>
@@ -428,12 +558,133 @@ function getInsumos(tipo) {
     : ['Insumo','Envase','Etiqueta','Caja'];
 }
 
+// === Validación campo por campo ===
+function showFieldError(id) {
+  const el = document.getElementById(id);
+  const err = document.getElementById('err-' + id);
+  if (el) { el.classList.add('invalid'); el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 450); }
+  if (err) err.classList.add('show');
+}
+function clearFieldError(id) {
+  const el = document.getElementById(id);
+  const err = document.getElementById('err-' + id);
+  if (el) el.classList.remove('invalid');
+  if (err) err.classList.remove('show');
+}
+
+// === Chips rápidos ===
+function setCantidad(n) {
+  document.getElementById('f-cantidad').value = n;
+  clearFieldError('f-cantidad');
+  syncChips('chips-cantidad', String(n));
+  onCantidad();
+  updateProgress();
+}
+function setAbono(pct) {
+  const precio = parseFloat(document.getElementById('f-precio').value) || 0;
+  const cant = parseInt(document.getElementById('f-cantidad').value) || 0;
+  const total = precio * cant;
+  const ab = document.getElementById('f-abono');
+  if (pct === 0) ab.value = '';
+  else ab.value = (total * pct / 100).toFixed(2);
+  syncChips('chips-abono', pct === 0 ? 'Sin abono' : pct + '%');
+  updatePreview();
+}
+function syncChips(containerId, activeText) {
+  document.querySelectorAll('#' + containerId + ' .chip').forEach(c => {
+    c.classList.toggle('active', c.textContent.trim() === activeText);
+  });
+}
+
+// === Barra de progreso (5 campos obligatorios) ===
+function updateProgress() {
+  const reqs = ['f-fecha','f-vendedor','f-cliente','f-producto','f-cantidad','f-precio'];
+  const filled = reqs.filter(id => {
+    const v = (document.getElementById(id).value || '').trim();
+    if (id === 'f-cantidad' || id === 'f-precio') return parseFloat(v) > 0;
+    return !!v;
+  }).length;
+  const total = reqs.length;
+  const pct = Math.round((filled / total) * 100);
+  const fill = document.getElementById('progress-fill');
+  fill.style.width = pct + '%';
+  fill.classList.toggle('done', filled === total);
+  document.getElementById('progress-count').textContent = filled + ' de ' + total;
+}
+
+// === Total en vivo en la barra de acción ===
+function updateActionTotal() {
+  const cant = parseInt(document.getElementById('f-cantidad').value);
+  const precio = parseFloat(document.getElementById('f-precio').value);
+  const abono = parseFloat(document.getElementById('f-abono').value) || 0;
+  const valEl = document.getElementById('at-value');
+  const subEl = document.getElementById('at-sub');
+  if (!cant || !precio) {
+    valEl.textContent = 'S/ 0.00';
+    subEl.textContent = 'Completa producto, cantidad y precio';
+    return;
+  }
+  const total = precio * cant;
+  valEl.textContent = 'S/ ' + total.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+  if (abono > 0) {
+    const pct = Math.round((abono / total) * 100);
+    const saldo = total - abono;
+    subEl.textContent = 'Abonado ' + pct + '% · saldo S/ ' + saldo.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+  } else {
+    subEl.textContent = cant.toLocaleString() + ' und × S/ ' + precio.toFixed(2);
+  }
+}
+
+// === Modal genérico (reemplaza prompt/confirm nativos) ===
+function uiPrompt(title, msg, defaultValue) {
+  return new Promise(resolve => {
+    const ov = document.getElementById('ui-modal-overlay');
+    const input = document.getElementById('ui-modal-input');
+    document.getElementById('ui-modal-title').textContent = title;
+    document.getElementById('ui-modal-msg').textContent = msg || '';
+    input.style.display = 'block';
+    input.value = defaultValue || '';
+    document.getElementById('ui-modal-ok').className = 'ui-modal-btn primary';
+    _uiModalShow(ov, () => resolve(input.value.trim() || null), () => resolve(null));
+    setTimeout(() => { input.focus(); input.select(); }, 60);
+  });
+}
+function uiConfirm(title, msg, danger) {
+  return new Promise(resolve => {
+    const ov = document.getElementById('ui-modal-overlay');
+    document.getElementById('ui-modal-input').style.display = 'none';
+    document.getElementById('ui-modal-title').textContent = title;
+    document.getElementById('ui-modal-msg').textContent = msg || '';
+    document.getElementById('ui-modal-ok').className = 'ui-modal-btn ' + (danger ? 'danger' : 'primary');
+    _uiModalShow(ov, () => resolve(true), () => resolve(false));
+  });
+}
+function _uiModalShow(ov, onOk, onCancel) {
+  const ok = document.getElementById('ui-modal-ok');
+  const cancel = document.getElementById('ui-modal-cancel');
+  const input = document.getElementById('ui-modal-input');
+  const close = (cb) => {
+    ov.classList.remove('visible');
+    ok.onclick = cancel.onclick = ov.onclick = input.onkeydown = null;
+    cb();
+  };
+  ok.onclick = () => close(onOk);
+  cancel.onclick = () => close(onCancel);
+  ov.onclick = (e) => { if (e.target === ov) close(onCancel); };
+  input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); close(onOk); } if (e.key === 'Escape') close(onCancel); };
+  ov.classList.add('visible');
+}
+
 // === ESTADO DE CATÁLOGOS (cargados desde Sheets) ===
 let listaClientes = [];
 let listaProductos = [];
 
 // Llamada JSONP al Apps Script (para evitar problemas de CORS con GET)
 async function cargarCatalogos() {
+  const hintC = document.getElementById('hint-clientes');
+  const hintP = document.getElementById('hint-productos');
+  hintC.classList.add('show');
+  hintP.classList.add('show');
   try {
     const [resC, resP] = await Promise.all([
       jsonp(`${SCRIPT_URL}?action=clientes`),
@@ -449,6 +700,9 @@ async function cargarCatalogos() {
     }
   } catch (e) {
     console.warn('No se pudo cargar catálogos:', e.message);
+  } finally {
+    hintC.classList.remove('show');
+    hintP.classList.remove('show');
   }
 }
 
@@ -463,12 +717,16 @@ function onClienteInput() {
   document.getElementById('f-cliente').value = v; // forzar mayúsculas
   const existe = listaClientes.some(c => c.toUpperCase() === v);
   document.getElementById('nuevo-wrap').style.display = (v && !existe) ? 'block' : 'none';
+  if (v) clearFieldError('f-cliente');
+  updateProgress();
 }
 
 function onProductoInput() {
   const v = (document.getElementById('f-producto').value || '').trim();
   const existe = listaProductos.some(p => p === v);
   document.getElementById('prod-nuevo-aviso').style.display = (v && !existe) ? 'block' : 'none';
+  if (v) clearFieldError('f-producto');
+  updateProgress();
 }
 
 // Llamado al cambiar producto o vendedor. Refresca tipo-badge y dispara
@@ -493,6 +751,9 @@ async function onProducto() {
 // Llamado al cambiar la cantidad. Re-dispara la sugerencia de precio
 // porque el precio puede variar por escala (más unidades = mejor precio).
 async function onCantidad() {
+  const v = document.getElementById('f-cantidad').value;
+  if (parseFloat(v) > 0) clearFieldError('f-cantidad');
+  syncChips('chips-cantidad', v);
   await sugerirPrecio();
   updatePreview();
 }
@@ -587,6 +848,9 @@ function updatePreview() {
   const abono = parseFloat(document.getElementById('f-abono').value) || 0;
   const preview = document.getElementById('preview');
 
+  updateActionTotal();
+  updateProgress();
+
   if (!prod || !cant || !precio) { preview.style.display = 'none'; return; }
 
   preview.style.display = 'block';
@@ -668,9 +932,24 @@ async function submitForm() {
   const errEl = document.getElementById('error-msg');
   errEl.style.display = 'none';
 
-  if (!fecha || !clienteRaw || !prod || !cant || !precio || !vendedor) {
-    errEl.textContent = 'Por favor completa todos los campos obligatorios (*)';
-    errEl.style.display = 'block';
+  // Validación campo por campo: marca cada campo faltante y enfoca el primero
+  const checks = [
+    ['f-fecha', !fecha],
+    ['f-vendedor', !vendedor],
+    ['f-cliente', !clienteRaw],
+    ['f-producto', !prod],
+    ['f-cantidad', !cant || parseFloat(cant) <= 0],
+    ['f-precio', !precio || parseFloat(precio) <= 0]
+  ];
+  let primerError = null;
+  checks.forEach(([id, falla]) => {
+    if (falla) { showFieldError(id); if (!primerError) primerError = id; }
+    else clearFieldError(id);
+  });
+  if (primerError) {
+    const el = document.getElementById(primerError);
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => el.focus(), 300);
     return;
   }
 
@@ -735,7 +1014,12 @@ function resetForm() {
   document.getElementById('price-suggest').style.display = 'none';
   document.getElementById('nuevo-wrap').style.display = 'none';
   document.getElementById('preview').style.display = 'none';
+  document.getElementById('prod-nuevo-aviso').style.display = 'none';
+  ['f-fecha','f-vendedor','f-cliente','f-producto','f-cantidad','f-precio'].forEach(clearFieldError);
+  document.querySelectorAll('.chip.active').forEach(c => c.classList.remove('active'));
   document.getElementById('f-fecha').value = fechaHoy();
+  updateActionTotal();
+  updateProgress();
 }
 
 function fechaHoy(){
@@ -745,6 +1029,8 @@ function fechaHoy(){
 const now = new Date();
 document.getElementById('fecha-chip').textContent = now.toLocaleDateString('es-PE', {weekday:'short', day:'numeric', month:'short', year:'numeric'});
 document.getElementById('f-fecha').value = fechaHoy();
+updateProgress();
+updateActionTotal();
 
 // ADMIN GESTOR DE PRODUCTOS
 function getProductos() {
@@ -792,7 +1078,7 @@ function renderCliList() {
 }
 
 async function editarProducto(viejo) {
-  const nuevo = prompt('Editar producto:\n(El nombre debe incluir capacidad entre paréntesis)', viejo);
+  const nuevo = await uiPrompt('Editar producto', 'El nombre debe incluir la capacidad entre paréntesis. Ej: PRODUCTO (60ml)', viejo);
   if (!nuevo) return;
   const nuevoUp = nuevo.trim().toUpperCase();
   if (nuevoUp === viejo.toUpperCase()) return;
@@ -816,7 +1102,7 @@ async function editarProducto(viejo) {
 }
 
 async function eliminarProducto(nombre) {
-  if (!confirm(`¿Eliminar "${nombre}" del catálogo?\n\nLos pedidos antiguos con este producto NO se borran.`)) return;
+  if (!(await uiConfirm('Eliminar producto', `¿Eliminar "${nombre}" del catálogo?\n\nLos pedidos antiguos con este producto NO se borran.`, true))) return;
   try {
     const data = await jsonp(`${SCRIPT_URL}?action=eliminarProducto&nombre=${encodeURIComponent(nombre)}`);
     if (data && data.success) {
@@ -832,7 +1118,7 @@ async function eliminarProducto(nombre) {
 }
 
 async function editarCliente(viejo) {
-  const nuevo = prompt('Editar cliente:', viejo);
+  const nuevo = await uiPrompt('Editar cliente', 'Modifica el nombre del cliente', viejo);
   if (!nuevo) return;
   const nuevoUp = nuevo.trim().toUpperCase();
   if (nuevoUp === viejo.toUpperCase()) return;
@@ -854,7 +1140,7 @@ async function editarCliente(viejo) {
 }
 
 async function eliminarCliente(nombre) {
-  if (!confirm(`¿Eliminar "${nombre}" del catálogo?\n\nLos pedidos antiguos con este cliente NO se borran.`)) return;
+  if (!(await uiConfirm('Eliminar cliente', `¿Eliminar "${nombre}" del catálogo?\n\nLos pedidos antiguos con este cliente NO se borran.`, true))) return;
   try {
     const data = await jsonp(`${SCRIPT_URL}?action=eliminarCliente&nombre=${encodeURIComponent(nombre)}`);
     if (data && data.success) {
@@ -975,6 +1261,19 @@ cargarCatalogos();
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- MODAL GENÉRICO (prompt / confirm) -->
+<div class="ui-modal-overlay" id="ui-modal-overlay">
+  <div class="ui-modal">
+    <div class="ui-modal-title" id="ui-modal-title"></div>
+    <div class="ui-modal-msg" id="ui-modal-msg"></div>
+    <input type="text" class="ui-modal-input" id="ui-modal-input" style="display:none">
+    <div class="ui-modal-actions">
+      <button class="ui-modal-btn" id="ui-modal-cancel">Cancelar</button>
+      <button class="ui-modal-btn primary" id="ui-modal-ok">Aceptar</button>
+    </div>
   </div>
 </div>
 
