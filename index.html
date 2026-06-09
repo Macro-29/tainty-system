@@ -9,38 +9,104 @@
 <style>
 html,body{height:100%}
 body{overflow-y:scroll;padding:3rem 1rem 4rem}
-.wrap{position:relative;z-index:1;max-width:900px;margin:0 auto}
-.header{text-align:center;margin-bottom:2.5rem;position:relative}
-.logo{font-family:'Syne',sans-serif;font-size:42px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
+.wrap{position:relative;z-index:1;max-width:920px;margin:0 auto}
+
+/* ---------- Header ---------- */
+.header{text-align:center;margin-bottom:2.25rem;position:relative}
+.logo{font-family:'Syne',sans-serif;font-size:42px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text);line-height:1}
 .logo span{color:var(--purple)}
-.tagline{font-size:14px;color:var(--muted);margin-top:6px}
+.greeting{font-family:'Syne',sans-serif;font-size:15px;font-weight:600;color:var(--text);margin-top:14px}
+.tagline{font-size:13px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.tagline b{color:var(--muted);font-weight:500}
 .session-bar{position:absolute;top:0;right:0;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-.session-bar button{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer}
-.session-bar button:hover{color:var(--text)}
+.session-bar button{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
+.session-bar button:hover{color:var(--text);border-color:var(--red);background:var(--red-dim)}
+.dot-live{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.dot-on{background:var(--green);box-shadow:0 0 0 0 rgba(62,207,142,.6);animation:pulse 2s infinite}
+.dot-off{background:var(--hint)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(62,207,142,.5)}70%{box-shadow:0 0 0 6px rgba(62,207,142,0)}100%{box-shadow:0 0 0 0 rgba(62,207,142,0)}}
+
+/* ---------- Section labels ---------- */
+.section-label{display:flex;align-items:center;gap:10px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--hint);margin:0 2px 12px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.section-label.has-top{margin-top:1.75rem}
+
+/* ---------- Grid + cards ---------- */
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.card{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.25rem;text-decoration:none;color:var(--text);transition:all .15s;cursor:pointer}
-.card:hover{border-color:var(--border2);background:var(--surface2);transform:translateY(-1px)}
-.card-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
-.icon-purple{background:var(--purple-dim)}
-.icon-green{background:var(--green-dim)}
-.icon-amber{background:var(--amber-dim)}
+.card{
+  position:relative;display:flex;align-items:center;gap:14px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;padding:1.25rem 1.25rem 1.25rem 1.4rem;
+  text-decoration:none;color:var(--text);cursor:pointer;overflow:hidden;
+  transition:transform .18s cubic-bezier(.2,.7,.3,1),border-color .18s,background .18s,box-shadow .18s;
+  --accent:var(--purple);--accent-dim:var(--purple-dim);
+}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:.55;transition:opacity .18s,width .18s}
+.card:hover{border-color:var(--accent);background:var(--surface2);transform:translateY(-3px);box-shadow:0 10px 28px -12px var(--accent-dim),0 0 0 1px var(--accent-dim)}
+.card:hover::before{opacity:1;width:4px}
+.card:active{transform:translateY(-1px)}
+
+.c-purple{--accent:var(--purple);--accent-dim:var(--purple-dim)}
+.c-green{--accent:var(--green);--accent-dim:var(--green-dim)}
+.c-amber{--accent:var(--amber);--accent-dim:var(--amber-dim)}
+.c-red{--accent:var(--red);--accent-dim:var(--red-dim)}
+.c-teal{--accent:var(--teal);--accent-dim:var(--teal-dim)}
+.c-blue{--accent:var(--blue);--accent-dim:var(--blue-dim)}
+
+.card-icon{
+  width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;background:var(--accent-dim);
+  transition:transform .18s,box-shadow .18s;
+}
+.card:hover .card-icon{transform:scale(1.06);box-shadow:0 0 18px -2px var(--accent-dim)}
 .card-body{flex:1;min-width:0}
-.card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px}
-.card-desc{font-size:12px;color:var(--muted);line-height:1.4}
-.card-arrow{font-size:20px;color:var(--hint);flex-shrink:0}
-.card.locked{opacity:.45;pointer-events:none;filter:grayscale(.3)}
-.card.locked .card-arrow::before{content:'🔒 '}
-.card-public-badge{font-size:9px;padding:2px 6px;border-radius:6px;background:var(--green-dim);color:var(--green);margin-left:6px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
-.guest-hint{text-align:center;font-size:12px;color:var(--hint);margin-top:1.25rem}
+.card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.card-desc{font-size:12px;color:var(--muted);line-height:1.45}
+.card-arrow{font-size:22px;color:var(--hint);flex-shrink:0;transition:transform .18s,color .18s}
+.card:hover .card-arrow{color:var(--accent);transform:translateX(4px)}
+
+.card-public-badge{font-size:9px;padding:2px 7px;border-radius:6px;background:var(--green-dim);color:var(--green);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+
+/* Locked state */
+.card.locked{cursor:not-allowed;pointer-events:none}
+.card.locked .card-icon{filter:grayscale(.7);opacity:.5}
+.card.locked .card-title,.card.locked .card-desc{opacity:.5}
+.card.locked::before{opacity:.15}
+.card.locked .card-arrow{display:none}
+.card-lock{display:none;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--hint);border:1px solid var(--border2);border-radius:20px;padding:3px 9px;flex-shrink:0;white-space:nowrap}
+.card.locked .card-lock{display:inline-flex}
+
+/* Entrance animation */
+@keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.anim .card{opacity:0;animation:cardIn .5s cubic-bezier(.2,.7,.3,1) forwards}
+.anim .card:nth-child(1){animation-delay:.04s}
+.anim .card:nth-child(2){animation-delay:.10s}
+.anim .card:nth-child(3){animation-delay:.16s}
+.anim .card:nth-child(4){animation-delay:.22s}
+.anim .card:nth-child(5){animation-delay:.28s}
+.anim .card:nth-child(6){animation-delay:.34s}
+@media(prefers-reduced-motion:reduce){
+  .anim .card{opacity:1;animation:none}
+  .card,.card-icon,.card-arrow{transition:none}
+}
+
+.guest-hint{text-align:center;font-size:12px;color:var(--hint);margin-top:1.5rem}
 .guest-hint a{color:var(--purple);text-decoration:none}
+.guest-hint a:hover{text-decoration:underline}
+
+/* PIN unlock success flourish */
+.pin-card.success{animation:popOk .35s ease}
+@keyframes popOk{0%{transform:scale(1)}45%{transform:scale(1.04)}100%{transform:scale(1)}}
+.pin-dot.ok{background:var(--green);border-color:var(--green)}
+
 @media(max-width:640px){
   body{padding:2rem .75rem 3rem}
   .logo{font-size:28px}
   .grid{grid-template-columns:1fr;gap:8px}
-  .card{padding:1rem}
+  .card{padding:1rem 1rem 1rem 1.15rem}
   .card-icon{width:40px;height:40px;font-size:18px}
   .card-title{font-size:14px}
-  .session-bar{position:static;justify-content:center;margin-top:8px}
+  .session-bar{position:static;justify-content:center;margin-top:12px}
 }
 @media(min-width:641px) and (max-width:800px){
   .grid{grid-template-columns:repeat(2,1fr)}
@@ -52,7 +118,7 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
 
 <!-- LOGIN OVERLAY -->
 <div class="pin-overlay" id="pin-overlay">
-  <div class="pin-card">
+  <div class="pin-card" id="pin-card">
     <div class="pin-logo">Tainty <span>Labs</span></div>
     <div class="pin-sub">Ingresa tu PIN para acceder</div>
     <div class="pin-dots" id="pin-dots-wrap">
@@ -87,57 +153,69 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
 <div class="wrap">
   <div class="header">
     <div class="logo">Tainty <span>Labs</span></div>
-    <div class="tagline">Sistema de gestión &middot; 2026</div>
+    <div class="greeting" id="greeting">Bienvenido</div>
+    <div class="tagline" id="clock">Sistema de gestión</div>
     <div class="session-bar" id="session-bar"></div>
   </div>
-  <div class="grid" id="grid-modulos">
-    <a class="card" href="./panel_produccion_tainty.html">
-      <div class="card-icon icon-purple">📺</div>
+
+  <div class="section-label">Acceso público</div>
+  <div class="grid anim">
+    <a class="card c-purple" href="./panel_produccion_tainty.html">
+      <div class="card-icon">📺</div>
       <div class="card-body">
         <div class="card-title">Panel de Producción <span class="card-public-badge">público</span></div>
         <div class="card-desc">Vista en tiempo real de pedidos activos, estados de insumos y cronograma de entregas</div>
       </div>
       <div class="card-arrow">›</div>
     </a>
-    <a class="card needs-login" href="./formulario_tainty.html">
-      <div class="card-icon icon-green">📋</div>
+  </div>
+
+  <div class="section-label has-top">Gestión interna</div>
+  <div class="grid anim" id="grid-modulos">
+    <a class="card c-green needs-login" href="./formulario_tainty.html">
+      <div class="card-icon">📋</div>
       <div class="card-body">
         <div class="card-title">Registro de Pedidos</div>
         <div class="card-desc">Formulario inteligente con precio sugerido automático y registro directo a Google Sheets</div>
       </div>
       <div class="card-arrow">›</div>
+      <span class="card-lock">🔒 Requiere PIN</span>
     </a>
-    <a class="card needs-login" href="./dashboard.html">
-      <div class="card-icon icon-amber">📊</div>
+    <a class="card c-amber needs-login" href="./dashboard.html">
+      <div class="card-icon">📊</div>
       <div class="card-body">
         <div class="card-title">Dashboard Analytics</div>
         <div class="card-desc">Ventas por mes, top productos, top clientes y comparativas históricas</div>
       </div>
       <div class="card-arrow">›</div>
+      <span class="card-lock">🔒 Requiere PIN</span>
     </a>
-    <a class="card needs-login" href="./pagos_tainty.html">
-      <div class="card-icon" style="background:var(--red-dim)">💳</div>
+    <a class="card c-red needs-login" href="./pagos_tainty.html">
+      <div class="card-icon">💳</div>
       <div class="card-body">
         <div class="card-title">Gestión de Pagos</div>
         <div class="card-desc">Control de abonos, montos pendientes y registro de pagos por cliente</div>
       </div>
       <div class="card-arrow">›</div>
+      <span class="card-lock">🔒 Requiere PIN</span>
     </a>
-    <a class="card needs-login" href="./costeo_tainty.html">
-      <div class="card-icon" style="background:var(--green-dim)">🧮</div>
+    <a class="card c-teal needs-login" href="./costeo_tainty.html">
+      <div class="card-icon">🧮</div>
       <div class="card-body">
         <div class="card-title">Costeo &amp; Compras</div>
         <div class="card-desc">Genera listas de compras por proveedor, calcula costos por producto y gestiona el catálogo de insumos</div>
       </div>
       <div class="card-arrow">›</div>
+      <span class="card-lock">🔒 Requiere PIN</span>
     </a>
-    <a class="card needs-login" href="./gestion_tainty.html">
-      <div class="card-icon" style="background:var(--purple-dim)">⚙️</div>
+    <a class="card c-blue needs-login" href="./gestion_tainty.html">
+      <div class="card-icon">⚙️</div>
       <div class="card-body">
         <div class="card-title">Gestión de Insumos</div>
         <div class="card-desc">Actualiza el estado de cada insumo por pedido: pendiente, en compra, en producción, en camino o en oficina</div>
       </div>
       <div class="card-arrow">›</div>
+      <span class="card-lock">🔒 Requiere PIN</span>
     </a>
   </div>
 </div>
@@ -145,36 +223,60 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
 <script>
 const PIN_LEN = 6;
 let pinBuf = '';
+let pinLocked = false; // bloquea input durante validación/animación
 
 function pp(d) {
-  if (pinBuf.length >= PIN_LEN) return;
+  if (pinLocked || pinBuf.length >= PIN_LEN) return;
   pinBuf += d;
   updDots();
   if (pinBuf.length === PIN_LEN) {
+    pinLocked = true;
     setTimeout(() => {
       if (login(pinBuf)) {
-        document.getElementById('pin-overlay').classList.add('hidden');
-        renderEstadoSesion();
+        onPinOk();
       } else {
-        document.querySelectorAll('.pin-dot').forEach(d => d.classList.add('error'));
-        document.getElementById('pin-err').textContent = 'PIN incorrecto';
-        setTimeout(() => {
-          pinBuf = '';
-          updDots();
-          document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('error'));
-          document.getElementById('pin-err').textContent = '';
-        }, 800);
+        onPinErr();
       }
     }, 100);
   }
 }
-function pc() { pinBuf = pinBuf.slice(0, -1); updDots(); }
+function pc() { if (pinLocked) return; pinBuf = pinBuf.slice(0, -1); updDots(); }
 function updDots() {
   for (let i = 0; i < PIN_LEN; i++) {
     const d = document.getElementById('pd' + i);
     if (d) d.classList.toggle('filled', i < pinBuf.length);
   }
 }
+
+function onPinOk() {
+  const card = document.getElementById('pin-card');
+  document.querySelectorAll('.pin-dot').forEach(d => { d.classList.remove('filled'); d.classList.add('ok'); });
+  card.classList.add('success');
+  setTimeout(() => {
+    document.getElementById('pin-overlay').classList.add('hidden');
+    renderEstadoSesion();
+  }, 380);
+}
+
+function onPinErr() {
+  document.querySelectorAll('.pin-dot').forEach(d => d.classList.add('error'));
+  document.getElementById('pin-err').textContent = 'PIN incorrecto';
+  setTimeout(() => {
+    pinBuf = '';
+    pinLocked = false;
+    updDots();
+    document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('error'));
+    document.getElementById('pin-err').textContent = '';
+  }, 800);
+}
+
+// Soporte de teclado físico para el PIN (números, Backspace, Escape)
+document.addEventListener('keydown', (e) => {
+  const overlay = document.getElementById('pin-overlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  if (e.key >= '0' && e.key <= '9') { pp(e.key); e.preventDefault(); }
+  else if (e.key === 'Backspace') { pc(); e.preventDefault(); }
+});
 
 /**
  * Renderiza la barra superior con el estado de sesión y bloquea visualmente
@@ -184,12 +286,28 @@ function renderEstadoSesion() {
   const logged = isLoggedIn();
   const bar = document.getElementById('session-bar');
   bar.innerHTML = logged
-    ? `<span style="color:var(--green)">● sesión activa</span><button onclick="cerrarSesion()">Cerrar sesión</button>`
-    : `<span style="color:var(--muted)">● sin sesión</span>`;
+    ? `<span style="color:var(--green)"><span class="dot-live dot-on"></span>Sesión activa</span><button onclick="cerrarSesion()">Cerrar sesión</button>`
+    : `<span style="color:var(--muted)"><span class="dot-live dot-off"></span>Sin sesión</span>`;
   document.querySelectorAll('.card.needs-login').forEach(c => {
     c.classList.toggle('locked', !logged);
   });
 }
+
+/** Saludo según la hora + fecha/hora en vivo. */
+function tickReloj() {
+  const now = new Date();
+  const h = now.getHours();
+  const saludo = h < 12 ? 'Buenos días' : (h < 19 ? 'Buenas tardes' : 'Buenas noches');
+  const g = document.getElementById('greeting');
+  if (g) g.textContent = saludo;
+  const fecha = now.toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const hora = now.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
+  const cap = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+  const c = document.getElementById('clock');
+  if (c) c.innerHTML = `${cap} &middot; <b>${hora}</b>`;
+}
+tickReloj();
+setInterval(tickReloj, 30000);
 
 // Estado inicial: si ya hay sesión, ocultar el overlay; sino dejarlo visible
 if (isLoggedIn()) {
