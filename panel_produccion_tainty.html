@@ -33,6 +33,15 @@
 .ticket{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .2s;animation:fadeIn .3s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .ticket:hover{border-color:var(--border2)}
+/* Fondo suave segun estado de entrega / pedido nuevo */
+.ticket.ticket-vencido{background:rgba(232,82,74,.08);border-color:rgba(232,82,74,.35)}
+.ticket.ticket-vencido:hover{border-color:rgba(232,82,74,.55)}
+.ticket.ticket-hoy{background:rgba(245,166,35,.07);border-color:rgba(245,166,35,.35)}
+.ticket.ticket-hoy:hover{border-color:rgba(245,166,35,.55)}
+.ticket.ticket-manana{background:rgba(76,163,232,.07);border-color:rgba(76,163,232,.32)}
+.ticket.ticket-manana:hover{border-color:rgba(76,163,232,.5)}
+.ticket.ticket-nuevo{background:rgba(62,207,142,.07);border-color:rgba(62,207,142,.32)}
+.ticket.ticket-nuevo:hover{border-color:rgba(62,207,142,.5)}
 
 .ticket-top{padding:14px 16px 10px;border-bottom:1px solid var(--border)}
 .ticket-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--hint);margin-bottom:4px}
@@ -299,10 +308,10 @@ function fechaEntregaLabel(str, fechaPedido){
   if(!f||isNaN(f))return null;
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const diff=Math.round((f-hoy)/86400000);
-  if(diff<0)return{text:'Vencido',cls:'fecha-urgente'};
-  if(diff===0)return{text:'Hoy',cls:'fecha-hoy-cl'};
-  if(diff===1)return{text:'Mañana',cls:''};
-  return{text:f.toLocaleDateString('es-PE',{day:'numeric',month:'short'}),cls:''};
+  if(diff<0)return{text:'Vencido',cls:'fecha-urgente',key:'vencido'};
+  if(diff===0)return{text:'Hoy',cls:'fecha-hoy-cl',key:'hoy'};
+  if(diff===1)return{text:'Mañana',cls:'',key:'manana'};
+  return{text:f.toLocaleDateString('es-PE',{day:'numeric',month:'short'}),cls:'',key:''};
 }
 function getEstadoInsumo(pedidoId,insumo){
   return estadosInsumos[pedidoId+'|'+insumo]||'pendiente';
@@ -363,7 +372,14 @@ function renderTicket(p){
 
   const estadoOptsTicket=ESTADOS_TICKET.map(s=>`<option value="${s}"${s===(p.estado||'')?' selected':''}>${LABELS_TICKET[s]||s}</option>`).join('');
 
-  return`<div class="ticket">
+  // Fondo suave segun urgencia de entrega; si no aplica, resaltar pedidos nuevos
+  let ticketCls='';
+  if(entrega&&entrega.key==='vencido')ticketCls=' ticket-vencido';
+  else if(entrega&&entrega.key==='hoy')ticketCls=' ticket-hoy';
+  else if(entrega&&entrega.key==='manana')ticketCls=' ticket-manana';
+  else if(esNuevo(p))ticketCls=' ticket-nuevo';
+
+  return`<div class="ticket${ticketCls}">
     <div class="ticket-top">
       <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
         <div class="ticket-num" style="margin:0">${p.numPedido||''}</div>
