@@ -10,11 +10,21 @@
 /* TOPBAR */
 .topbar-right{display:flex;align-items:center;gap:8px}
 /* TABS */
-.tabs-nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);position:relative;z-index:9}
+.tabs-nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:9}
+.tabs-nav.stuck{box-shadow:0 6px 16px -10px rgba(0,0,0,.5)}
 .tab-btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
 .tab-btn.active{color:var(--purple);border-bottom-color:var(--purple)}
+.tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:7px;border-radius:10px;background:var(--purple-dim);color:var(--purple);font-family:'DM Mono',monospace;font-size:11px;font-weight:500;line-height:1;vertical-align:middle}
+.tab-btn.active .tab-count{background:var(--purple);color:#fff}
 .tab-content{display:none;padding:1.5rem;position:relative;z-index:1}
 .tab-content.active{display:block}
+/* GUIA DE PASOS (estado vacío) */
+.guia-pasos{display:flex;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap}
+.guia-paso{flex:1;min-width:190px;display:flex;align-items:flex-start;gap:11px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:.85rem 1rem}
+.guia-num{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--purple-dim);color:var(--purple);font-family:'Syne',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.guia-t{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.guia-s{font-size:11px;color:var(--muted);line-height:1.4}
+@media(max-width:640px){.guia-paso{min-width:100%}}
 /* CARDS */
 .section-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px}
 .section-sub{font-size:13px;color:var(--muted);margin-bottom:1.25rem}
@@ -121,7 +131,7 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 </div>
 
 <div class="tabs-nav">
-  <button class="tab-btn active" onclick="switchTab('compras',this)">&#128722; Lista de compras</button>
+  <button class="tab-btn active" onclick="switchTab('compras',this)">&#128722; Lista de compras<span class="tab-count" id="tab-compras-count" style="display:none">0</span></button>
   <button class="tab-btn" onclick="switchTab('costeo',this)">&#128200; Costeo por producto</button>
   <button class="tab-btn" onclick="switchTab('catalogo',this)">&#128218; Catálogo de insumos</button>
 </div>
@@ -130,6 +140,12 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 <div class="tab-content active" id="tab-compras">
   <div class="section-title">Generador de lista de compras</div>
   <div class="section-sub">Agrega los pedidos activos y genera automáticamente qué insumos comprar y a qué proveedor</div>
+
+  <div class="guia-pasos" id="guia-compras">
+    <div class="guia-paso"><div class="guia-num">1</div><div><div class="guia-t">Agrega pedidos</div><div class="guia-s">Carga los pedidos en cola o añádelos a mano por producto y cantidad.</div></div></div>
+    <div class="guia-paso"><div class="guia-num">2</div><div><div class="guia-t">Revisa los insumos</div><div class="guia-s">Verás el total de cada insumo a comprar con su costo estimado.</div></div></div>
+    <div class="guia-paso"><div class="guia-num">3</div><div><div class="guia-t">Copia por proveedor</div><div class="guia-s">Genera el pedido agrupado, listo para enviar por WhatsApp.</div></div></div>
+  </div>
 
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
@@ -400,7 +416,19 @@ function limpiarPedidos() {
   document.getElementById('proveedores-result').style.display = 'none';
 }
 
+// Mantiene el contador de la pestaña y el estado vacío guiado en sync
+// con la cantidad de pedidos activos. Se llama desde renderPedidosLista,
+// que a su vez se dispara en cada agregar/eliminar/limpiar.
+function sincronizarEstadoCompras() {
+  const n = pedidosActivos.length;
+  const badge = document.getElementById('tab-compras-count');
+  if (badge) { badge.textContent = n; badge.style.display = n > 0 ? 'inline-flex' : 'none'; }
+  const guia = document.getElementById('guia-compras');
+  if (guia) guia.style.display = n > 0 ? 'none' : 'flex';
+}
+
 function renderPedidosLista() {
+  sincronizarEstadoCompras();
   const div = document.getElementById('pedidos-lista');
   if (!pedidosActivos.length) { div.innerHTML = ''; return; }
   div.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-bottom:1rem">
@@ -1649,6 +1677,25 @@ function irACatalogo(nombreProducto) {
     }
   }, 100);
 }
+
+// La barra de pestañas queda pegada (sticky) justo debajo del topbar.
+// El topbar tiene altura variable según breakpoint, así que calculamos
+// su alto real y lo usamos como offset. Sombra sutil cuando está "pegada".
+function ajustarStickyTabs() {
+  const topbar = document.querySelector('.topbar');
+  const tabs = document.querySelector('.tabs-nav');
+  if (!topbar || !tabs) return;
+  tabs.style.top = (topbar.offsetHeight - 1) + 'px';
+}
+function actualizarSombraTabs() {
+  const topbar = document.querySelector('.topbar');
+  const tabs = document.querySelector('.tabs-nav');
+  if (!topbar || !tabs) return;
+  tabs.classList.toggle('stuck', window.scrollY > topbar.offsetHeight - 2);
+}
+window.addEventListener('resize', () => { ajustarStickyTabs(); actualizarSombraTabs(); });
+window.addEventListener('scroll', actualizarSombraTabs, { passive: true });
+ajustarStickyTabs();
 
 </script>
 </body>
