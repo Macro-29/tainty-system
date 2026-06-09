@@ -50,6 +50,12 @@
 .stat-card:hover::before{opacity:1;width:4px}
 .stat-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
 .stat-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--accent-dim);flex-shrink:0}
+.stat-icon-btn{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .15s,box-shadow .15s,opacity .15s;position:relative}
+.stat-icon-btn:hover{transform:scale(1.08)}
+.stat-icon-btn:active{transform:scale(.94)}
+.stat-icon-btn.locked{box-shadow:0 0 0 1px var(--amber) inset,0 0 10px -2px var(--amber-dim);opacity:.85}
+.stat-icon-btn.locked::after{content:'🙈';position:absolute;bottom:-3px;right:-3px;font-size:10px;line-height:1}
+.stat-val.masked{letter-spacing:3px;color:var(--muted)}
 .stat-spark{width:84px;height:30px;flex-shrink:0}
 .stat-label{font-size:12px;color:var(--muted);margin-bottom:5px}
 .stat-val{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:var(--text);line-height:1.1}
@@ -197,7 +203,7 @@
     </div>
     <div class="stat-card c-amber">
       <div class="stat-top">
-        <div class="stat-icon">💰</div>
+        <div class="stat-icon stat-icon-btn" id="monto-toggle" role="button" tabindex="0" title="Ocultar monto" onclick="toggleMonto()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMonto();}">💰</div>
         <div class="stat-spark"><canvas id="spark-monto"></canvas></div>
       </div>
       <div class="stat-label">Monto total (S/)</div>
@@ -221,7 +227,7 @@
   <div class="section-label has-top">Tendencias</div>
   <div class="charts-grid anim">
     <div class="chart-card full">
-      <div class="chart-title">Unidades vendidas <span class="chart-hint">últimos 6 meses</span></div>
+      <div class="chart-title">Unidades vendidas <span class="chart-hint">6 meses · proy. punteada</span></div>
       <div class="chart-wrap"><canvas id="chart-meses"></canvas><div class="sk-fill"></div></div>
     </div>
     <div class="chart-card">
@@ -274,6 +280,9 @@ let charts={};
 let rowsActualGlobal=[];
 let filtroEstado=null;
 let lastUpdate=null;
+let montoVisible=true;           // el monto siempre arranca visible en cada ingreso
+let _montoRealTxt='—';           // último monto real formateado (para re-mostrarlo)
+let _montoProjTxt='';            // última proyección de monto formateada
 
 // JSONP
 async function cargarDatos(){
@@ -348,30 +357,44 @@ function mesEstado(){
 }
 
 /**
- * Proyección a fin de mes (solo para el mes en curso): extrapola el total
- * según el ritmo diario hasta hoy → total * (díasDelMes / díaActual).
- * Meses cerrados o futuros no muestran proyección (el total ya es definitivo
- * o aún no hay datos).
+ * Factor de extrapolación lineal del mes en curso: díasDelMes / díaActual.
+ * Devuelve null si el mes no está en curso o si es muy temprano (día < 3),
+ * cuando el run-rate todavía es demasiado ruidoso.
+ */
+function projFactor(){
+  if(mesEstado()!=='actual')return null;
+  const hoy=new Date();
+  const dia=hoy.getDate();
+  if(dia<3)return null;
+  const diasMes=new Date(anioIdx,mesIdx+1,0).getDate();
+  return{factor:diasMes/dia,dia,diasMes};
+}
+
+// Proyección conservadora de clientes únicos: como los clientes se repiten,
+// no crecen de forma lineal. Aplicamos solo la mitad del crecimiento lineal
+// extra (dampening 0.5), nunca por debajo del valor actual.
+function proyClientes(actual,factor){
+  return Math.max(actual,Math.round(actual*(1+(factor-1)*0.5)));
+}
+
+/**
+ * Proyección a fin de mes (solo para el mes en curso). Unidades, pedidos y
+ * monto se extrapolan linealmente; clientes usa el modelo conservador.
+ * Meses cerrados o futuros no muestran proyección.
  */
 function renderProyeccion(curr){
   const ids=['pedidos','unidades','monto','clientes'];
   const hide=()=>ids.forEach(k=>document.getElementById('p-'+k).classList.add('hidden'));
 
-  if(mesEstado()!=='actual'){hide();return;}
+  const pf=projFactor();
+  if(!pf){hide();_montoProjTxt='';return;}
 
-  const hoy=new Date();
-  const dia=hoy.getDate();
-  const diasMes=new Date(anioIdx,mesIdx+1,0).getDate();
-
-  // Muy al inicio del mes el run-rate es demasiado ruidoso para mostrarlo.
-  if(dia<3){hide();return;}
-
-  const factor=diasMes/dia;
+  const{factor,dia,diasMes}=pf;
   const proy={
     pedidos:Math.round(curr.pedidos*factor),
     unidades:Math.round(curr.unidades*factor),
     monto:curr.monto*factor,
-    clientes:Math.round(curr.clientes*factor)
+    clientes:proyClientes(curr.clientes,factor)
   };
   const fmt={
     pedidos:proy.pedidos.toLocaleString(),
@@ -379,11 +402,13 @@ function renderProyeccion(curr){
     monto:'S/ '+proy.monto.toLocaleString('es-PE',{maximumFractionDigits:0}),
     clientes:proy.clientes.toLocaleString()
   };
+  _montoProjTxt=fmt.monto;
   const titulo=`Estimado a fin de mes según el ritmo actual (día ${dia} de ${diasMes})`;
+  const tituloCli=`Estimado conservador a fin de mes (clientes se repiten; día ${dia} de ${diasMes})`;
   ids.forEach(k=>{
     const el=document.getElementById('p-'+k);
     el.classList.remove('hidden');
-    el.title=titulo;
+    el.title=(k==='clientes')?tituloCli:titulo;
     el.innerHTML=`📈 Proy.: <span class="pj-val">${fmt[k]}</span>`;
   });
 }
@@ -400,7 +425,7 @@ function renderDashboard(){
 
   document.getElementById('s-pedidos').textContent=curr.pedidos;
   document.getElementById('s-unidades').textContent=curr.unidades.toLocaleString();
-  document.getElementById('s-monto').textContent='S/ '+curr.monto.toLocaleString('es-PE',{minimumFractionDigits:2});
+  _montoRealTxt='S/ '+curr.monto.toLocaleString('es-PE',{minimumFractionDigits:2});
   document.getElementById('s-clientes').textContent=curr.clientes;
 
   ['pedidos','unidades','monto','clientes'].forEach(k=>{
@@ -421,6 +446,34 @@ function renderDashboard(){
   renderChartMonto();
   renderChartEstados(rowsActual);
   renderRankings();
+  applyMontoMask();
+}
+
+// Muestra u oculta el monto (y su proyección) según el toggle de la bolsa.
+function applyMontoMask(){
+  const v=document.getElementById('s-monto');
+  const p=document.getElementById('p-monto');
+  const btn=document.getElementById('monto-toggle');
+  if(montoVisible){
+    v.textContent=_montoRealTxt;
+    v.classList.remove('masked');
+    if(btn){btn.classList.remove('locked');btn.title='Ocultar monto';}
+    if(p&&!p.classList.contains('hidden')&&_montoProjTxt){
+      p.innerHTML=`📈 Proy.: <span class="pj-val">${_montoProjTxt}</span>`;
+    }
+  }else{
+    v.textContent='S/ ••••••';
+    v.classList.add('masked');
+    if(btn){btn.classList.add('locked');btn.title='Mostrar monto';}
+    if(p&&!p.classList.contains('hidden')){
+      p.innerHTML=`📈 Proy.: <span class="pj-val">S/ ••••</span>`;
+    }
+  }
+}
+
+function toggleMonto(){
+  montoVisible=!montoVisible;
+  applyMontoMask();
 }
 
 function getUltimos6Meses(){
@@ -471,18 +524,38 @@ function renderChartMeses(){
   const meses=getUltimos6Meses();
   const labels=meses.map(x=>x.label);
   const vals=meses.map(x=>rowsDelMes(x.m,x.a).reduce((s,r)=>s+r.cantidad,0));
+
+  // Barra fantasma: solo en el último mes (el actual, en curso) mostramos el
+  // tramo proyectado que falta para llegar al estimado de fin de mes.
+  const pf=projFactor();
+  const ghost=meses.map(()=>0);
+  let proyTotal=null;
+  if(pf){
+    proyTotal=Math.round(vals[5]*pf.factor);
+    ghost[5]=Math.max(0,proyTotal-vals[5]);
+  }
+
   charts['meses']=new Chart(document.getElementById('chart-meses'),{
     type:'bar',
-    data:{labels,datasets:[{
-      label:'Unidades',data:vals,
-      backgroundColor:meses.map((_,i)=>i===5?'rgba(124,111,239,0.85)':'rgba(124,111,239,0.28)'),
-      hoverBackgroundColor:'rgba(124,111,239,1)',
-      borderRadius:6,borderSkipped:false
-    }]},
+    data:{labels,datasets:[
+      {label:'Unidades',data:vals,
+        backgroundColor:meses.map((_,i)=>i===5?'rgba(124,111,239,0.85)':'rgba(124,111,239,0.28)'),
+        hoverBackgroundColor:'rgba(124,111,239,1)',
+        borderRadius:6,borderSkipped:false,stack:'u'},
+      {label:'Proyección',data:ghost,
+        backgroundColor:'rgba(124,111,239,0.12)',
+        borderColor:'rgba(124,111,239,0.7)',borderWidth:1.5,borderDash:[4,3],
+        borderRadius:6,borderSkipped:false,stack:'u'}
+    ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y.toLocaleString()+' und'}}},
-      scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#7a7a8a'}},
-              y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#7a7a8a'}}}}
+      plugins:{legend:{display:false},
+        tooltip:{
+          filter:item=>!(item.datasetIndex===1&&item.parsed.y===0),
+          callbacks:{label:ctx=>ctx.datasetIndex===1
+            ? `Proyección fin de mes: ~${proyTotal.toLocaleString()} und`
+            : ctx.parsed.y.toLocaleString()+' und'}}},
+      scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#7a7a8a'}},
+              y:{stacked:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#7a7a8a'}}}}
   });
 }
 
