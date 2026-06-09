@@ -115,7 +115,6 @@ textarea { resize: vertical; min-height: 80px; }
 .ps-value { font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500; color: var(--blue); }
 .ps-hint { font-size: 11px; color: #5a9ec0; margin-top: 2px; }
 
-.nuevo-campo { margin-top: 8px; display: none; }
 
 .preview-card {
   background: #fafaf8; border: 1px dashed var(--border);
@@ -446,9 +445,6 @@ input.invalid, select.invalid, textarea.invalid{
         <datalist id="clientes-list"></datalist>
         <div class="catalog-hint" id="hint-clientes"><span class="dot"></span>Cargando clientes...</div>
         <div class="field-error" id="err-f-cliente">⚠ Ingresa el cliente</div>
-        <div class="nuevo-campo" id="nuevo-wrap" style="display:none">
-          <div style="font-size:12px;color:var(--amber);margin-bottom:6px">⚠ Cliente nuevo — se agregará al catálogo al guardar</div>
-        </div>
       </div>
     </div>
 
@@ -459,7 +455,6 @@ input.invalid, select.invalid, textarea.invalid{
         <input type="text" id="f-producto" list="productos-list" placeholder="Escribe o elige producto..." autocomplete="off" oninput="onProductoInput()" onchange="onProducto()">
         <datalist id="productos-list"></datalist>
         <div class="catalog-hint" id="hint-productos"><span class="dot"></span>Cargando productos...</div>
-        <div id="prod-nuevo-aviso" style="display:none;font-size:12px;color:var(--amber);margin-top:6px">⚠ Producto nuevo — se agregará al catálogo al guardar</div>
         <div class="field-error" id="err-f-producto">⚠ Ingresa el producto</div>
         <div id="tipo-wrap"></div>
       </div>
@@ -559,11 +554,11 @@ function getInsumos(tipo) {
 }
 
 // === Validación campo por campo ===
-function showFieldError(id) {
+function showFieldError(id, msg) {
   const el = document.getElementById(id);
   const err = document.getElementById('err-' + id);
   if (el) { el.classList.add('invalid'); el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 450); }
-  if (err) err.classList.add('show');
+  if (err) { if (msg) err.textContent = '⚠ ' + msg; err.classList.add('show'); }
 }
 function clearFieldError(id) {
   const el = document.getElementById(id);
@@ -715,16 +710,12 @@ function renderDatalist(id, items) {
 function onClienteInput() {
   const v = (document.getElementById('f-cliente').value || '').trim().toUpperCase();
   document.getElementById('f-cliente').value = v; // forzar mayúsculas
-  const existe = listaClientes.some(c => c.toUpperCase() === v);
-  document.getElementById('nuevo-wrap').style.display = (v && !existe) ? 'block' : 'none';
   if (v) clearFieldError('f-cliente');
   updateProgress();
 }
 
 function onProductoInput() {
   const v = (document.getElementById('f-producto').value || '').trim();
-  const existe = listaProductos.some(p => p === v);
-  document.getElementById('prod-nuevo-aviso').style.display = (v && !existe) ? 'block' : 'none';
   if (v) clearFieldError('f-producto');
   updateProgress();
 }
@@ -932,19 +923,29 @@ async function submitForm() {
   const errEl = document.getElementById('error-msg');
   errEl.style.display = 'none';
 
-  // Validación campo por campo: marca cada campo faltante y enfoca el primero
+  // El cliente y el producto deben existir en el catálogo (gestionado con la tuerca ⚙)
+  const clienteExiste = listaClientes.some(c => c.toUpperCase() === clienteRaw);
+  const prodExiste = listaProductos.includes(prod);
+
+  // Validación campo por campo: marca cada campo faltante y enfoca el primero.
+  // Cada entrada: [id, condición de fallo, mensaje]. La primera que falle por id se muestra.
   const checks = [
-    ['f-fecha', !fecha],
-    ['f-vendedor', !vendedor],
-    ['f-cliente', !clienteRaw],
-    ['f-producto', !prod],
-    ['f-cantidad', !cant || parseFloat(cant) <= 0],
-    ['f-precio', !precio || parseFloat(precio) <= 0]
+    ['f-fecha', !fecha, 'Selecciona una fecha'],
+    ['f-vendedor', !vendedor, 'Elige un vendedor'],
+    ['f-cliente', !clienteRaw, 'Ingresa el cliente'],
+    ['f-cliente', clienteRaw && !clienteExiste, 'Cliente no registrado. Agrégalo con la tuerca ⚙'],
+    ['f-producto', !prod, 'Ingresa el producto'],
+    ['f-producto', prod && !prodExiste, 'Producto no registrado. Agrégalo con la tuerca ⚙'],
+    ['f-cantidad', !cant || parseFloat(cant) <= 0, 'Ingresa una cantidad válida'],
+    ['f-precio', !precio || parseFloat(precio) <= 0, 'Ingresa el precio por unidad']
   ];
+  const errados = new Set();
   let primerError = null;
-  checks.forEach(([id, falla]) => {
-    if (falla) { showFieldError(id); if (!primerError) primerError = id; }
-    else clearFieldError(id);
+  checks.forEach(([id, falla, msg]) => {
+    if (falla && !errados.has(id)) { showFieldError(id, msg); errados.add(id); if (!primerError) primerError = id; }
+  });
+  ['f-fecha','f-vendedor','f-cliente','f-producto','f-cantidad','f-precio'].forEach(id => {
+    if (!errados.has(id)) clearFieldError(id);
   });
   if (primerError) {
     const el = document.getElementById(primerError);
@@ -975,18 +976,6 @@ async function submitForm() {
       throw new Error((data && data.error) || 'Error desconocido del servidor');
     }
 
-    // Refrescar caché local de catálogos por si el cliente/producto era nuevo
-    if (!listaClientes.includes(clienteRaw)) {
-      listaClientes.push(clienteRaw);
-      listaClientes.sort((a, b) => a.localeCompare(b, 'es'));
-      renderDatalist('clientes-list', listaClientes);
-    }
-    if (!listaProductos.includes(prod)) {
-      listaProductos.push(prod);
-      listaProductos.sort((a, b) => a.localeCompare(b, 'es'));
-      renderDatalist('productos-list', listaProductos);
-    }
-
     document.getElementById('loading').style.display = 'none';
     document.getElementById('form-wrap').style.display = 'none';
     document.getElementById('success-num').textContent = data.numPedido || '(registrado)';
@@ -1012,9 +1001,7 @@ function resetForm() {
   document.getElementById('btn-submit').disabled = false;
   document.getElementById('tipo-wrap').innerHTML = '';
   document.getElementById('price-suggest').style.display = 'none';
-  document.getElementById('nuevo-wrap').style.display = 'none';
   document.getElementById('preview').style.display = 'none';
-  document.getElementById('prod-nuevo-aviso').style.display = 'none';
   ['f-fecha','f-vendedor','f-cliente','f-producto','f-cantidad','f-precio'].forEach(clearFieldError);
   document.querySelectorAll('.chip.active').forEach(c => c.classList.remove('active'));
   document.getElementById('f-fecha').value = fechaHoy();
