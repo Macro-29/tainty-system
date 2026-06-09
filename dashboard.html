@@ -57,6 +57,9 @@
 .stat-up{color:var(--green)}
 .stat-down{color:var(--red)}
 .stat-neutral{color:var(--muted)}
+.stat-proj{font-size:11px;color:var(--hint);margin-top:9px;padding-top:9px;border-top:1px dashed var(--border2);display:flex;align-items:center;gap:5px;cursor:help}
+.stat-proj .pj-val{font-family:'DM Mono',monospace;color:var(--accent);font-weight:500}
+.stat-proj.hidden{display:none}
 
 .c-purple{--accent:var(--purple);--accent-dim:var(--purple-dim)}
 .c-green{--accent:var(--green);--accent-dim:var(--green-dim)}
@@ -180,6 +183,7 @@
       <div class="stat-label">Pedidos del mes</div>
       <div class="stat-val sk" id="s-pedidos">—</div>
       <div class="stat-sub" id="s-pedidos-cmp"></div>
+      <div class="stat-proj hidden" id="p-pedidos"></div>
     </div>
     <div class="stat-card c-green">
       <div class="stat-top">
@@ -189,6 +193,7 @@
       <div class="stat-label">Unidades vendidas</div>
       <div class="stat-val sk" id="s-unidades">—</div>
       <div class="stat-sub" id="s-unidades-cmp"></div>
+      <div class="stat-proj hidden" id="p-unidades"></div>
     </div>
     <div class="stat-card c-amber">
       <div class="stat-top">
@@ -198,6 +203,7 @@
       <div class="stat-label">Monto total (S/)</div>
       <div class="stat-val sk" id="s-monto">—</div>
       <div class="stat-sub" id="s-monto-cmp"></div>
+      <div class="stat-proj hidden" id="p-monto"></div>
     </div>
     <div class="stat-card c-blue">
       <div class="stat-top">
@@ -207,6 +213,7 @@
       <div class="stat-label">Clientes únicos</div>
       <div class="stat-val sk" id="s-clientes">—</div>
       <div class="stat-sub" id="s-clientes-cmp"></div>
+      <div class="stat-proj hidden" id="p-clientes"></div>
     </div>
   </div>
 
@@ -332,6 +339,55 @@ function cmpArrow(curr,prev){
   return{txt:'Sin cambio vs mes anterior',cls:'stat-neutral'};
 }
 
+// Devuelve 'pasado' | 'actual' | 'futuro' para el mes que se está viendo.
+function mesEstado(){
+  const hoy=new Date();
+  if(anioIdx<hoy.getFullYear()||(anioIdx===hoy.getFullYear()&&mesIdx<hoy.getMonth()))return'pasado';
+  if(anioIdx>hoy.getFullYear()||(anioIdx===hoy.getFullYear()&&mesIdx>hoy.getMonth()))return'futuro';
+  return'actual';
+}
+
+/**
+ * Proyección a fin de mes (solo para el mes en curso): extrapola el total
+ * según el ritmo diario hasta hoy → total * (díasDelMes / díaActual).
+ * Meses cerrados o futuros no muestran proyección (el total ya es definitivo
+ * o aún no hay datos).
+ */
+function renderProyeccion(curr){
+  const ids=['pedidos','unidades','monto','clientes'];
+  const hide=()=>ids.forEach(k=>document.getElementById('p-'+k).classList.add('hidden'));
+
+  if(mesEstado()!=='actual'){hide();return;}
+
+  const hoy=new Date();
+  const dia=hoy.getDate();
+  const diasMes=new Date(anioIdx,mesIdx+1,0).getDate();
+
+  // Muy al inicio del mes el run-rate es demasiado ruidoso para mostrarlo.
+  if(dia<3){hide();return;}
+
+  const factor=diasMes/dia;
+  const proy={
+    pedidos:Math.round(curr.pedidos*factor),
+    unidades:Math.round(curr.unidades*factor),
+    monto:curr.monto*factor,
+    clientes:Math.round(curr.clientes*factor)
+  };
+  const fmt={
+    pedidos:proy.pedidos.toLocaleString(),
+    unidades:proy.unidades.toLocaleString(),
+    monto:'S/ '+proy.monto.toLocaleString('es-PE',{maximumFractionDigits:0}),
+    clientes:proy.clientes.toLocaleString()
+  };
+  const titulo=`Estimado a fin de mes según el ritmo actual (día ${dia} de ${diasMes})`;
+  ids.forEach(k=>{
+    const el=document.getElementById('p-'+k);
+    el.classList.remove('hidden');
+    el.title=titulo;
+    el.innerHTML=`📈 Proy.: <span class="pj-val">${fmt[k]}</span>`;
+  });
+}
+
 function renderDashboard(){
   document.getElementById('month-label').textContent=MESES_ES[mesIdx]+' '+anioIdx;
   actualizarBtnHoy();
@@ -352,6 +408,8 @@ function renderDashboard(){
     const el=document.getElementById('s-'+k+'-cmp');
     el.textContent=c.txt;el.className='stat-sub '+c.cls;
   });
+
+  renderProyeccion(curr);
 
   // Si el filtro por estado ya no existe en el mes actual, lo limpiamos.
   if(filtroEstado && !rowsActual.some(r=>(r.estado||'Sin estado').toString().trim()===filtroEstado)){
