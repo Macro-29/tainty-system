@@ -25,6 +25,16 @@
 .guia-t{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
 .guia-s{font-size:11px;color:var(--muted);line-height:1.4}
 @media(max-width:640px){.guia-paso{min-width:100%}}
+/* BARRA TOTAL FIJA */
+body.has-barra{padding-bottom:76px}
+.barra-total{position:fixed;left:0;right:0;bottom:0;z-index:20;display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 1.5rem;background:var(--surface);border-top:1px solid var(--border2);box-shadow:0 -8px 24px -14px rgba(0,0,0,.7);flex-wrap:wrap}
+.barra-total.show{display:flex;animation:barraUp .2s ease}
+@keyframes barraUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.barra-total-info{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.barra-total-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:var(--amber)}
+.barra-total-sub{font-size:12px;color:var(--muted)}
+.btn-copy.copiado{background:var(--green);color:#fff;border-color:var(--green)}
+@media(max-width:640px){.barra-total{padding:10px 1rem}.barra-total-val{font-size:16px}.barra-total .btn-primary{padding:9px 16px;font-size:13px}}
 /* CARDS */
 .section-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px}
 .section-sub{font-size:13px;color:var(--muted);margin-bottom:1.25rem}
@@ -201,7 +211,7 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
           <button class="seg-btn active" id="ord-prov" onclick="setOrdenProveedores('proveedor',this)">📦 Por proveedor</button>
           <button class="seg-btn" id="ord-tipo" onclick="setOrdenProveedores('tipo',this)">🧪 Por tipo</button>
         </div>
-        <button class="btn-copy" onclick="copiarTodo()" title="Copiar la lista completa: insumos, cápsulas, envases, etiquetas y cajas agrupadas por tipo">&#128203; Copiar todo</button>
+        <button class="btn-copy" onclick="copiarTodo(this)" title="Copiar la lista completa: insumos, cápsulas, envases, etiquetas y cajas agrupadas por tipo">&#128203; Copiar todo</button>
         <button class="btn-secondary" onclick="volverAInsumos()">&#8592; Volver</button>
       </div>
     </div>
@@ -283,6 +293,14 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
   </div>
 </div>
 
+<div class="barra-total" id="barra-total">
+  <div class="barra-total-info">
+    <span class="barra-total-val" id="barra-total-val">S/ 0.00</span>
+    <span class="barra-total-sub" id="barra-total-sub">0 insumos</span>
+  </div>
+  <button class="btn-primary" id="barra-total-btn" onclick="accionBarraTotal()">Ver por proveedor &#8594;</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -309,6 +327,7 @@ function switchTab(id,btn) {
   document.getElementById('tab-'+id).classList.add('active'); btn.classList.add('active');
   if(id==='catalogo') renderCatalogo();
   if(id==='costeo') renderCosteoSelects();
+  if(id==='compras') actualizarBarraTotal(barraTotalModo); else actualizarBarraTotal('hidden');
 }
 
 // JSONP
@@ -414,6 +433,7 @@ function limpiarPedidos() {
   renderPedidosLista();
   document.getElementById('compras-result').style.display = 'none';
   document.getElementById('proveedores-result').style.display = 'none';
+  actualizarBarraTotal('hidden');
 }
 
 // Mantiene el contador de la pestaña y el estado vacío guiado en sync
@@ -425,6 +445,44 @@ function sincronizarEstadoCompras() {
   if (badge) { badge.textContent = n; badge.style.display = n > 0 ? 'inline-flex' : 'none'; }
   const guia = document.getElementById('guia-compras');
   if (guia) guia.style.display = n > 0 ? 'none' : 'flex';
+}
+
+// Barra de total fija (parte inferior). Modo:
+//   'insumos'     → CTA "Ver por proveedor →"
+//   'proveedores' → CTA "Copiar todo"
+//   'hidden'      → oculta
+let barraTotalModo = 'insumos';
+function actualizarBarraTotal(modo) {
+  const bar = document.getElementById('barra-total');
+  if (!bar) return;
+  const lista = window._insumosCalculados || [];
+  const enCompras = document.getElementById('tab-compras').classList.contains('active');
+  if (modo === 'hidden' || !lista.length || !enCompras) {
+    bar.classList.remove('show');
+    document.body.classList.remove('has-barra');
+    return;
+  }
+  barraTotalModo = modo;
+  const total = lista.reduce((s, i) => s + (i.costoTotal || 0), 0);
+  document.getElementById('barra-total-val').textContent = 'S/ ' + total.toLocaleString('es-PE', {minimumFractionDigits:2});
+  document.getElementById('barra-total-sub').textContent = lista.length + ' insumo' + (lista.length === 1 ? '' : 's');
+  const btn = document.getElementById('barra-total-btn');
+  btn.innerHTML = modo === 'proveedores' ? '&#128203; Copiar todo' : 'Ver por proveedor &#8594;';
+  bar.classList.add('show');
+  document.body.classList.add('has-barra');
+}
+function accionBarraTotal() {
+  if (barraTotalModo === 'proveedores') copiarTodo(document.getElementById('barra-total-btn'));
+  else mostrarProveedores();
+}
+
+// Feedback visual en un botón de copiar: "✓ Copiado" durante 1.5s.
+function flashCopiado(btn) {
+  if (!btn) return;
+  const orig = btn.innerHTML;
+  btn.classList.add('copiado');
+  btn.innerHTML = '&#10003; Copiado';
+  setTimeout(() => { btn.classList.remove('copiado'); btn.innerHTML = orig; }, 1500);
 }
 
 function renderPedidosLista() {
@@ -470,7 +528,7 @@ function normalizarNombre(valor) {
 }
 
 function calcularCompras() {
-  if (!pedidosActivos.length) { document.getElementById('compras-result').style.display = 'none'; return; }
+  if (!pedidosActivos.length) { document.getElementById('compras-result').style.display = 'none'; actualizarBarraTotal('hidden'); return; }
   const insumos = {};
   const noEncontrados = [];
   for (const ped of pedidosActivos) {
@@ -531,6 +589,7 @@ function calcularCompras() {
   document.getElementById('compras-result').style.display = 'block';
   document.getElementById('proveedores-result').style.display = 'none';
   window._insumosCalculados = lista;
+  actualizarBarraTotal('insumos');
 }
 
 /**
@@ -599,6 +658,7 @@ function mostrarProveedores() {
     </div>`;
   document.getElementById('compras-result').style.display = 'none';
   document.getElementById('proveedores-result').style.display = 'block';
+  actualizarBarraTotal('proveedores');
 }
 
 function renderProveedoresPorProveedor(porProv) {
@@ -609,7 +669,7 @@ function renderProveedoresPorProveedor(porProv) {
         <div class="prov-name">&#128230; ${prov||'—'}</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="prov-total">S/ ${data.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
-          <button class="btn-copy" onclick="copiarProveedor('${(prov||'').replace(/'/g,"\\'")}')" >&#128203; Copiar</button>
+          <button class="btn-copy" onclick="copiarProveedor('${(prov||'').replace(/'/g,"\\'")}',this)" >&#128203; Copiar</button>
         </div>
       </div>
       <div class="prov-body">
@@ -657,7 +717,7 @@ function renderProveedoresPorTipo(lista, porProv) {
           <div style="font-size:12px;font-weight:500;color:var(--text);flex:1;min-width:120px">&#128230; ${prov||'—'}</div>
           <div style="display:flex;align-items:center;gap:8px">
             <div style="font-family:DM Mono,monospace;font-size:11px;color:var(--amber)">S/ ${subtotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
-            <button class="btn-copy" onclick="copiarProveedor('${provEsc}')" title="Copiar pedido completo del proveedor (todos sus insumos)">&#128203; Copiar</button>
+            <button class="btn-copy" onclick="copiarProveedor('${provEsc}',this)" title="Copiar pedido completo del proveedor (todos sus insumos)">&#128203; Copiar</button>
           </div>
         </div>
         ${itemsHtml}
@@ -669,7 +729,7 @@ function renderProveedoresPorTipo(lista, porProv) {
         <div class="prov-name">${meta.ic} ${meta.label.toUpperCase()}</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="prov-total">S/ ${data.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
-          <button class="btn-copy" onclick="copiarTipo('${tipo}')" title="Copiar todos los insumos de ${meta.label.toUpperCase()} agrupados por proveedor">&#128203; Copiar</button>
+          <button class="btn-copy" onclick="copiarTipo('${tipo}',this)" title="Copiar todos los insumos de ${meta.label.toUpperCase()} agrupados por proveedor">&#128203; Copiar</button>
         </div>
       </div>
       <div class="prov-body">${cuerpo}</div>
@@ -681,7 +741,7 @@ function renderProveedoresPorTipo(lista, porProv) {
  * Copia al portapapeles solo los nombres y cantidades de los insumos del
  * tipo dado. Sin cabecera de tipo, sin proveedor, sin total.
  */
-function copiarTipo(tipo) {
+function copiarTipo(tipo, btn) {
   const lista = (window._insumosCalculados || []).filter(i => (i.tipo||'').toUpperCase() === tipo);
   if (!lista.length) {
     mostrarToast('No hay insumos de ' + tipo + ' para copiar', {type:'error', duration:2500});
@@ -700,11 +760,11 @@ function copiarTipo(tipo) {
     return `- ${cant} ${i.nombre}`;
   }).join('\n');
   navigator.clipboard.writeText(texto)
-    .then(() => mostrarToast(`${meta.label} copiado (${items.length} insumos)`, {type:'success', duration:2500}))
+    .then(() => { mostrarToast(`${meta.label} copiado (${items.length} insumos)`, {type:'success', duration:2500}); flashCopiado(btn); })
     .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3000}));
 }
 
-function copiarProveedor(prov) {
+function copiarProveedor(prov, btn) {
   const data = (window._proveedoresData || {})[prov];
   if (!data) return;
   const insumosStr = data.insumos.map(i => {
@@ -722,7 +782,7 @@ function copiarProveedor(prov) {
     return `- ${cantidad} ${i.nombre}`;
   }).join('\n');
   const texto = `Buen día, podría cotizarme lo siguiente:\n\n${insumosStr}`;
-  navigator.clipboard.writeText(texto).then(() => mostrarToast('¡Copiado para WhatsApp!')).catch(() => mostrarToast('No se pudo copiar', {type:'error',duration:3500}));
+  navigator.clipboard.writeText(texto).then(() => { mostrarToast('¡Copiado para WhatsApp!'); flashCopiado(btn); }).catch(() => mostrarToast('No se pudo copiar', {type:'error',duration:3500}));
 }
 
 /**
@@ -752,7 +812,7 @@ function copiarProveedor(prov) {
  * Útil como checklist interno o para enviar a un único proveedor que
  * suministre varios tipos.
  */
-function copiarTodo() {
+function copiarTodo(btn) {
   const lista = window._insumosCalculados || [];
   if (!lista.length) {
     mostrarToast('No hay insumos para copiar', {type:'error', duration:2500});
@@ -794,13 +854,14 @@ function copiarTodo() {
   const texto = `📋 LISTA COMPLETA DE COMPRAS\n\n${bloques.join('\n\n')}\n\n${totalLine}`;
 
   navigator.clipboard.writeText(texto)
-    .then(() => mostrarToast(`Lista completa copiada (${lista.length} insumos)`, {type:'success', duration:2500}))
+    .then(() => { mostrarToast(`Lista completa copiada (${lista.length} insumos)`, {type:'success', duration:2500}); flashCopiado(btn); })
     .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3500}));
 }
 
 function volverAInsumos() {
   document.getElementById('compras-result').style.display = 'block';
   document.getElementById('proveedores-result').style.display = 'none';
+  actualizarBarraTotal('insumos');
 }
 
 // COSTEO
