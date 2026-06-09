@@ -79,6 +79,9 @@
 .chart-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .chart-hint{font-size:10px;font-weight:500;color:var(--hint);text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif}
 .chart-wrap{position:relative;height:220px}
+.monto-cover{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:6px;font-size:13px;color:var(--muted);background:rgba(22,22,26,.45);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);border-radius:10px;cursor:pointer}
+#card-monto.masked .monto-cover{display:flex}
+#card-monto.masked canvas{opacity:.3}
 
 /* ---------- RANKINGS ---------- */
 .filtro-banner{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);background:var(--purple-dim);border:1px solid rgba(124,111,239,.25);border-radius:10px;padding:7px 12px;margin-bottom:12px}
@@ -230,9 +233,9 @@
       <div class="chart-title">Unidades vendidas <span class="chart-hint">6 meses · proy. punteada</span></div>
       <div class="chart-wrap"><canvas id="chart-meses"></canvas><div class="sk-fill"></div></div>
     </div>
-    <div class="chart-card">
-      <div class="chart-title">Monto total (S/) <span class="chart-hint">últimos 6 meses</span></div>
-      <div class="chart-wrap"><canvas id="chart-monto"></canvas><div class="sk-fill"></div></div>
+    <div class="chart-card" id="card-monto">
+      <div class="chart-title">Monto total (S/) <span class="chart-hint">6 meses · proy. punteada</span></div>
+      <div class="chart-wrap"><canvas id="chart-monto"></canvas><div class="sk-fill"></div><div class="monto-cover" id="monto-cover" onclick="toggleMonto()" title="Mostrar monto">🙈 Monto oculto</div></div>
     </div>
     <div class="chart-card">
       <div class="chart-title">Pedidos por estado <span class="chart-hint">clic para filtrar</span></div>
@@ -280,7 +283,10 @@ let charts={};
 let rowsActualGlobal=[];
 let filtroEstado=null;
 let lastUpdate=null;
-let montoVisible=true;           // el monto siempre arranca visible en cada ingreso
+// Estado de visibilidad del monto. Se recuerda en sessionStorage para que
+// un refresco (auto o manual) NO vuelva a revelar el monto si el usuario lo
+// ocultó. Arranca visible solo en una sesión nueva del navegador.
+let montoVisible=(()=>{try{return sessionStorage.getItem('tainty_monto_hidden')!=='1';}catch(_){return true;}})();
 let _montoRealTxt='—';           // último monto real formateado (para re-mostrarlo)
 let _montoProjTxt='';            // última proyección de monto formateada
 
@@ -454,10 +460,12 @@ function applyMontoMask(){
   const v=document.getElementById('s-monto');
   const p=document.getElementById('p-monto');
   const btn=document.getElementById('monto-toggle');
+  const card=document.getElementById('card-monto');
   if(montoVisible){
     v.textContent=_montoRealTxt;
     v.classList.remove('masked');
     if(btn){btn.classList.remove('locked');btn.title='Ocultar monto';}
+    if(card)card.classList.remove('masked');
     if(p&&!p.classList.contains('hidden')&&_montoProjTxt){
       p.innerHTML=`📈 Proy.: <span class="pj-val">${_montoProjTxt}</span>`;
     }
@@ -465,6 +473,7 @@ function applyMontoMask(){
     v.textContent='S/ ••••••';
     v.classList.add('masked');
     if(btn){btn.classList.add('locked');btn.title='Mostrar monto';}
+    if(card)card.classList.add('masked');
     if(p&&!p.classList.contains('hidden')){
       p.innerHTML=`📈 Proy.: <span class="pj-val">S/ ••••</span>`;
     }
@@ -473,6 +482,7 @@ function applyMontoMask(){
 
 function toggleMonto(){
   montoVisible=!montoVisible;
+  try{sessionStorage.setItem('tainty_monto_hidden',montoVisible?'0':'1');}catch(_){}
   applyMontoMask();
 }
 
@@ -564,15 +574,35 @@ function renderChartMonto(){
   const meses=getUltimos6Meses();
   const labels=meses.map(x=>x.label);
   const vals=meses.map(x=>rowsDelMes(x.m,x.a).reduce((s,r)=>s+r.montoTotal,0));
+
+  // Línea fantasma: tramo punteado del mes previo al punto proyectado de fin
+  // de mes (solo cuando el último mes es el que está en curso).
+  const pf=projFactor();
+  const proyData=meses.map(()=>null);
+  if(pf){
+    proyData[4]=vals[4];            // ancla en el mes anterior
+    proyData[5]=vals[5]*pf.factor;  // proyección a fin de mes
+  }
+
   charts['monto']=new Chart(document.getElementById('chart-monto'),{
     type:'line',
-    data:{labels,datasets:[{
-      label:'S/',data:vals,
-      borderColor:'#3ecf8e',backgroundColor:'rgba(62,207,142,0.1)',
-      pointBackgroundColor:'#3ecf8e',tension:0.4,fill:true,pointRadius:4,pointHoverRadius:6
-    }]},
+    data:{labels,datasets:[
+      {label:'S/',data:vals,
+        borderColor:'#3ecf8e',backgroundColor:'rgba(62,207,142,0.1)',
+        pointBackgroundColor:'#3ecf8e',tension:0.4,fill:true,pointRadius:4,pointHoverRadius:6},
+      {label:'Proyección',data:proyData,spanGaps:false,
+        borderColor:'rgba(62,207,142,0.65)',borderDash:[5,4],borderWidth:2,
+        pointBackgroundColor:'rgba(62,207,142,0.9)',
+        pointRadius:[0,0,0,0,0,5],pointHoverRadius:[0,0,0,0,0,7],
+        tension:0.4,fill:false}
+    ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'S/ '+ctx.parsed.y.toLocaleString('es-PE',{minimumFractionDigits:2})}}},
+      plugins:{legend:{display:false},
+        tooltip:{
+          filter:item=>item.parsed.y!==null&&!(item.datasetIndex===1&&item.dataIndex!==5),
+          callbacks:{label:ctx=>ctx.datasetIndex===1
+            ? 'Proyección fin de mes: ~S/ '+ctx.parsed.y.toLocaleString('es-PE',{maximumFractionDigits:0})
+            : 'S/ '+ctx.parsed.y.toLocaleString('es-PE',{minimumFractionDigits:2})}}},
       scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#7a7a8a'}},
               y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#7a7a8a',callback:v=>'S/'+v.toLocaleString()}}}}
   });
