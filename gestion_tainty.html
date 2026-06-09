@@ -31,8 +31,8 @@
    Cada insumo se muestra como pasos conectados. La parte
    completada del track se tiñe con el color del estado actual
    (--acc), el paso actual lleva halo y los futuros van huecos. */
-.stepper-wrap{flex:1;display:flex;align-items:center;gap:12px;min-width:0}
-.stepper{flex:1;display:flex;align-items:flex-start;min-width:0}
+.stepper-wrap{flex:1;display:flex;align-items:center;justify-content:flex-end;gap:12px;min-width:0}
+.stepper{flex:0 1 520px;display:flex;align-items:flex-start;min-width:0}
 .step{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .step-node{width:16px;height:16px;border-radius:50%;border:2px solid var(--border2);background:var(--surface);position:relative;z-index:2;transition:all .18s}
 .step-label{font-size:10px;line-height:1.15;color:var(--hint);white-space:nowrap;transition:color .18s}
@@ -83,7 +83,8 @@
   .fila-pedido{flex-direction:column;align-items:stretch;gap:12px;padding:14px}
   .fila-info{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0!important}
   .fila-cliente,.fila-prod{max-width:100%}
-  .stepper-wrap{width:100%}
+  .stepper-wrap{width:100%;justify-content:flex-start}
+  .stepper{flex:1}
   .step-label{font-size:9px}
   .seccion-header{padding:12px 14px;flex-wrap:wrap}
   .seccion-titulo{font-size:13px}
