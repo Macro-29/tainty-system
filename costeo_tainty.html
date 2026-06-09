@@ -53,7 +53,7 @@ body.has-barra{padding-bottom:76px}
 /* ESCALA SELECTOR */
 .escala-tabs{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap}
 .escala-btn{font-size:12px;padding:5px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
-.escala-btn.active{background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,.3)}
+.escala-btn.active{background:var(--amber);color:#fff;border-color:var(--amber);font-weight:600;box-shadow:0 2px 10px -4px rgba(245,166,35,.8)}
 /* TABLA INSUMOS */
 .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1rem}
 .table-scroll{overflow-x:auto}
@@ -99,10 +99,23 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 .btn-danger{padding:6px 12px;border-radius:8px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer}
 /* COSTO CARD */
 .costo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem}
-.costo-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.75rem;text-align:center}
+.costo-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.75rem;text-align:center;transition:all .15s;position:relative}
+.costo-card.activa{border-color:var(--amber);background:var(--amber-dim);box-shadow:0 0 0 1px var(--amber) inset}
 .costo-label{font-size:11px;color:var(--hint);margin-bottom:4px}
+.costo-card.activa .costo-label{color:var(--amber);font-weight:600}
 .costo-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:500;color:var(--amber)}
 .costo-unit{font-size:11px;color:var(--muted);margin-top:2px}
+/* MINI-GRAFICO COSTO/UND POR ESCALA */
+.cu-chart{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px 10px;margin-bottom:1rem}
+.cu-head{font-size:12px;color:var(--muted);margin-bottom:12px}
+.cu-cols{display:flex;gap:10px;align-items:flex-end;height:92px}
+.cu-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:5px}
+.cu-bar{width:100%;max-width:54px;border-radius:6px 6px 0 0;background:var(--border2);transition:height .3s ease}
+.cu-bar.activa{background:var(--amber)}
+.cu-bar.mejor{background:var(--green)}
+.cu-bar-val{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);white-space:nowrap}
+.cu-axis{display:flex;gap:10px;margin-top:6px}
+.cu-axis>div{flex:1;text-align:center;font-size:11px;color:var(--muted)}
 /* SPINNER */
 .spinner{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin:2rem auto;display:block}
 }
@@ -908,36 +921,67 @@ function renderCosteo() {
   const costoActual = prod.insumos.reduce((s,i) => s + costoInsumoEnEscala(i, escalaActual), 0);
   const costoUnd = escalaActual > 0 ? costoActual / escalaActual : 0;
 
+  // Subtotales por insumo a la escala activa → para resaltar el más caro.
+  const subs = prod.insumos.map(i => costoInsumoEnEscala(i, escalaActual));
+  const maxSub = subs.length ? Math.max(...subs) : 0;
+  const idxMax = subs.indexOf(maxSub);
+
+  // Costo por unidad en cada escala → mini-gráfico de barras.
+  const cus = costosPorEscala.map(c => c.escala > 0 ? c.total / c.escala : 0);
+  const minCU = Math.min(...cus), maxCU = Math.max(...cus);
+  const hayVariacion = (maxCU - minCU) > 0.005;
+  const escalaMejor = hayVariacion ? costosPorEscala[cus.indexOf(minCU)].escala : null;
+
   div.innerHTML = `
     <div class="costo-grid">
-      ${costosPorEscala.map(c => `<div class="costo-card">
+      ${costosPorEscala.map(c => `<div class="costo-card${c.escala===escalaActual?' activa':''}">
         <div class="costo-label">${c.escala} und</div>
         <div class="costo-val" style="color:${c.escala===escalaActual?'var(--amber)':'var(--text)'}">S/ ${c.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
         <div class="costo-unit">S/ ${(c.total/c.escala).toFixed(2)}/und</div>
       </div>`).join('')}
+    </div>
+    <div class="cu-chart">
+      <div class="cu-head">Costo por unidad según escala${escalaMejor?` · <span style="color:var(--green);font-weight:500">más barato desde ${escalaMejor} und</span>`:''}</div>
+      <div class="cu-cols">
+        ${costosPorEscala.map((c,k) => {
+          const cu = cus[k];
+          const h = maxCU > 0 ? Math.max(8, Math.round(cu / maxCU * 100)) : 8;
+          const activa = c.escala === escalaActual;
+          const mejor = hayVariacion && Math.abs(cu - minCU) < 0.0001;
+          const cls = mejor ? 'mejor' : (activa ? 'activa' : '');
+          return `<div class="cu-col">
+            <div class="cu-bar-val"${mejor?' style="color:var(--green)"':activa?' style="color:var(--amber)"':''}>S/ ${cu.toFixed(2)}</div>
+            <div class="cu-bar ${cls}" style="height:${h}%"></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="cu-axis">
+        ${costosPorEscala.map(c => `<div${c.escala===escalaActual?' style="color:var(--amber);font-weight:600"':''}>x${c.escala}</div>`).join('')}
+      </div>
     </div>
     <div class="table-wrap">
       <div class="table-scroll">
         <table>
           <thead><tr><th>Tipo</th><th>Insumo</th><th>Proveedor</th><th>Precio</th><th>Cantidad (${escalaActual} und)</th><th>Subtotal</th></tr></thead>
           <tbody>
-            ${prod.insumos.map(i => {
+            ${prod.insumos.map((i,ri) => {
               const config = getTipoConfig(i.tipo);
               const cant = cantidadInsumoEnEscala(i, escalaActual);
               const sub = costoInsumoEnEscala(i, escalaActual);
+              const esMax = ri === idxMax && maxSub > 0;
               const precioStr = config === 'kg' ? `S/ ${(parseFloat(i.precioUnitario)||0).toFixed(2)}/kg`
                 : config === 'und' ? `S/ ${(parseFloat(i.precioUnitario)||0).toFixed(2)}/und`
                 : '—';
               const cantStr = config === 'kg' ? `${cant.toFixed(3)} kg`
                 : config === 'und' ? `${Math.round(cant)} und`
                 : '—';
-              return `<tr>
+              return `<tr${esMax?' style="background:var(--amber-dim)"':''}>
                 <td><span style="font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted)">${i.tipo}</span></td>
-                <td style="font-size:13px">${i.nombre}</td>
+                <td style="font-size:13px">${i.nombre}${esMax?' <span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:6px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,.3);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">▲ mayor costo</span>':''}</td>
                 <td><span class="proveedor-badge">${i.proveedor||'—'}</span></td>
                 <td class="td-mono">${precioStr}</td>
                 <td class="td-mono">${cantStr}</td>
-                <td class="td-mono" style="color:var(--green)">S/ ${sub.toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
+                <td class="td-mono" style="color:${esMax?'var(--amber)':'var(--green)'};${esMax?'font-weight:600':''}">S/ ${sub.toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
               </tr>`;
             }).join('')}
             <tr style="background:var(--surface2)">
