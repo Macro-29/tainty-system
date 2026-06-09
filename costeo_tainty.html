@@ -121,6 +121,13 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 .empty{text-align:center;padding:2rem;color:var(--hint);font-size:14px}
 /* TOAST */
 /* CATALOGO */
+.cat-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+.cat-chip{font-size:12px;padding:8px 12px;border-radius:10px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.cat-chip:hover{color:var(--text)}
+.cat-chip.active{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
+.cat-chip.pend.active{background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,.3)}
+.cat-sel{flex:0 1 auto;min-width:160px;padding:8px 10px;font-size:12px}
+.cat-count{margin-left:auto;font-size:12px;color:var(--muted)}
 .prod-accordion{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden}
 .prod-acc-header{padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .1s}
 .prod-acc-header:hover{background:var(--surface2)}
@@ -251,8 +258,18 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
     <div><div class="section-title">Catálogo de insumos</div><div class="section-sub" style="margin:0">Gestiona los insumos por producto — se guarda en Google Sheets</div></div>
     <button class="btn-primary" onclick="abrirEditorProducto(null)">+ Nuevo producto</button>
   </div>
-  <div style="margin:1rem 0">
+  <div style="margin:1rem 0 .75rem">
     <input style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:9px 14px;font-family:DM Sans,sans-serif;font-size:13px;color:var(--text);outline:none" placeholder="Buscar producto..." id="cat-search" oninput="renderCatalogo()">
+  </div>
+  <div class="cat-controls">
+    <select class="sel cat-sel" id="cat-orden" onchange="renderCatalogo()">
+      <option value="nombre">Orden: Nombre (A-Z)</option>
+      <option value="costo-desc">Orden: Costo (mayor)</option>
+      <option value="costo-asc">Orden: Costo (menor)</option>
+    </select>
+    <button class="cat-chip" id="cat-chip-compacto" onclick="toggleCatCompacto(this)">&#9636; Vista compacta</button>
+    <button class="cat-chip pend" id="cat-chip-pend" onclick="toggleCatPend(this)" style="display:none">&#9888; No sincronizados</button>
+    <span class="cat-count" id="cat-count"></span>
   </div>
   <div id="catalogo-list"></div>
 </div>
@@ -1001,11 +1018,46 @@ function getTiposInsumo(nombre) {
   return ['INSUMO','ENVASE','ETIQUETA','CAJA'];
 }
 
+// Estado de la vista de catálogo
+let catCompacto = false, catSoloPend = false;
+function toggleCatCompacto(btn) { catCompacto = !catCompacto; btn.classList.toggle('active', catCompacto); renderCatalogo(); }
+function toggleCatPend(btn) { catSoloPend = !catSoloPend; btn.classList.toggle('active', catSoloPend); renderCatalogo(); }
+
 function renderCatalogo() {
   const q = (document.getElementById('cat-search').value||'').toLowerCase();
-  const lista = catalogo.filter(p => !q || p.nombre.toLowerCase().includes(q));
-  if (!lista.length) { document.getElementById('catalogo-list').innerHTML = '<div class="empty">No hay productos en el catálogo</div>'; return; }
-  document.getElementById('catalogo-list').innerHTML = lista.map((p,pi) => {
+  const ordenEl = document.getElementById('cat-orden');
+  const orden = ordenEl ? ordenEl.value : 'nombre';
+
+  // Contador de pendientes + estado del chip "No sincronizados"
+  const totalPend = catalogo.filter(p => p._localOnly).length;
+  const chipPend = document.getElementById('cat-chip-pend');
+  if (chipPend) {
+    if (totalPend > 0) { chipPend.style.display = ''; chipPend.innerHTML = '&#9888; No sincronizados (' + totalPend + ')'; }
+    else { chipPend.style.display = 'none'; if (catSoloPend) { catSoloPend = false; chipPend.classList.remove('active'); } }
+  }
+
+  // Filtrar: búsqueda + (opcional) solo pendientes
+  let lista = catalogo.filter(p => !q || p.nombre.toLowerCase().includes(q));
+  if (catSoloPend) lista = lista.filter(p => p._localOnly);
+
+  // Ordenar: por nombre o por costo (a 1000 und como referencia)
+  const costoRef = p => p.insumos.reduce((s,i) => s + costoInsumoEnEscala(i, 1000), 0);
+  lista = lista.slice();
+  if (orden === 'costo-desc') lista.sort((a,b) => costoRef(b) - costoRef(a));
+  else if (orden === 'costo-asc') lista.sort((a,b) => costoRef(a) - costoRef(b));
+  else lista.sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
+
+  // Contador de resultados
+  const cnt = document.getElementById('cat-count');
+  if (cnt) cnt.textContent = lista.length + ' de ' + catalogo.length + ' producto' + (catalogo.length === 1 ? '' : 's');
+
+  if (!lista.length) {
+    const msg = catSoloPend ? 'Todo está sincronizado 🎉' : (q ? 'Sin resultados para “' + q + '”' : 'No hay productos en el catálogo');
+    document.getElementById('catalogo-list').innerHTML = '<div class="empty">' + msg + '</div>';
+    return;
+  }
+  document.getElementById('catalogo-list').innerHTML = lista.map(p => {
+    const gi = catalogo.indexOf(p);
     const costos = [100,300,500,1000].map(e => ({
       escala: e,
       total: p.insumos.reduce((s,i)=>s+costoInsumoEnEscala(i,e),0)
@@ -1013,25 +1065,25 @@ function renderCatalogo() {
     const tipos = getTiposInsumo(p.nombre);
     const pendiente = p._localOnly;
     return `<div class="prod-accordion" style="${pendiente?'border-color:var(--amber);background:linear-gradient(180deg,rgba(245,166,35,.04),var(--surface))':''}">
-      <div class="prod-acc-header" onclick="toggleAcc(${pi})">
+      <div class="prod-acc-header" onclick="toggleAcc(${gi})">
         <div style="flex:1;min-width:0">
           <div class="prod-acc-title">${p.nombre}${pendiente?' <span title="Pendiente de sincronizar con Google Sheets" style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,.3);font-weight:500;margin-left:6px;font-family:DM Sans,sans-serif">⚠ No sincronizado</span>':''}</div>
           <div class="prod-acc-meta" style="flex-wrap:wrap;gap:6px 10px">
             <span>${p.insumos.length} insumos</span>
             ${esCap(p.nombre)?'<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--green-dim);color:var(--green)">CAP</span>':''}
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          ${catCompacto?'':`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
             ${costos.map(c => `<span style="font-size:11px;font-family:DM Mono,monospace;padding:3px 8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);color:var(--amber)">x${c.escala}: S/ ${c.total.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>`).join('')}
-          </div>
+          </div>`}
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          ${pendiente?`<button onclick="event.stopPropagation();reintentarSyncProducto(${pi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(245,166,35,.4);background:var(--amber-dim);color:var(--amber);cursor:pointer">↻ Reintentar sync</button>`:''}
-          <button onclick="event.stopPropagation();abrirEditorProducto(${pi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(124,111,239,.3);background:var(--purple-dim);color:var(--purple);cursor:pointer">✏ Editar</button>
-          <button onclick="event.stopPropagation();eliminarProducto(${pi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">🗑 Eliminar</button>
-          <span style="color:var(--hint);font-size:18px" id="acc-icon-${pi}">›</span>
+          ${pendiente?`<button onclick="event.stopPropagation();reintentarSyncProducto(${gi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(245,166,35,.4);background:var(--amber-dim);color:var(--amber);cursor:pointer">↻ Reintentar sync</button>`:''}
+          <button onclick="event.stopPropagation();abrirEditorProducto(${gi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(124,111,239,.3);background:var(--purple-dim);color:var(--purple);cursor:pointer">✏ Editar</button>
+          <button onclick="event.stopPropagation();eliminarProducto(${gi})" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid rgba(232,82,74,.3);background:var(--red-dim);color:var(--red);cursor:pointer">🗑 Eliminar</button>
+          <span style="color:var(--hint);font-size:18px" id="acc-icon-${gi}">›</span>
         </div>
       </div>
-      <div class="prod-acc-body" id="acc-body-${pi}">
+      <div class="prod-acc-body" id="acc-body-${gi}">
         <div style="display:grid;gap:8px;padding-top:8px">
           ${tipos.map(tipo => {
             const ins = p.insumos.find(i => i.tipo === tipo);
