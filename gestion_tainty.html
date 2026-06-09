@@ -27,28 +27,27 @@
 .estado-camino{background:var(--blue-dim);color:var(--blue);border-color:rgba(76,163,232,.2)}
 .estado-listo{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.2)}
 .estado-cancelado{background:var(--red-dim);color:var(--red);border-color:rgba(232,82,74,.2)}
-.insumos-grid{display:grid;gap:0}
-.insumo-row{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
-.insumo-row:last-child{border:none}
-.insumo-label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);min-width:80px}
-.insumo-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .2s}
-.dot-pendiente{background:var(--hint)}
-.dot-compra{background:var(--amber)}
-.dot-produccion{background:var(--purple)}
-.dot-camino{background:var(--blue)}
-.dot-oficina{background:var(--green)}
-.dot-noaplica{background:var(--hint);opacity:.3}
-.estado-btns{display:flex;gap:5px;flex-wrap:wrap}
-.est-btn{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
-.est-btn:hover{border-color:var(--border2);color:var(--text)}
-.est-btn.sel-pendiente{background:var(--surface2);color:var(--text);border-color:var(--border2)}
-.est-btn.sel-compra{background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,.3)}
-.est-btn.sel-produccion{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
-.est-btn.sel-camino{background:var(--blue-dim);color:var(--blue);border-color:rgba(76,163,232,.3)}
-.est-btn.sel-oficina{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.3)}
-.est-btn.sel-encurso{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.3)}
-.est-btn.sel-finalizado{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.3)}
-.est-btn.sel-noaplica{background:transparent;color:var(--hint);border-color:var(--hint);text-decoration:line-through}
+/* ── Stepper / track de fases ─────────────────────────────
+   Cada insumo se muestra como pasos conectados. La parte
+   completada del track se tiñe con el color del estado actual
+   (--acc), el paso actual lleva halo y los futuros van huecos. */
+.stepper-wrap{flex:1;display:flex;align-items:center;gap:12px;min-width:0}
+.stepper{flex:1;display:flex;align-items:flex-start;min-width:0}
+.step{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.step-node{width:16px;height:16px;border-radius:50%;border:2px solid var(--border2);background:var(--surface);position:relative;z-index:2;transition:all .18s}
+.step-label{font-size:10px;line-height:1.15;color:var(--hint);white-space:nowrap;transition:color .18s}
+.step:not(:first-child)::before{content:'';position:absolute;top:7px;left:-50%;right:50%;height:2px;background:var(--border2);z-index:1;transition:background .18s}
+.step:hover .step-node{border-color:var(--text)}
+.step:hover .step-label{color:var(--muted)}
+.step.done .step-node{background:var(--acc);border-color:var(--acc)}
+.step.done::before,.step.current::before{background:var(--acc)}
+.step.done .step-label{color:var(--muted)}
+.step.current .step-node{background:var(--acc);border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-dim)}
+.step.current .step-label{color:var(--acc);font-weight:600}
+.step-na{flex-shrink:0;width:26px;height:26px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--hint);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.step-na:hover{color:var(--text);border-color:var(--border2)}
+.step-na.active{color:var(--red);border-color:rgba(232,82,74,.4);background:var(--red-dim)}
+.stepper-wrap.is-na .stepper{opacity:.32;filter:grayscale(1)}
 .saving-indicator{font-size:11px;color:var(--muted);padding:2px 8px}
 .seccion-insumo{margin-bottom:2rem}
 .seccion-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--border2);border-radius:14px 14px 0 0;border-bottom:none;position:sticky;top:0;z-index:5}
@@ -67,7 +66,7 @@
 .btn-copiar-sec:hover{background:rgba(124,111,239,.25)}
 .btn-copiar-sec:active{transform:scale(.97)}
 .seccion-body{background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;overflow:hidden}
-.fila-pedido{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border)}
+.fila-pedido{display:flex;align-items:center;gap:18px;padding:14px 18px;border-bottom:1px solid var(--border)}
 .fila-pedido:last-child{border:none}
 .fila-pedido:hover{background:var(--surface2)}
 .fila-info{display:flex;align-items:center;gap:10px;min-width:0}
@@ -75,22 +74,20 @@
 .fila-cliente{font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
 .fila-prod{font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px}
 .fila-cant{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
-.fila-estado-actual{display:flex;align-items:center;gap:6px;margin-right:8px}
+.fila-info{flex-shrink:0;min-width:0}
 .seccion-empty{padding:1.5rem;text-align:center;color:var(--hint);font-size:13px}
 .empty{text-align:center;padding:3rem;color:var(--hint)}
 .spinner{width:30px;height:30px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin:2rem auto;display:block}
-}
 @media(max-width:640px){
-  .insumo-row{flex-direction:column;align-items:flex-start;gap:6px}
-  .estado-btns{flex-wrap:wrap;gap:4px}
-  .est-btn{font-size:10px;padding:3px 7px}
   .ticket-header{flex-direction:column;align-items:flex-start}
-  .fila-pedido{grid-template-columns:1fr;gap:8px;padding:12px 14px}
-  .fila-info{flex-wrap:wrap;gap:6px}
+  .fila-pedido{flex-direction:column;align-items:stretch;gap:12px;padding:14px}
+  .fila-info{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0!important}
   .fila-cliente,.fila-prod{max-width:100%}
+  .stepper-wrap{width:100%}
+  .step-label{font-size:9px}
   .seccion-header{padding:12px 14px;flex-wrap:wrap}
   .seccion-titulo{font-size:13px}
-.topbar{padding:.75rem 1rem}.main{padding:1rem}.estado-btns{gap:4px}.est-btn{font-size:10px;padding:3px 8px}}
+  .topbar{padding:.75rem 1rem}.main{padding:1rem}}
 </style>
 <script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
@@ -155,6 +152,53 @@ const LABELS={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion'
 const DOT={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
 // Emoji compacto usado en el texto exportable (botón Copiar por sección).
 const ESTADO_EMOJI={'pendiente':'⏳','compra':'🛒','produccion':'⚙️','camino':'🚚','oficina':'✅','noaplica':'➖','encurso':'⚙️','finalizado':'✅'};
+// Etiquetas cortas (sin emoji) para los nodos del stepper.
+const STEP_LABEL={'pendiente':'Pendiente','compra':'Compra','produccion':'Producción','camino':'Camino','oficina':'Oficina','encurso':'En curso','finalizado':'Finalizado'};
+// Color del track según el estado actual: [--acc, --acc-dim].
+const ACC={
+  'pendiente':['var(--muted)','rgba(122,122,138,.18)'],
+  'compra':['var(--amber)','var(--amber-dim)'],
+  'produccion':['var(--purple)','var(--purple-dim)'],
+  'camino':['var(--blue)','var(--blue-dim)'],
+  'oficina':['var(--green)','var(--green-dim)'],
+  'encurso':['var(--purple)','var(--purple-dim)'],
+  'finalizado':['var(--green)','var(--green-dim)'],
+  'noaplica':['var(--hint)','transparent'],
+};
+
+/**
+ * Renderiza el stepper de un insumo: pasos conectados con el track
+ * coloreado hasta el estado actual, más el toggle "✕ No aplica"
+ * (oculto en Máquina, que no admite ese estado).
+ */
+function renderStepper(pid,insumo){
+  const all=estadosDeInsumo(insumo);
+  const hasNa=all.includes('noaplica');
+  const linear=all.filter(s=>s!=='noaplica');
+  const cur=getEstadoInsumo(pid,insumo);
+  const na=cur==='noaplica';
+  const curIdx=na?-1:linear.indexOf(cur);
+  const [acc,accDim]=ACC[na?'noaplica':cur]||ACC['pendiente'];
+  const steps=linear.map((s,i)=>{
+    let cls='step';
+    if(!na){
+      if(i<curIdx)cls+=' done';
+      else if(i===curIdx)cls+=' current';
+    }
+    return`<button class="${cls}" onclick="cambiarEstado('${pid}','${insumo}','${s}')" title="${LABELS[s]}">
+      <span class="step-node"></span>
+      <span class="step-label">${STEP_LABEL[s]||s}</span>
+    </button>`;
+  }).join('');
+  const naBtn=hasNa
+    ?`<button class="step-na${na?' active':''}" onclick="cambiarEstado('${pid}','${insumo}','noaplica')" title="No aplica">✕</button>`
+    :'';
+  return`<div class="stepper-wrap${na?' is-na':''}">
+    <div class="stepper" style="--acc:${acc};--acc-dim:${accDim}">${steps}</div>
+    ${naBtn}
+    <span class="saving-indicator" id="si-${pid}-${insumo}"></span>
+  </div>`;
+}
 let pedidos=[],estadosInsumos={},filtroActual='todos',modoOrden='insumo';
 
 function initDots(){
@@ -277,7 +321,6 @@ function renderLista(){
   // Construir cada sección de insumo
   const seccionesHtml=ORDEN_INSUMOS.map(insumo=>{
     const esMaquina=insumo==='Maquina';
-    const estadosSeccion=estadosDeInsumo(insumo);
     const estadoFiltro=esMaquina?FILTRO_A_ESTADO_MAQ[filtroActual]:FILTRO_A_ESTADO[filtroActual];
     const filtroAplicable=filtroActual==='todos'?null:estadoFiltro;
 
@@ -315,22 +358,13 @@ function renderLista(){
       bodyHtml='<div class="seccion-empty">Sin pedidos en este estado</div>';
     }else{
       bodyHtml=pedidosFiltrados.map(p=>{
-        const est=getEstadoInsumo(p.numPedido,insumo);
-        const btns=estadosSeccion.map(s=>{
-          const isSel=est===s;
-          return`<button class="est-btn${isSel?' sel-'+s:''}" onclick="cambiarEstado('${p.numPedido}','${insumo}','${s}')">${LABELS[s]}</button>`;
-        }).join('');
         return`<div class="fila-pedido">
           <div class="fila-info">
             <span class="fila-num">${p.numPedido||''}</span>
             <span class="fila-prod">${p.producto||''}</span>
             <span class="fila-cant">${parseInt(p.cantidad||0).toLocaleString()} und</span>
           </div>
-          <div class="fila-estado-actual">
-            <span class="insumo-dot ${DOT[est]||'dot-pendiente'}"></span>
-            <div class="estado-btns">${btns}</div>
-            <span class="saving-indicator" id="si-${p.numPedido}-${insumo}"></span>
-          </div>
+          ${renderStepper(p.numPedido,insumo)}
         </div>`;
       }).join('');
     }
@@ -491,22 +525,12 @@ function renderListaPorProducto(){
     const insumosP=getInsumos(getTipo(p.producto));
     const cant=parseInt(p.cantidad||0);
     const filas=insumosP.map(insumo=>{
-      const estados=estadosDeInsumo(insumo);
-      const est=getEstadoInsumo(p.numPedido,insumo);
-      const btns=estados.map(s=>{
-        const isSel=est===s;
-        return`<button class="est-btn${isSel?' sel-'+s:''}" onclick="cambiarEstado('${p.numPedido}','${insumo}','${s}')">${LABELS[s]}</button>`;
-      }).join('');
       return`<div class="fila-pedido">
-        <div class="fila-info" style="min-width:120px">
+        <div class="fila-info" style="min-width:120px;flex-shrink:0">
           <span class="seccion-icono" style="margin-right:4px">${ICONO_INSUMO[insumo]||''}</span>
           <span style="font-size:13px;color:var(--text)">${ORDEN_INSUMOS_LABELS[insumo]||insumo}</span>
         </div>
-        <div class="fila-estado-actual">
-          <span class="insumo-dot ${DOT[est]||'dot-pendiente'}"></span>
-          <div class="estado-btns">${btns}</div>
-          <span class="saving-indicator" id="si-${p.numPedido}-${insumo}"></span>
-        </div>
+        ${renderStepper(p.numPedido,insumo)}
       </div>`;
     }).join('');
 
