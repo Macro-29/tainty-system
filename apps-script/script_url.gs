@@ -9,13 +9,11 @@
    y desplegar como nueva versión.
 
    Cambio vs versión anterior:
-   - getPrecioSugerido ahora considera CANTIDAD además de vendedor.
-     Cascada:
-       1. mismo producto + vendedor + cantidad → fuente='vendedor_cantidad'
-       2. mismo producto + vendedor             → fuente='vendedor'
-       3. mismo producto (cualquier vendedor)   → fuente='generico'
-     El cliente (formulario_tainty.html) ya envía &cantidad=N y
-     muestra una etiqueta distinta según la fuente.
+   - getPrecioSugerido ahora exige COINCIDENCIA EXACTA en los 4 datos:
+       producto + vendedor + cliente + cantidad → fuente='exacto'
+     Si la combinación exacta no existe en el historial, NO se sugiere
+     precio (fuente='ninguno') y el campo queda en blanco para ingresar
+     un monto nuevo. El formulario envía &cliente=...&cantidad=N.
    ========================================================= */
 
 const SHEET_ID = '1zIM2d9d-ILpChn4EVlLFkkZY_Rgod0y3i1a0dxWNatQ';
@@ -157,9 +155,9 @@ function sumarDiasHabiles(fecha, dias) {
 function doGet(e) {
   let result;
   if (e && e.parameter && e.parameter.action === 'precio') {
-    // CAMBIO: ahora pasa también cantidad para que la sugerencia
-    // priorice el último precio para esa misma escala/cantidad.
-    result = getPrecioSugerido(e.parameter.producto, e.parameter.vendedor, e.parameter.cantidad);
+    // Sugerencia solo si existe una venta previa IDÉNTICA en
+    // producto + vendedor + cliente + cantidad.
+    result = getPrecioSugerido(e.parameter.producto, e.parameter.vendedor, e.parameter.cantidad, e.parameter.cliente);
   } else if (e && e.parameter && e.parameter.action === 'guardarPedido') {
     try {
       result = guardarNuevoPedido(e.parameter);
@@ -306,19 +304,6 @@ function buildResponse(obj) {
   return output;
 }
 
-/**
- * Devuelve el último precio unitario sugerido para un producto, intentando
- * ser lo más específico posible.
- *
- * Estrategia (cascada de la más específica a la más general):
- *   1. Mismo producto + mismo vendedor + MISMA cantidad → 'vendedor_cantidad'
- *      (porque el precio por unidad cambia con la escala: 100 vs 500 vs 1000)
- *   2. Mismo producto + mismo vendedor (cualquier cantidad) → 'vendedor'
- *   3. Mismo producto (cualquier vendedor)                 → 'generico'
- *
- * Recorremos las filas de la última a la primera para que "último precio"
- * sea efectivamente el más reciente.
- */
 /** Normaliza un string para comparar nombres tolerante a casing/acentos/espacios. */
 function normNombre_(s) {
   if (s === null || s === undefined) return '';
@@ -327,55 +312,45 @@ function normNombre_(s) {
   return v.replace(/\s+/g, ' ');
 }
 
-function getPrecioSugerido(nombreProducto, vendedor, cantidad) {
+/**
+ * Devuelve el precio unitario de una venta previa SOLO si existe una
+ * coincidencia EXACTA en los cuatro datos: producto + vendedor + cliente
+ * + cantidad. La idea: si ya le vendiste ese mismo producto, en esa misma
+ * cantidad, a ese mismo cliente, debe cobrarse el mismo monto.
+ *
+ * Si falta cualquiera de los cuatro datos, o no hay una fila idéntica,
+ * devuelve precio=null / fuente='ninguno' → el formulario deja el campo
+ * en blanco para ingresar un precio nuevo.
+ *
+ * Recorremos de la última fila a la primera para tomar la venta más
+ * reciente. Comparación case-insensitive y sin acentos.
+ */
+function getPrecioSugerido(nombreProducto, vendedor, cantidad, cliente) {
+  const prodNorm = normNombre_(nombreProducto);
+  const vendNorm = normNombre_(vendedor);
+  const cliNorm  = normNombre_(cliente);
+  const cantNum  = parseInt(cantidad) || 0;
+
+  // Sin los 4 datos no puede haber coincidencia exacta.
+  if (!prodNorm || !vendNorm || !cliNorm || cantNum <= 0) {
+    return { precio: null, fuente: 'ninguno', success: true };
+  }
+
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
 
-  const prodNorm = normNombre_(nombreProducto);
-  const vendNorm = vendedor ? normNombre_(vendedor) : null;
-  const cantNum = parseInt(cantidad) || 0;
-
-  let precioVendedorCantidad = null;
-  let precioVendedor = null;
-  let precioGenerico = null;
-
+  // Columnas (0-indexed): [3]=cliente, [4]=producto, [5]=cantidad, [6]=vendedor, [7]=precio
   for (let i = data.length - 1; i >= 1; i--) {
-    // Comparación case-insensitive + sin acentos para que matchee aunque
-    // el producto haya quedado guardado con distinto casing en pedidos viejos.
-    if (normNombre_(data[i][4]) !== prodNorm) continue;
+    if (normNombre_(data[i][4]) !== prodNorm) continue;          // producto
+    if (normNombre_(data[i][6]) !== vendNorm) continue;          // vendedor
+    if (normNombre_(data[i][3]) !== cliNorm) continue;           // cliente
+    if ((parseInt(data[i][5]) || 0) !== cantNum) continue;       // cantidad
     const precio = parseFloat(data[i][7]) || 0;
     if (precio <= 0) continue;
-
-    // Nivel 3 (cualquier vendedor) — siempre se toma el primero encontrado
-    if (precioGenerico === null) precioGenerico = precio;
-
-    if (vendNorm && data[i][6]) {
-      const v = normNombre_(data[i][6]);
-      if (v === vendNorm) {
-        // Nivel 2 (vendedor, cualquier cantidad)
-        if (precioVendedor === null) precioVendedor = precio;
-        // Nivel 1 (vendedor + cantidad exacta)
-        if (cantNum > 0 && precioVendedorCantidad === null) {
-          const filaCant = parseInt(data[i][5]) || 0;
-          if (filaCant === cantNum) {
-            precioVendedorCantidad = precio;
-            break; // ya tenemos el más específico
-          }
-        }
-      }
-    }
+    return { precio: precio, fuente: 'exacto', success: true };
   }
 
-  if (precioVendedorCantidad !== null) {
-    return { precio: precioVendedorCantidad, fuente: 'vendedor_cantidad', success: true };
-  }
-  if (precioVendedor !== null) {
-    return { precio: precioVendedor, fuente: 'vendedor', success: true };
-  }
-  if (precioGenerico !== null) {
-    return { precio: precioGenerico, fuente: 'generico', success: true };
-  }
   return { precio: null, fuente: 'ninguno', success: true };
 }
 

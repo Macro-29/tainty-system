@@ -441,7 +441,7 @@ input.invalid, select.invalid, textarea.invalid{
       </div>
       <div class="field">
         <label>Cliente <span class="req">*</span></label>
-        <input type="text" id="f-cliente" list="clientes-list" placeholder="Escribe o elige cliente..." autocomplete="off" oninput="onClienteInput()" onchange="onClienteInput()">
+        <input type="text" id="f-cliente" list="clientes-list" placeholder="Escribe o elige cliente..." autocomplete="off" oninput="onClienteInput()" onchange="onClienteInput();sugerirPrecio()">
         <datalist id="clientes-list"></datalist>
         <div class="catalog-hint" id="hint-clientes"><span class="dot"></span>Cargando clientes...</div>
         <div class="field-error" id="err-f-cliente">⚠ Ingresa el cliente</div>
@@ -475,7 +475,7 @@ input.invalid, select.invalid, textarea.invalid{
       <div class="card-title">Precios</div>
       <div class="field">
         <label>Precio de venta por unidad (S/) <span class="req">*</span></label>
-        <input type="number" id="f-precio" step="0.01" min="0" placeholder="S/ 0.00" oninput="clearFieldError('f-precio');updatePreview()">
+        <input type="number" id="f-precio" step="0.01" min="0" placeholder="S/ 0.00" oninput="precioAutollenado=false;clearFieldError('f-precio');updatePreview()">
         <div class="field-error" id="err-f-precio">⚠ Ingresa el precio por unidad</div>
         <div class="price-suggest" id="price-suggest">
           <div class="ps-label">Último precio registrado en Sheets</div>
@@ -539,6 +539,10 @@ if (!requireLogin()) {
   // El navegador ya esta yendo al index; lo siguiente no se ejecuta.
 }
 const preciosCache = {};
+// true cuando el precio del campo lo puso una sugerencia (no el usuario).
+// Permite reemplazarlo o limpiarlo al cambiar los datos sin pisar un
+// monto escrito a mano.
+let precioAutollenado = false;
 
 function getTipo(nombre) {
   const n = nombre.toLowerCase();
@@ -750,29 +754,31 @@ async function onCantidad() {
 }
 
 /**
- * Busca el último precio para (producto, vendedor, cantidad).
- *
- * Estrategia con fallback (la maneja el server):
- *   1. Match exacto: mismo producto + vendedor + cantidad → fuente='vendedor_cantidad'
- *   2. Mismo producto + vendedor (cualquier cantidad)       → fuente='vendedor'
- *   3. Mismo producto (cualquier vendedor)                  → fuente='otro_vendedor'
- *
- * El cliente envía cantidad y el server elige el mejor match disponible.
- * Si el server aún no soporta cantidad, simplemente devuelve niveles 2/3
- * como antes (compatibilidad total).
+ * Sugiere el precio SOLO cuando existe una venta previa idéntica en los
+ * cuatro datos: producto + vendedor + cliente + cantidad (fuente='exacto').
+ * El server hace la búsqueda; si no hay coincidencia exacta devuelve
+ * fuente='ninguno' y el campo de precio queda en blanco para ingresarlo
+ * a mano. Se recalcula al cambiar cualquiera de esos cuatro campos.
  */
 async function sugerirPrecio() {
   const ps = document.getElementById('price-suggest');
   const prod = document.getElementById('f-producto').value;
   const vendedor = document.getElementById('f-vendedor').value;
-  const cantInput = document.getElementById('f-cantidad').value;
-  const cantidad = parseInt(cantInput) || 0;
+  const cliente = (document.getElementById('f-cliente').value || '').trim().toUpperCase();
+  const cantidad = parseInt(document.getElementById('f-cantidad').value) || 0;
 
   ps.style.display = 'none';
-  if (!prod || !vendedor) { updatePreview(); return; }
+  // Solo se sugiere precio con los 4 datos completos: producto, vendedor,
+  // cliente y cantidad. La sugerencia corresponde a una venta previa
+  // IDÉNTICA en esos 4 datos; si no existe, el campo queda en blanco.
+  if (!prod || !vendedor || !cliente || cantidad <= 0) {
+    if (precioAutollenado) { document.getElementById('f-precio').value = ''; precioAutollenado = false; }
+    updatePreview();
+    return;
+  }
 
-  // Cache por (vendedor, producto, cantidad). Cantidad 0 = "sin cantidad"
-  const cacheKey = vendedor + '||' + prod + '||' + cantidad;
+  // Cache por (vendedor, cliente, producto, cantidad)
+  const cacheKey = vendedor + '||' + cliente + '||' + prod + '||' + cantidad;
   if (preciosCache[cacheKey] !== undefined) {
     const c = preciosCache[cacheKey];
     if (c.precio > 0) mostrarPrecio(c.precio, c.fuente);
@@ -781,8 +787,11 @@ async function sugerirPrecio() {
     return;
   }
   try {
-    let url = `${SCRIPT_URL}?action=precio&producto=${encodeURIComponent(prod)}&vendedor=${encodeURIComponent(vendedor)}`;
-    if (cantidad > 0) url += `&cantidad=${cantidad}`;
+    const url = `${SCRIPT_URL}?action=precio`
+      + `&producto=${encodeURIComponent(prod)}`
+      + `&vendedor=${encodeURIComponent(vendedor)}`
+      + `&cliente=${encodeURIComponent(cliente)}`
+      + `&cantidad=${cantidad}`;
     const data = await jsonp(url);
     if (data && data.success && data.precio > 0) {
       preciosCache[cacheKey] = { precio: data.precio, fuente: data.fuente };
@@ -799,14 +808,11 @@ async function sugerirPrecio() {
 }
 
 function mostrarPrecio(precio, fuente) {
-  // 'vendedor_cantidad' = match exacto vendedor + cantidad
-  // 'vendedor'          = mismo vendedor, otra cantidad
-  // otro                = otro vendedor (cualquier cantidad)
+  // 'exacto' = venta previa idéntica en vendedor + cliente + producto + cantidad
   const labelMap = {
-    vendedor_cantidad: 'Último precio de este vendedor para esta cantidad',
-    vendedor: 'Último precio de este vendedor (otra cantidad)'
+    exacto: 'Mismo precio de una venta previa idéntica (vendedor, cliente y cantidad)'
   };
-  const label = labelMap[fuente] || 'Último precio registrado (otro vendedor)';
+  const label = labelMap[fuente] || 'Precio de una venta previa';
   document.getElementById('ps-val').textContent = 'S/ ' + parseFloat(precio).toFixed(2) + ' por unidad';
   const lbl = document.querySelector('#price-suggest .ps-label');
   if (lbl) lbl.textContent = label;
@@ -814,7 +820,14 @@ function mostrarPrecio(precio, fuente) {
   ps.style.display = 'block';
   ps.style.opacity = '1';
   const precioInput = document.getElementById('f-precio');
-  if (!precioInput.value) precioInput.value = parseFloat(precio).toFixed(2);
+  // Rellena si está vacío, o reemplaza si el valor previo también fue
+  // autollenado (p.ej. al cambiar la cantidad a otra con match distinto).
+  // No pisa nunca un precio escrito a mano.
+  if (!precioInput.value || precioAutollenado) {
+    precioInput.value = parseFloat(precio).toFixed(2);
+    precioAutollenado = true;
+    clearFieldError('f-precio');
+  }
   updatePreview();
 }
 
@@ -825,8 +838,14 @@ function mostrarPrecio(precio, fuente) {
  */
 function mostrarSinSugerencia() {
   const ps = document.getElementById('price-suggest');
+  // Si el precio actual venía de una sugerencia, lo limpiamos para que no
+  // quede un monto que ya no corresponde a esta combinación.
+  if (precioAutollenado) {
+    document.getElementById('f-precio').value = '';
+    precioAutollenado = false;
+  }
   const lbl = ps.querySelector('.ps-label');
-  if (lbl) lbl.textContent = 'Sin precio histórico para este producto';
+  if (lbl) lbl.textContent = 'No hay una venta previa idéntica';
   document.getElementById('ps-val').textContent = 'Ingresa el precio manualmente';
   ps.style.display = 'block';
   ps.style.opacity = '0.55';
@@ -999,6 +1018,7 @@ function resetForm() {
   document.getElementById('success-card').style.display = 'none';
   document.getElementById('form-wrap').style.display = 'block';
   document.getElementById('btn-submit').disabled = false;
+  precioAutollenado = false;
   document.getElementById('tipo-wrap').innerHTML = '';
   document.getElementById('price-suggest').style.display = 'none';
   document.getElementById('preview').style.display = 'none';
