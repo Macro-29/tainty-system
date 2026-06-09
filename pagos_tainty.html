@@ -75,7 +75,30 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 .btn-save:disabled{opacity:.4;cursor:not-allowed}
 .spinner{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
 }
-@media(max-width:640px){.topbar{padding:.75rem 1rem}.tab-content{padding:1rem}.charts-grid{grid-template-columns:1fr}.chart-card.full{grid-column:1}.stats-row{grid-template-columns:1fr 1fr}.modal{margin:1rem;max-width:100%}.controls{flex-direction:column}}
+.kpi-delta{font-size:11px;margin-top:8px;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.kpi-delta .arrow{font-weight:700}
+.risk-card{background:var(--red-dim);border:1px solid rgba(232,82,74,.3);border-radius:14px;padding:1.25rem;margin-bottom:1.5rem}
+.risk-card.ok{background:var(--green-dim);border-color:rgba(62,207,142,.3)}
+.risk-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.risk-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700}
+.risk-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.risk-amount{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--red);white-space:nowrap}
+.risk-card.ok .risk-amount{color:var(--green)}
+.risk-count{font-size:12px;color:var(--muted);margin:10px 0 2px}
+.risk-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(232,82,74,.15)}
+.risk-cli{font-size:13px;font-weight:500}
+.risk-prod{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+.risk-val{font-family:'DM Mono',monospace;font-size:13px;color:var(--red);white-space:nowrap}
+.risk-more{font-size:12px;color:var(--muted);padding-top:8px;text-align:center}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--text)}
+.sort-ind{font-size:9px;color:var(--purple);margin-left:2px}
+tbody tr.row-riesgo{background:rgba(232,82,74,.07)}
+tbody tr.row-riesgo:hover{background:rgba(232,82,74,.13)}
+tfoot tr{background:var(--surface2);border-top:2px solid var(--border2)}
+tfoot td{padding:11px 14px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500}
+.foot-label{font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted);display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em}
+@media(max-width:640px){.topbar{padding:.75rem 1rem}.tab-content{padding:1rem}.charts-grid{grid-template-columns:1fr}.chart-card.full{grid-column:1}.stats-row{grid-template-columns:1fr 1fr}.modal{margin:1rem;max-width:100%}.controls{flex-direction:column}.risk-head{flex-wrap:wrap}}
 </style>
 <script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
@@ -95,15 +118,8 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
   <button class="tab-nav-btn" onclick="switchTab('lista',this)">&#128203; Lista de pagos</button>
 </div>
 <div class="tab-content active" id="tab-dashboard">
-  <div class="stats-row">
-    <div class="stat-card"><div class="stat-label">Total por cobrar</div><div class="stat-val" style="color:var(--red)" id="s-cobrar">&#8212;</div></div>
-    <div class="stat-card"><div class="stat-label">Pendientes</div><div class="stat-val" style="color:var(--amber)" id="s-pend">&#8212;</div></div>
-    <div class="stat-card"><div class="stat-label">Parciales</div><div class="stat-val" style="color:var(--blue)" id="s-parc">&#8212;</div></div>
-    <div class="stat-card"><div class="stat-label">Realizados</div><div class="stat-val" style="color:var(--green)" id="s-real">&#8212;</div></div>
-    <div class="stat-card"><div class="stat-label">Monto cobrado</div><div class="stat-val" style="color:var(--amber)" id="s-cobrado">&#8212;</div></div>
-  </div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap">
-    <div style="font-size:13px;color:var(--muted)">Filtrar dashboard por mes:</div>
+    <div style="font-size:13px;color:var(--muted)">Mes:</div>
     <select class="sel" id="dash-mes" onchange="renderStats();renderCharts()">
       <option value="">Todos los meses</option>
       <option>ENERO</option><option>FEBRERO</option><option>MARZO</option><option>ABRIL</option>
@@ -112,10 +128,29 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
     </select>
     <div style="font-size:12px;color:var(--hint)" id="dash-mes-label">Mostrando todos los meses</div>
   </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Facturado</div><div class="stat-val" id="k-fact">&#8212;</div><div class="kpi-delta" id="d-fact"></div></div>
+    <div class="stat-card"><div class="stat-label">Cobrado</div><div class="stat-val" style="color:var(--green)" id="k-cobrado">&#8212;</div><div class="kpi-delta" id="d-cobrado"></div></div>
+    <div class="stat-card"><div class="stat-label">Por cobrar</div><div class="stat-val" style="color:var(--red)" id="k-porcobrar">&#8212;</div><div class="kpi-delta" id="d-porcobrar"></div></div>
+    <div class="stat-card"><div class="stat-label">Pedidos</div><div class="stat-val" style="color:var(--blue)" id="k-pedidos">&#8212;</div><div class="kpi-delta" id="d-pedidos"></div></div>
+    <div class="stat-card"><div class="stat-label">Ticket promedio</div><div class="stat-val" style="color:var(--amber)" id="k-ticket">&#8212;</div><div class="kpi-delta" id="d-ticket"></div></div>
+  </div>
+  <div class="risk-card" id="risk-card">
+    <div class="risk-head">
+      <div>
+        <div class="risk-title">&#128680; Entregados sin pagar</div>
+        <div class="risk-sub">Pedidos ya entregados que todav&iacute;a tienen saldo pendiente</div>
+      </div>
+      <div class="risk-amount" id="risk-monto">S/ 0.00</div>
+    </div>
+    <div class="risk-count" id="risk-count"></div>
+    <div id="risk-list"></div>
+  </div>
   <div class="charts-grid">
     <div class="chart-card full"><div class="chart-title">Monto pendiente por mes</div><div class="chart-wrap"><canvas id="chart-meses"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Antig&uuml;edad de la deuda</div><div class="chart-wrap"><canvas id="chart-aging"></canvas></div></div>
     <div class="chart-card"><div class="chart-title">Estado de pagos</div><div class="chart-wrap"><canvas id="chart-estados"></canvas></div></div>
-    <div class="chart-card"><div class="chart-title">Top clientes con deuda</div><div class="chart-wrap"><canvas id="chart-clientes"></canvas></div></div>
+    <div class="chart-card full"><div class="chart-title">Top clientes con deuda</div><div class="chart-wrap"><canvas id="chart-clientes"></canvas></div></div>
   </div>
 </div>
 <div class="tab-content" id="tab-lista">
@@ -133,8 +168,21 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
     <button class="btn-add-pago" onclick="abrirModalBuscar()">+ Agregar pago</button>
   </div>
   <div class="table-wrap"><div class="table-scroll"><table>
-    <thead><tr><th>N&#176; Pedido</th><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Cantidad</th><th>Precio/und</th><th>Total</th><th>Abonos</th><th>Restante</th><th>Estado</th><th>Accion</th></tr></thead>
+    <thead><tr>
+      <th class="sortable" data-col="numPedido" onclick="sortBy('numPedido')">N&#176; Pedido <span class="sort-ind"></span></th>
+      <th class="sortable" data-col="fecha" onclick="sortBy('fecha')">Fecha <span class="sort-ind"></span></th>
+      <th class="sortable" data-col="cliente" onclick="sortBy('cliente')">Cliente <span class="sort-ind"></span></th>
+      <th class="sortable" data-col="producto" onclick="sortBy('producto')">Producto <span class="sort-ind"></span></th>
+      <th class="sortable" data-col="cantidad" onclick="sortBy('cantidad')">Cantidad <span class="sort-ind"></span></th>
+      <th>Precio/und</th>
+      <th class="sortable" data-col="total" onclick="sortBy('total')">Total <span class="sort-ind"></span></th>
+      <th>Abonos</th>
+      <th class="sortable" data-col="restante" onclick="sortBy('restante')">Restante <span class="sort-ind"></span></th>
+      <th class="sortable" data-col="estado" onclick="sortBy('estado')">Estado <span class="sort-ind"></span></th>
+      <th>Accion</th>
+    </tr></thead>
     <tbody id="tabla-body"><tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted)"><div class="spinner"></div>Cargando...</td></tr></tbody>
+    <tfoot id="tabla-foot"></tfoot>
   </table></div></div>
 </div>
 <div class="modal-overlay" id="modal-abono">
@@ -175,8 +223,14 @@ if (!requireLogin()) {
 }
 const MESES=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 let pagos=[],filtroActual='todos',pedidoActual=null,charts={};
+let sortCol=null,sortDir=1,mesInicializado=false;
+// Columnas numéricas/fecha: primer clic ordena descendente (más grande/reciente arriba).
+const SORT_DESC_FIRST=['fecha','cantidad','total','restante'];
+function getSortValue(p,col){switch(col){case'fecha':{const d=new Date(p.fecha);return isNaN(d)?0:d.getTime();}case'cliente':return(p.cliente||'').toLowerCase();case'producto':return(p.producto||'').toLowerCase();case'numPedido':return(p.numPedido||'').toLowerCase();case'cantidad':return parseInt(p.cantidad||0);case'total':return parseFloat(p.montoTotal||0);case'restante':return getRestante(p);case'estado':return{pendiente:0,parcial:1,realizado:2}[getEstadoPago(p)];default:return 0;}}
+function sortBy(col){if(sortCol===col){sortDir=-sortDir;}else{sortCol=col;sortDir=SORT_DESC_FIRST.includes(col)?-1:1;}renderTabla();}
+function updateSortIndicators(){document.querySelectorAll('th.sortable').forEach(th=>{const ind=th.querySelector('.sort-ind');if(!ind)return;ind.textContent=(th.dataset.col===sortCol)?(sortDir===1?'▲':'▼'):'';});}
 function switchTab(id,btn){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='dashboard')renderCharts();}
-async function cargarPagos(){try{const res=await jsonp(SCRIPT_URL+'?action=pagos&t='+Date.now());if(res.success&&res.pagos){pagos=res.pagos;poblarFiltroClientes();renderStats();renderCharts();renderTabla();}}catch(e){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--red)">Error al conectar.</td></tr>';}}
+async function cargarPagos(){try{const res=await jsonp(SCRIPT_URL+'?action=pagos&t='+Date.now());if(res.success&&res.pagos){pagos=res.pagos;if(!mesInicializado){const fm=document.getElementById('filtro-mes');const mesActual=MESES[new Date().getMonth()];if(fm)fm.value=mesActual;mesInicializado=true;}poblarFiltroClientes();renderStats();renderCharts();renderTabla();}}catch(e){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--red)">Error al conectar.</td></tr>';}}
 // Pobla el dropdown de clientes mostrando SOLO los que tienen al menos un
 // pedido que matchea el filtro de estado actual (todos / pendiente / parcial /
 // realizado). Preserva la selección actual si el cliente sigue disponible;
@@ -204,10 +258,65 @@ function esEntregado(estado){return (estado||'').toString().toLowerCase().includ
 function getSiguienteAbono(p){if(!p.abono1||parseFloat(p.abono1)===0)return 1;if(!p.abono2||parseFloat(p.abono2)===0)return 2;if(!p.abono3||parseFloat(p.abono3)===0)return 3;if(!p.abono4||parseFloat(p.abono4)===0)return 4;return null;}
 function getMesPedido(p){if(p.mes)return(p.mes||'').toString().toUpperCase().trim();const f=p.fecha?new Date(p.fecha):null;if(f&&!isNaN(f))return MESES[f.getMonth()];return'';}
 function getPagosFiltrados(){const m=document.getElementById('dash-mes')?document.getElementById('dash-mes').value:'';const label=document.getElementById('dash-mes-label');if(label)label.textContent=m?'Mostrando: '+m:'Mostrando todos los meses';if(!m)return pagos;return pagos.filter(p=>getMesPedido(p)===m);}
-function renderStats(){const lista=getPagosFiltrados();const pend=lista.filter(p=>getEstadoPago(p)==='pendiente').length;const parc=lista.filter(p=>getEstadoPago(p)==='parcial').length;const real=lista.filter(p=>getEstadoPago(p)==='realizado').length;const cobrar=lista.reduce((s,p)=>s+getRestante(p),0);const cobrado=lista.reduce((s,p)=>s+getTotalAbonado(p),0);document.getElementById('s-cobrar').textContent='S/ '+cobrar.toLocaleString('es-PE',{minimumFractionDigits:2});document.getElementById('s-pend').textContent=pend;document.getElementById('s-parc').textContent=parc;document.getElementById('s-real').textContent=real;document.getElementById('s-cobrado').textContent='S/ '+cobrado.toLocaleString('es-PE',{minimumFractionDigits:2});}
+function money(n){return 'S/ '+(parseFloat(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});}
+// Agrega los totales clave de una lista de pedidos.
+function aggLista(lista){let facturado=0,cobrado=0,porCobrar=0;lista.forEach(p=>{facturado+=parseFloat(p.montoTotal)||0;cobrado+=getTotalAbonado(p);porCobrar+=getRestante(p);});const pedidos=lista.length;return{facturado,cobrado,porCobrar,pedidos,ticket:pedidos>0?facturado/pedidos:0};}
+function pagosDeMes(mes){return pagos.filter(p=>getMesPedido(p)===mes);}
+// Pinta el indicador de variación vs el mes anterior. goodDir indica qué
+// dirección es "buena": 'up' (más es mejor: facturado, cobrado, pedidos) o
+// 'down' (más es peor: por cobrar).
+function setDelta(id,actual,anterior,goodDir,prevMes,fmt){
+  const el=document.getElementById(id);if(!el)return;
+  if(anterior===null||anterior===undefined){el.innerHTML='<span style="color:var(--hint)">sin '+(prevMes?prevMes.toLowerCase():'mes previo')+'</span>';return;}
+  const diff=actual-anterior;
+  const pct=anterior!==0?(diff/Math.abs(anterior)*100):(actual>0?100:0);
+  const arrow=diff>0?'&#9650;':diff<0?'&#9660;':'&#9632;';
+  const isGood=goodDir==='up'?diff>=0:diff<=0;
+  const color=diff===0?'var(--hint)':(isGood?'var(--green)':'var(--red)');
+  const pctTxt=(diff>0?'+':'')+pct.toFixed(0)+'%';
+  el.innerHTML=`<span class="arrow" style="color:${color}">${arrow} ${pctTxt}</span> <span style="color:var(--hint)">vs ${prevMes.toLowerCase()}</span>`;
+}
+function renderStats(){
+  const lista=getPagosFiltrados();
+  const a=aggLista(lista);
+  document.getElementById('k-fact').textContent=money(a.facturado);
+  document.getElementById('k-cobrado').textContent=money(a.cobrado);
+  document.getElementById('k-porcobrar').textContent=money(a.porCobrar);
+  document.getElementById('k-pedidos').textContent=a.pedidos;
+  document.getElementById('k-ticket').textContent=money(a.ticket);
+  // Comparativa vs mes anterior: solo cuando hay un mes seleccionado.
+  const m=document.getElementById('dash-mes')?document.getElementById('dash-mes').value:'';
+  const deltaIds=['d-fact','d-cobrado','d-porcobrar','d-pedidos','d-ticket'];
+  if(m){
+    const idx=MESES.indexOf(m);
+    const prevMes=idx>0?MESES[idx-1]:null;
+    const prev=prevMes?aggLista(pagosDeMes(prevMes)):null;
+    setDelta('d-fact',a.facturado,prev?prev.facturado:null,'up',prevMes);
+    setDelta('d-cobrado',a.cobrado,prev?prev.cobrado:null,'up',prevMes);
+    setDelta('d-porcobrar',a.porCobrar,prev?prev.porCobrar:null,'down',prevMes);
+    setDelta('d-pedidos',a.pedidos,prev?prev.pedidos:null,'up',prevMes);
+    setDelta('d-ticket',a.ticket,prev?prev.ticket:null,'up',prevMes);
+  }else{
+    deltaIds.forEach(id=>{document.getElementById(id).innerHTML='<span style="color:var(--hint)">elige un mes para comparar</span>';});
+  }
+  renderRiesgo(lista);
+}
+// Bloque de riesgo: pedidos ya entregados (estado contiene "entregado") que aún
+// tienen saldo pendiente. Es plata ya "gastada" en producto pero no cobrada.
+function renderRiesgo(lista){
+  const riesgo=lista.filter(p=>esEntregado(p.estado)&&getRestante(p)>0).sort((a,b)=>getRestante(b)-getRestante(a));
+  const monto=riesgo.reduce((s,p)=>s+getRestante(p),0);
+  document.getElementById('risk-monto').textContent=money(monto);
+  document.getElementById('risk-count').textContent=riesgo.length?`${riesgo.length} pedido${riesgo.length===1?'':'s'} entregado${riesgo.length===1?'':'s'} con saldo pendiente`:'Sin pedidos entregados con deuda \u{1F389}';
+  document.getElementById('risk-card').classList.toggle('ok',riesgo.length===0);
+  const top=riesgo.slice(0,6);
+  document.getElementById('risk-list').innerHTML=riesgo.length
+    ?top.map(p=>`<div class="risk-row"><div><div class="risk-cli">${p.cliente||''}</div><div class="risk-prod">${p.numPedido||''} · ${p.producto||''}</div></div><div class="risk-val">${money(getRestante(p))}</div></div>`).join('')+(riesgo.length>6?`<div class="risk-more">+${riesgo.length-6} más…</div>`:'')
+    :'';
+}
 function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 function renderCharts(){
-  destroyChart('meses');destroyChart('estados');destroyChart('clientes');
+  destroyChart('meses');destroyChart('estados');destroyChart('clientes');destroyChart('aging');
   const lista=getPagosFiltrados();
   const porMes={};MESES.forEach(m=>porMes[m]=0);
   lista.forEach(p=>{const m=getMesPedido(p);const r=getRestante(p);if(m&&r>0)porMes[m]=(porMes[m]||0)+r;});
@@ -218,6 +327,16 @@ function renderCharts(){
   const deudaCliente={};lista.filter(p=>getRestante(p)>0).forEach(p=>{deudaCliente[p.cliente]=(deudaCliente[p.cliente]||0)+getRestante(p);});
   const top=Object.entries(deudaCliente).sort((a,b)=>b[1]-a[1]).slice(0,8);
   charts['clientes']=new Chart(document.getElementById('chart-clientes'),{type:'bar',data:{labels:top.map(x=>x[0]),datasets:[{label:'Deuda',data:top.map(x=>x[1]),backgroundColor:'rgba(124,111,239,0.7)',borderRadius:6,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#7a7a8a',callback:v=>'S/'+v.toLocaleString()}},y:{ticks:{color:'#7a7a8a',font:{size:11}}}}}});
+  // Antigüedad de la deuda: distribuye el saldo pendiente por días desde la
+  // fecha del pedido en tramos 0-30 / 31-60 / 61-90 / +90.
+  const buckets={'0-30 d':0,'31-60 d':0,'61-90 d':0,'+90 d':0};
+  const hoy=new Date();
+  lista.filter(p=>getRestante(p)>0).forEach(p=>{
+    const d=p.fecha?new Date(p.fecha):null;if(!d||isNaN(d))return;
+    const dias=Math.floor((hoy-d)/86400000);const r=getRestante(p);
+    if(dias<=30)buckets['0-30 d']+=r;else if(dias<=60)buckets['31-60 d']+=r;else if(dias<=90)buckets['61-90 d']+=r;else buckets['+90 d']+=r;
+  });
+  charts['aging']=new Chart(document.getElementById('chart-aging'),{type:'bar',data:{labels:Object.keys(buckets),datasets:[{label:'Deuda',data:Object.values(buckets),backgroundColor:['#3ecf8e','#f5a623','#f5824a','#e8524a'],borderRadius:6,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#7a7a8a'}},y:{ticks:{color:'#7a7a8a',callback:v=>'S/'+v.toLocaleString()}}}}});
 }
 // Devuelve la lista de pagos respetando todos los filtros activos en la UI
 // (search, mes, cliente y filtro de estado). Usado por renderTabla y por
@@ -236,9 +355,25 @@ function getListaFiltrada(){
   });
 }
 
+function renderFoot(lista){
+  const foot=document.getElementById('tabla-foot');if(!foot)return;
+  if(!lista.length){foot.innerHTML='';return;}
+  const a=aggLista(lista);
+  foot.innerHTML=`<tr>
+    <td colspan="4"><span class="foot-label">Pedidos</span>${a.pedidos}</td>
+    <td colspan="2" style="text-align:right"><span class="foot-label">Total facturado</span></td>
+    <td><span style="color:var(--text)">${money(a.facturado)}</span></td>
+    <td style="text-align:right"><span class="foot-label">Cobrado</span><span style="color:var(--green)">${money(a.cobrado)}</span></td>
+    <td><span class="foot-label">Por cobrar</span><span style="color:var(--red)">${money(a.porCobrar)}</span></td>
+    <td colspan="2"></td>
+  </tr>`;
+}
 function renderTabla(){
   const filtroCliente=document.getElementById('filtro-cliente').value;
   let lista=getListaFiltrada();
+  if(sortCol){lista=lista.slice().sort((a,b)=>{const va=getSortValue(a,sortCol),vb=getSortValue(b,sortCol);if(va<vb)return -sortDir;if(va>vb)return sortDir;return 0;});}
+  updateSortIndicators();
+  renderFoot(lista);
   if(!lista.length){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--hint)">No hay resultados</td></tr>';return;}
   document.getElementById('tabla-body').innerHTML=lista.map(p=>{
     const est=getEstadoPago(p);const restante=getRestante(p);const abonado=getTotalAbonado(p);const total=parseFloat(p.montoTotal)||0;
@@ -257,7 +392,8 @@ function renderTabla(){
     const dotEntregado = entregado
       ? '<span title="Entregado" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:middle;box-shadow:0 0 4px rgba(62,207,142,.5)"></span>'
       : '';
-    return`<tr><td>${dotEntregado}<span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span></td><td><span class="td-mono" style="color:var(--blue)">${cantidad.toLocaleString()} und</span></td><td><span class="td-mono" style="color:var(--muted)">S/ ${precioUnd.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${pct}%;background:${pc2}"></div></div><span style="font-size:10px;color:var(--hint)">${pct}% abonado</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
+    const filaRiesgo = entregado && restante > 0;
+    return`<tr class="${filaRiesgo?'row-riesgo':''}" ${filaRiesgo?'title="Entregado con saldo pendiente"':''}><td>${dotEntregado}<span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span></td><td><span class="td-mono" style="color:var(--blue)">${cantidad.toLocaleString()} und</span></td><td><span class="td-mono" style="color:var(--muted)">S/ ${precioUnd.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${pct}%;background:${pc2}"></div></div><span style="font-size:10px;color:var(--hint)">${pct}% abonado</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
   }).join('');
 }
 function setFiltro(f,btn){
