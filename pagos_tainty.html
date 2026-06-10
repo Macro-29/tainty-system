@@ -465,7 +465,7 @@ function copiarSaldoCliente(numPedido){
     `✅ Ya abonaste: ${m(abonado)}`,
     `⚠️ Te queda por pagar: ${m(restante)}`,
     ``,
-    `Cuando puedas realizar el pago nos avisas 🙌 Cualquier consulta quedamos atentos. ¡Gracias por confiar en nosotros! 🌿`
+    `Si ya realizaste el pago, por favor envíanos el comprobante 📲. Si aún no, indícanos por favor si lo estarás abonando hoy o a más tardar mañana. ¡Gracias por confiar en nosotros! 🌿`
   ];
   navigator.clipboard.writeText(lineas.join('\n'))
     .then(()=>mostrarToast('Mensaje de saldo copiado',{type:'success',duration:2200}))
