@@ -374,6 +374,11 @@ function renderTabla(){
   if(sortCol){lista=lista.slice().sort((a,b)=>{const va=getSortValue(a,sortCol),vb=getSortValue(b,sortCol);if(va<vb)return -sortDir;if(va>vb)return sortDir;return 0;});}
   updateSortIndicators();
   renderFoot(lista);
+  // Cuenta, sobre TODOS los pagos, cuántos pedidos entregados-con-saldo tiene
+  // cada cliente. Sirve para mostrar el botón de mensaje consolidado solo a los
+  // clientes con 2+ pedidos entregados pendientes.
+  const entregadosPendPorCliente={};
+  pagos.forEach(p=>{if(esEntregado(p.estado)&&getRestante(p)>0){const k=p.cliente||'';entregadosPendPorCliente[k]=(entregadosPendPorCliente[k]||0)+1;}});
   if(!lista.length){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--hint)">No hay resultados</td></tr>';return;}
   document.getElementById('tabla-body').innerHTML=lista.map(p=>{
     const est=getEstadoPago(p);const restante=getRestante(p);const abonado=getTotalAbonado(p);const total=parseFloat(p.montoTotal)||0;
@@ -383,8 +388,10 @@ function renderTabla(){
     const abonosHtml=[[p.abono1,p.fecha1],[p.abono2,p.fecha2],[p.abono3,p.fecha3],[p.abono4,p.fecha4]].filter(([a])=>a&&parseFloat(a)>0).map(([a,f],i)=>`<div class="abono-row"><span class="abono-num">${i+1}&deg;</span><span class="abono-monto">S/ ${parseFloat(a).toLocaleString('es-PE',{minimumFractionDigits:2})}</span><span class="abono-fecha">${f||''}</span></div>`).join('');
     const btnCopiar=`<button class="btn-abono" style="background:var(--surface2);border-color:var(--border2);color:var(--muted)" onclick="copiarPedido('${p.numPedido}')" title="Copiar resumen del pago">&#128203;</button>`;
     const btnSaldo=restante>0?`<button class="btn-abono" style="background:var(--green-dim);border-color:rgba(62,207,142,.3);color:var(--green)" onclick="copiarSaldoCliente('${p.numPedido}')" title="Copiar mensaje de saldo para el cliente">&#128172;</button>`:'';
+    const nEntregadosPend=entregadosPendPorCliente[p.cliente||'']||0;
+    const btnEntregados=nEntregadosPend>=2?`<button class="btn-abono" style="background:var(--red-dim);border-color:rgba(232,82,74,.3);color:var(--red)" onclick="copiarSaldoEntregadosCliente('${p.numPedido}')" title="Copiar mensaje: ${nEntregadosPend} pedidos entregados con saldo pendiente">&#128230; ${nEntregadosPend}</button>`:'';
     const btnPrincipal=est==='realizado'?'<span style="font-size:12px;color:var(--green)">Pagado</span>':sig?`<button class="btn-abono" onclick="abrirModal('${p.numPedido}')">+ Abono</button>`:'<span style="font-size:11px;color:var(--hint)">Max</span>';
-    const accion=`<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${btnPrincipal}${btnSaldo}${btnCopiar}</div>`;
+    const accion=`<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${btnPrincipal}${btnSaldo}${btnEntregados}${btnCopiar}</div>`;
     const pc2=pct===100?'var(--green)':pct>0?'var(--amber)':'var(--red)';
     const fechaStr=p.fecha?String(p.fecha).split('T')[0]:'';
     const cantidad=parseInt(p.cantidad||0);
@@ -469,6 +476,36 @@ function copiarSaldoCliente(numPedido){
   ];
   navigator.clipboard.writeText(lineas.join('\n'))
     .then(()=>mostrarToast('Mensaje de saldo copiado',{type:'success',duration:2200}))
+    .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
+}
+
+/**
+ * Copia un mensaje consolidado para un cliente que tiene VARIOS pedidos ya
+ * entregados con saldo pendiente. Lista cada pedido con su saldo y el total a
+ * cancelar. Se invoca desde cualquier fila del cliente (vía su numPedido).
+ */
+function copiarSaldoEntregadosCliente(numPedido){
+  const ref=pagos.find(x=>x.numPedido===numPedido);
+  if(!ref){mostrarToast('Pedido no encontrado',{type:'error',duration:2500});return;}
+  const lista=pagos.filter(p=>(p.cliente||'')===(ref.cliente||'')&&esEntregado(p.estado)&&getRestante(p)>0)
+    .sort((a,b)=>{const fa=new Date(a.fecha),fb=new Date(b.fecha);if(!isNaN(fa)&&!isNaN(fb))return fa-fb;return (a.numPedido||'').localeCompare(b.numPedido||'');});
+  if(!lista.length){mostrarToast('Sin pedidos entregados con saldo',{type:'error',duration:2500});return;}
+  const m=n=>`S/ ${(parseFloat(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const nombre=(ref.cliente||'').toString().trim().toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+  const totalPend=lista.reduce((s,p)=>s+getRestante(p),0);
+  const lineas=[
+    `Hola ${nombre} 😊`,
+    ``,
+    `Esperamos que estés muy bien. Te escribimos para recordarte que tienes ${lista.length} pedidos ya entregados con saldo pendiente por cancelar:`,
+    ``,
+    ...lista.map(p=>`📦 ${p.producto||''} (${parseInt(p.cantidad||0).toLocaleString('en-US')} und) — Te queda por pagar: ${m(getRestante(p))}`),
+    ``,
+    `💰 Total pendiente: ${m(totalPend)}`,
+    ``,
+    `Si ya realizaste el pago, por favor envíanos el comprobante 📲. Si aún no, indícanos por favor si lo estarás abonando hoy o a más tardar mañana. ¡Gracias por confiar en nosotros! 🌿`
+  ];
+  navigator.clipboard.writeText(lineas.join('\n'))
+    .then(()=>mostrarToast(`Mensaje de ${lista.length} pedidos copiado`,{type:'success',duration:2200}))
     .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
 }
 
