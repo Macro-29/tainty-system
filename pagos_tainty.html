@@ -382,8 +382,9 @@ function renderTabla(){
     const badgeTxt=est==='realizado'?'Realizado':est==='parcial'?'Parcial':'Pendiente';
     const abonosHtml=[[p.abono1,p.fecha1],[p.abono2,p.fecha2],[p.abono3,p.fecha3],[p.abono4,p.fecha4]].filter(([a])=>a&&parseFloat(a)>0).map(([a,f],i)=>`<div class="abono-row"><span class="abono-num">${i+1}&deg;</span><span class="abono-monto">S/ ${parseFloat(a).toLocaleString('es-PE',{minimumFractionDigits:2})}</span><span class="abono-fecha">${f||''}</span></div>`).join('');
     const btnCopiar=`<button class="btn-abono" style="background:var(--surface2);border-color:var(--border2);color:var(--muted)" onclick="copiarPedido('${p.numPedido}')" title="Copiar resumen del pago">&#128203;</button>`;
+    const btnSaldo=restante>0?`<button class="btn-abono" style="background:var(--green-dim);border-color:rgba(62,207,142,.3);color:var(--green)" onclick="copiarSaldoCliente('${p.numPedido}')" title="Copiar mensaje de saldo para el cliente">&#128172;</button>`:'';
     const btnPrincipal=est==='realizado'?'<span style="font-size:12px;color:var(--green)">Pagado</span>':sig?`<button class="btn-abono" onclick="abrirModal('${p.numPedido}')">+ Abono</button>`:'<span style="font-size:11px;color:var(--hint)">Max</span>';
-    const accion=`<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${btnPrincipal}${btnCopiar}</div>`;
+    const accion=`<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${btnPrincipal}${btnSaldo}${btnCopiar}</div>`;
     const pc2=pct===100?'var(--green)':pct>0?'var(--amber)':'var(--red)';
     const fechaStr=p.fecha?String(p.fecha).split('T')[0]:'';
     const cantidad=parseInt(p.cantidad||0);
@@ -437,6 +438,38 @@ function copiarPedido(numPedido){
   const texto=lineas.join('\n');
   navigator.clipboard.writeText(texto)
     .then(()=>mostrarToast('Resumen copiado',{type:'success',duration:2000}))
+    .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
+}
+
+/**
+ * Copia un mensaje AMABLE orientado al cliente con el saldo pendiente de UN
+ * pedido, listo para pegar en WhatsApp/SMS. Distinto de copiarPedido (que es
+ * un resumen interno). Solo tiene sentido cuando hay saldo > 0.
+ */
+function copiarSaldoCliente(numPedido){
+  const p=pagos.find(x=>x.numPedido===numPedido);
+  if(!p){mostrarToast('Pedido no encontrado',{type:'error',duration:2500});return;}
+  const total=parseFloat(p.montoTotal)||0;
+  const abonado=getTotalAbonado(p);
+  const restante=getRestante(p);
+  const cant=parseInt(p.cantidad||0).toLocaleString('en-US');
+  const m=n=>`S/ ${(parseFloat(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  // Nombre en formato "Título" (de NUEVO CLIENTE -> Nuevo Cliente) para un trato más cordial.
+  const nombre=(p.cliente||'').toString().trim().toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+  const lineas=[
+    `Hola ${nombre} 👋`,
+    ``,
+    `Te compartimos el estado de tu pedido en *Tainty Labs*:`,
+    ``,
+    `📦 ${p.producto||''} (${cant} und)`,
+    `💵 Total: ${m(total)}`,
+    `✅ Abonado: ${m(abonado)}`,
+    `⚠️ Saldo pendiente: ${m(restante)}`,
+    ``,
+    `Cualquier consulta quedamos atentos. ¡Gracias por tu preferencia! 🌿`
+  ];
+  navigator.clipboard.writeText(lineas.join('\n'))
+    .then(()=>mostrarToast('Mensaje de saldo copiado',{type:'success',duration:2200}))
     .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
 }
 
