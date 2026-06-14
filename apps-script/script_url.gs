@@ -132,8 +132,11 @@ function guardarNuevoPedido(data) {
   sheet.getRange(nuevaFila, 12).setValue(mes);
   sheet.getRange(nuevaFila, 13).setValue(fechaTentativaStr);
   sheet.getRange(nuevaFila, 15).setValue(data.observaciones || '');
+  // Columna P (16): condición de pago. 'A CRÉDITO' o 'CONTADO'.
+  sheet.getRange(nuevaFila, 16).setValue(data.condicion || 'CONTADO');
+  try { if (!sheet.getRange(1, 16).getValue()) sheet.getRange(1, 16).setValue('CONDICIÓN DE PAGO'); } catch(e) {}
   try { sheet.getRange(nuevaFila, 13).setNumberFormat('dd/MM/yyyy'); } catch(e) {}
-  try { sheet.getRange(nuevaFila, 1, 1, 15).setHorizontalAlignment('center'); } catch(e) {}
+  try { sheet.getRange(nuevaFila, 1, 1, 16).setHorizontalAlignment('center'); } catch(e) {}
 
   try { if (data.cliente) agregarASimple(CLIENTES_SHEET, data.cliente); } catch(e) {}
   try { if (data.producto) agregarASimple(PRODUCTOS_SHEET, data.producto); } catch(e) {}

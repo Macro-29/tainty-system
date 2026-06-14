@@ -331,6 +331,8 @@ input.invalid, select.invalid, textarea.invalid{
 }
 .chip:hover{border-color:var(--purple);color:var(--purple)}
 .chip.active{background:var(--purple-light);border-color:var(--purple);color:var(--purple-dark);font-weight:600}
+.chip.credito:hover{border-color:var(--amber);color:var(--amber)}
+.chip.credito.active{background:var(--amber-light);border-color:var(--amber);color:var(--amber)}
 
 /* Sugerencia de precio: animación suave */
 .price-suggest{transition:opacity .25s ease, transform .25s ease}
@@ -490,6 +492,7 @@ input.invalid, select.invalid, textarea.invalid{
           <span class="chip" onclick="setAbono(0)">Sin abono</span>
           <span class="chip" onclick="setAbono(50)">50%</span>
           <span class="chip" onclick="setAbono(100)">100%</span>
+          <span class="chip credito" onclick="setCredito()">A crédito</span>
         </div>
       </div>
     </div>
@@ -543,6 +546,8 @@ const preciosCache = {};
 // Permite reemplazarlo o limpiarlo al cambiar los datos sin pisar un
 // monto escrito a mano.
 let precioAutollenado = false;
+// true cuando el pedido se marca como venta a crédito (abono 0, sin pago inicial).
+let esCredito = false;
 
 function getTipo(nombre) {
   const n = nombre.toLowerCase();
@@ -580,13 +585,25 @@ function setCantidad(n) {
   updateProgress();
 }
 function setAbono(pct) {
+  esCredito = false;
+  const ab = document.getElementById('f-abono');
+  ab.disabled = false;
   const precio = parseFloat(document.getElementById('f-precio').value) || 0;
   const cant = parseInt(document.getElementById('f-cantidad').value) || 0;
   const total = precio * cant;
-  const ab = document.getElementById('f-abono');
   if (pct === 0) ab.value = '';
   else ab.value = (total * pct / 100).toFixed(2);
   syncChips('chips-abono', pct === 0 ? 'Sin abono' : pct + '%');
+  updatePreview();
+}
+
+// Marca el pedido como venta a crédito: abono 0 y campo de abono bloqueado.
+function setCredito() {
+  esCredito = true;
+  const ab = document.getElementById('f-abono');
+  ab.value = '';
+  ab.disabled = true;
+  syncChips('chips-abono', 'A crédito');
   updatePreview();
 }
 function syncChips(containerId, activeText) {
@@ -625,7 +642,9 @@ function updateActionTotal() {
   }
   const total = precio * cant;
   valEl.textContent = 'S/ ' + total.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-  if (abono > 0) {
+  if (esCredito) {
+    subEl.textContent = 'A crédito · saldo total S/ ' + total.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+  } else if (abono > 0) {
     const pct = Math.round((abono / total) * 100);
     const saldo = total - abono;
     subEl.textContent = 'Abonado ' + pct + '% · saldo S/ ' + saldo.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -873,7 +892,7 @@ function updatePreview() {
     <div class="preview-row"><span class="preview-key">Cantidad</span><span class="preview-val">${cant.toLocaleString()} und</span></div>
     <div class="preview-row"><span class="preview-key">Precio unitario</span><span class="preview-val">S/ ${precio.toFixed(2)}</span></div>
     <div class="preview-row"><span class="preview-key">Monto total</span><span class="preview-val">S/ ${total.toLocaleString('es-PE', {minimumFractionDigits:2})}</span></div>
-    <div class="preview-row"><span class="preview-key">Abonado</span><span class="preview-val">${abono > 0 ? 'S/ ' + abono.toFixed(2) + ' (' + pct + ')' : '—'}</span></div>
+    <div class="preview-row"><span class="preview-key">${esCredito ? 'Condición' : 'Abonado'}</span><span class="preview-val">${esCredito ? 'A crédito (saldo total pendiente)' : (abono > 0 ? 'S/ ' + abono.toFixed(2) + ' (' + pct + ')' : '—')}</span></div>
   `;
 
   document.getElementById('preview-insumos').innerHTML = getInsumos(tipo)
@@ -910,7 +929,7 @@ function copiarPreview() {
     `📦 Producto: ${prod} - ${cant.toLocaleString()} und`,
     `💵 Precio unitario: ${money(precio)}`,
     `💰 Monto total: ${money(total)}`,
-    abono > 0 ? `💸 Abonado: ${money(abono)} (${pct}%)` : null
+    esCredito ? `🧾 A crédito (saldo total: ${money(total)})` : (abono > 0 ? `💸 Abonado: ${money(abono)} (${pct}%)` : null)
   ].filter(Boolean);
   const texto = lineas.join('\n');
   navigator.clipboard.writeText(texto)
@@ -980,7 +999,8 @@ async function submitForm() {
     action: 'guardarPedido',
     fecha, cliente: clienteRaw, producto: prod,
     cantidad: cant, precio, abono: abono || 0,
-    vendedor, observaciones: obs
+    vendedor, observaciones: obs,
+    condicion: esCredito ? 'A CRÉDITO' : 'CONTADO'
   };
 
   try {
@@ -999,7 +1019,7 @@ async function submitForm() {
     document.getElementById('form-wrap').style.display = 'none';
     document.getElementById('success-num').textContent = data.numPedido || '(registrado)';
     const total = (parseFloat(precio) * parseInt(cant)).toLocaleString('es-PE', {minimumFractionDigits:2});
-    document.getElementById('success-det').textContent = `${prod} · ${parseInt(cant).toLocaleString()} und · S/ ${total} · ${clienteRaw}`;
+    document.getElementById('success-det').textContent = `${prod} · ${parseInt(cant).toLocaleString()} und · S/ ${total} · ${clienteRaw}${esCredito ? ' · A crédito' : ''}`;
     document.getElementById('success-card').style.display = 'block';
 
   } catch(err) {
@@ -1019,6 +1039,8 @@ function resetForm() {
   document.getElementById('form-wrap').style.display = 'block';
   document.getElementById('btn-submit').disabled = false;
   precioAutollenado = false;
+  esCredito = false;
+  document.getElementById('f-abono').disabled = false;
   document.getElementById('tipo-wrap').innerHTML = '';
   document.getElementById('price-suggest').style.display = 'none';
   document.getElementById('preview').style.display = 'none';
