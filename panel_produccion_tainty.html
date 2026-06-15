@@ -85,6 +85,7 @@
 .ticket-estado-select{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer}
 .ticket-estado-select:focus{outline:none;border-color:var(--purple)}
 .nuevo-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--green-dim);color:var(--green);border:1px solid rgba(62,207,142,.3);letter-spacing:.04em;margin-left:6px;vertical-align:middle;animation:pulse 2s infinite}
+.credito-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,.35);letter-spacing:.04em;margin-left:6px;vertical-align:middle}
 
 .estado-select{font-family:'DM Sans',sans-serif;font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);cursor:pointer;display:none}
 .estado-select.visible{display:block}
@@ -384,6 +385,7 @@ function renderTicket(p){
       <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
         <div class="ticket-num" style="margin:0">${p.numPedido||''}</div>
         ${esNuevo(p)?'<span class="nuevo-badge">NUEVO</span>':''}
+        ${esCreditoPedido(p)?'<span class="credito-badge">A cr&eacute;dito</span>':''}
         <button onclick="copiarMensajeCliente('${p.numPedido}')" title="Copiar mensaje para el cliente" style="margin-left:auto;font-size:11px;padding:3px 9px;border-radius:7px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);cursor:pointer;white-space:nowrap">&#128203; Cliente</button>
       </div>
       <div class="ticket-product">${p.producto||'—'}</div>
@@ -446,6 +448,12 @@ function esNuevo(p){
   const f=parseFecha(p.fecha);
   if(!f||isNaN(f))return false;
   return(new Date()-f)<172800000;
+}
+
+// true si el pedido fue registrado como venta a crédito (columna Condición de pago)
+function esCreditoPedido(p){
+  const c=(p&&p.condicion||'').toString().trim().toUpperCase();
+  return c && c!=='CONTADO';
 }
 
 function renderGrid(){

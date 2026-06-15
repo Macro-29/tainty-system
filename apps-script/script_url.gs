@@ -187,7 +187,8 @@ function doGet(e) {
         numPedido: row[0], fecha: row[2], cliente: row[3],
         producto: row[4], cantidad: row[5], vendedor: row[6],
         precio: row[7], montoTotal: row[8], abono: row[9],
-        fechaTentativa: row[12], estado: row[13], observaciones: row[14]
+        fechaTentativa: row[12], estado: row[13], observaciones: row[14],
+        condicion: row[15]
       });
     }
     result = { success: true, pedidos: pedidos };
@@ -223,12 +224,16 @@ function doGet(e) {
     // Así cada pago puede incluir su estado (entregado, en camino, etc.) sin
     // requerir un segundo request desde el cliente.
     const estadosPedido = {};
+    const condicionPedido = {};
     const sheetPed = ss.getSheetByName(SHEET_NAME);
     if (sheetPed) {
       const dataPed = sheetPed.getDataRange().getValues();
       for (let i = 1; i < dataPed.length; i++) {
         const np = dataPed[i][0];
-        if (np) estadosPedido[np] = (dataPed[i][13] || '').toString();
+        if (np) {
+          estadosPedido[np] = (dataPed[i][13] || '').toString();
+          condicionPedido[np] = (dataPed[i][15] || '').toString();
+        }
       }
     }
 
@@ -244,7 +249,8 @@ function doGet(e) {
         abono3:r[12], fecha3:r[13], restante3:r[14],
         abono4:r[15], fecha4:r[16], restante4:r[17],
         detalle:r[18], observaciones:r[19],
-        estado: estadosPedido[r[0]] || ''
+        estado: estadosPedido[r[0]] || '',
+        condicion: condicionPedido[r[0]] || ''
       });
     }
     result = { success: true, pagos: pagos };

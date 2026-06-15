@@ -49,6 +49,7 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
 .badge-pending{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--red-dim);color:var(--red);border:1px solid rgba(232,82,74,.2);font-weight:500;display:inline-flex}
 .badge-done{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--green-dim);color:var(--green);border:1px solid rgba(62,207,142,.2);font-weight:500;display:inline-flex}
 .badge-partial{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,.2);font-weight:500;display:inline-flex}
+.badge-credito{font-size:10px;padding:1px 7px;border-radius:20px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,.35);font-weight:600;display:inline-block;margin-top:3px;white-space:nowrap}
 .abono-row{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:2px}
 .abono-num{color:var(--hint);font-family:'DM Mono',monospace;min-width:20px}
 .abono-monto{color:var(--green);font-family:'DM Mono',monospace}
@@ -396,12 +397,15 @@ function renderTabla(){
     const fechaStr=p.fecha?String(p.fecha).split('T')[0]:'';
     const cantidad=parseInt(p.cantidad||0);
     const precioUnd=cantidad>0&&total>0?(total/cantidad):0;
+    const condTxt=(p.condicion||'').toString().trim().toUpperCase();
+    const esCredito=condTxt&&condTxt!=='CONTADO';
+    const badgeCredito=esCredito?'<div class="badge-credito">A cr&eacute;dito</div>':'';
     const entregado = esEntregado(p.estado);
     const dotEntregado = entregado
       ? '<span title="Entregado" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:middle;box-shadow:0 0 4px rgba(62,207,142,.5)"></span>'
       : '';
     const filaRiesgo = entregado && restante > 0;
-    return`<tr class="${filaRiesgo?'row-riesgo':''}" ${filaRiesgo?'title="Entregado con saldo pendiente"':''}><td>${dotEntregado}<span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span></td><td><span class="td-mono" style="color:var(--blue)">${cantidad.toLocaleString()} und</span></td><td><span class="td-mono" style="color:var(--muted)">S/ ${precioUnd.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${Math.min(pct,100)}%;background:${pc2}"></div></div><span style="font-size:10px;color:${pct>100?'var(--amber)':'var(--hint)'}">${pct>100?'&#9888; abonado &gt; total ('+pct+'%)':pct+'% abonado'}</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
+    return`<tr class="${filaRiesgo?'row-riesgo':''}" ${filaRiesgo?'title="Entregado con saldo pendiente"':''}><td>${dotEntregado}<span class="td-mono">${p.numPedido||''}</span></td><td><span style="font-size:12px;color:var(--muted)">${fechaStr}</span></td><td>${p.cliente||''}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px">${p.producto||''}</span>${badgeCredito}</td><td><span class="td-mono" style="color:var(--blue)">${cantidad.toLocaleString()} und</span></td><td><span class="td-mono" style="color:var(--muted)">S/ ${precioUnd.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="td-mono">S/ ${parseFloat(p.montoTotal||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><div>${abonosHtml||'<span style="color:var(--hint);font-size:12px">Sin abonos</span>'}</div><div class="progress-mini"><div class="progress-mini-fill" style="width:${Math.min(pct,100)}%;background:${pc2}"></div></div><span style="font-size:10px;color:${pct>100?'var(--amber)':'var(--hint)'}">${pct>100?'&#9888; abonado &gt; total ('+pct+'%)':pct+'% abonado'}</span></td><td><span class="td-mono" style="color:${restante>0?'var(--red)':'var(--green)'}">S/ ${restante.toLocaleString('es-PE',{minimumFractionDigits:2})}</span></td><td><span class="${badgeCls}">${badgeTxt}</span></td><td>${accion}</td></tr>`;
   }).join('');
 }
 function setFiltro(f,btn){
