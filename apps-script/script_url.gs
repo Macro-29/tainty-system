@@ -117,7 +117,49 @@ function guardarNuevoPedido(data) {
   const pctAbonado = montoTotal > 0 ? Math.round((abono / montoTotal) * 100) + '%' : '0%';
   const meses = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
   const mes = meses[fechaBase.getMonth()];
-  const fechaTentativa = sumarDiasHabiles(fechaBase, 4);
+
+  // ===== Fecha tentativa de entrega =====
+  // Leemos el historial una sola vez para (a) saber si el producto ya se hizo
+  // antes y (b) calcular la carga de unidades por día de entrega.
+  const histData = sheet.getDataRange().getValues();
+
+  // (1) Día de inicio: el día del pedido; si se registra al mediodía o después
+  //     (hora Perú), la producción arranca el día siguiente.
+  const horaLima = parseInt(Utilities.formatDate(new Date(), 'America/Lima', 'H'), 10);
+  const inicio = new Date(fechaBase.getTime());
+  if (horaLima >= 12) inicio.setDate(inicio.getDate() + 1);
+
+  // (2) Días hábiles a sumar: 3 si el producto ya se produjo antes (aparece en
+  //     el historial), 4 si es la primera vez. "Día hábil" = lunes a sábado.
+  const prodNorm = normNombre_(data.producto);
+  let productoConocido = false;
+  for (let i = 1; i < histData.length; i++) {
+    if (!histData[i][0]) continue;
+    if (normNombre_(histData[i][4]) === prodNorm) { productoConocido = true; break; }
+  }
+  const diasHabiles = productoConocido ? 3 : 4;
+  let fechaTentativa = sumarDiasHabiles(inicio, diasHabiles);
+
+  // (3) Tope de capacidad: máx. 700 und por día de entrega. Si el día candidato
+  //     ya tiene carga y sumar este pedido pasaría de 700, se corre al siguiente
+  //     día hábil. Un día vacío acepta el pedido aunque por sí solo supere 700.
+  // Precalculamos las unidades ya comprometidas por día (clave yyyy-MM-dd).
+  const cargaPorDia = {};
+  for (let i = 1; i < histData.length; i++) {
+    if (!histData[i][0]) continue;
+    const k = fechaKey_(histData[i][12]);
+    if (!k) continue;
+    cargaPorDia[k] = (cargaPorDia[k] || 0) + (parseInt(histData[i][5]) || 0);
+  }
+  const CAP_DIA = 700;
+  let guard = 0;
+  while (guard < 366) {
+    const keyEntrega = Utilities.formatDate(fechaTentativa, 'America/Lima', 'yyyy-MM-dd');
+    const cargaDia = cargaPorDia[keyEntrega] || 0;
+    if (cargaDia === 0 || cargaDia + cantidad <= CAP_DIA) break;
+    fechaTentativa = sumarDiasHabiles(fechaTentativa, 1);
+    guard++;
+  }
   const fechaTentativaStr = Utilities.formatDate(fechaTentativa, 'America/Lima', 'dd/MM/yyyy');
   sheet.getRange(nuevaFila, 1).setValue(nuevoPedido);
   sheet.getRange(nuevaFila, 3).setValue(fechaFormateada);
@@ -153,6 +195,20 @@ function sumarDiasHabiles(fecha, dias) {
     if (result.getDay() !== 0) sumados++;
   }
   return result;
+}
+
+/**
+ * Normaliza un valor de fecha (celda de la hoja) a clave 'yyyy-MM-dd' para
+ * comparar días. Tolera Date nativo, texto 'dd/MM/yyyy' y texto 'yyyy-MM-dd'.
+ */
+function fechaKey_(val) {
+  if (val instanceof Date) return Utilities.formatDate(val, 'America/Lima', 'yyyy-MM-dd');
+  const s = (val === null || val === undefined) ? '' : val.toString().trim();
+  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);   // dd/MM/yyyy
+  if (m) return m[3] + '-' + m[2] + '-' + m[1];
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);          // yyyy-MM-dd
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  return s;
 }
 
 function doGet(e) {
