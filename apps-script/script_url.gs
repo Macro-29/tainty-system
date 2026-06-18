@@ -184,6 +184,29 @@ function guardarNuevoPedido(data) {
   try { if (data.producto) agregarASimple(PRODUCTOS_SHEET, data.producto); } catch(e) {}
 
   SpreadsheetApp.flush();
+
+  // Reflejar el abono inicial del formulario en la hoja PAGOS. Sin esto, el
+  // valor por defecto de PAGOS rellena el 1er abono con el monto total y el
+  // pedido aparece como "pago completo" aunque el abono sea parcial o cero.
+  // Espejo de lo que hace registrarAbono, pero con el abono inicial del pedido.
+  try {
+    const sheetPagos = ss.getSheetByName('PAGOS');
+    if (sheetPagos) {
+      const dataPagos = sheetPagos.getDataRange().getValues();
+      for (let i = 1; i < dataPagos.length; i++) {
+        if (dataPagos[i][0] === nuevoPedido) {
+          const restante = Math.max(0, montoTotal - abono);
+          sheetPagos.getRange(i + 1, 7).setValue(abono > 0 ? abono : '');            // 1er abono
+          sheetPagos.getRange(i + 1, 8).setValue(abono > 0 ? fechaFormateada : '');  // fecha 1er abono
+          sheetPagos.getRange(i + 1, 9).setValue(restante);                           // restante tras 1er abono
+          sheetPagos.getRange(i + 1, 19).setValue((abono > 0 && restante <= 0) ? 'PAGO REALIZADO' : ''); // detalle
+          break;
+        }
+      }
+      SpreadsheetApp.flush();
+    }
+  } catch(e) {}
+
   return { success: true, pedido: nuevoPedido };
 }
 
@@ -229,6 +252,10 @@ function doGet(e) {
     const lastRow = sheet.getLastRow();
     const ultimo = lastRow > 1 ? sheet.getRange(lastRow, 1).getValue() : 'P0211';
     result = { ultimo: ultimo };
+  } else if (e && e.parameter && e.parameter.action === 'repararPagosIniciales') {
+    // Repara filas de PAGOS afectadas por el bug del abono por defecto.
+    // Usar &dry=1 para solo previsualizar (no escribe nada).
+    result = repararPagosIniciales(e.parameter.dry == '1' || e.parameter.dry === 'true');
   } else if (e && e.parameter && e.parameter.action === 'panel') {
     const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName(SHEET_NAME);
@@ -390,6 +417,62 @@ function normNombre_(s) {
  * Recorremos de la última fila a la primera para tomar la venta más
  * reciente. Comparación case-insensitive y sin acentos.
  */
+/**
+ * Reparación puntual del bug donde PAGOS rellenaba el 1er abono con el monto
+ * total (haciendo ver el pedido como pagado). Solo corrige filas con la firma
+ * EXACTA del bug, para no tocar pagos reales:
+ *   - abono1 == montoTotal (el valor por defecto erróneo)
+ *   - el abono real registrado en NUEVO PEDIDO es MENOR al total
+ *   - no hay abonos manuales posteriores (abono2/3/4 vacíos)
+ * En esos casos pone abono1 = abono real (o vacío si fue 0) y recalcula saldo.
+ * @param {boolean} dry  Si es true, solo reporta los cambios sin escribir.
+ */
+function repararPagosIniciales(dry) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheetPed = ss.getSheetByName(SHEET_NAME);
+  const sheetPagos = ss.getSheetByName('PAGOS');
+  if (!sheetPed || !sheetPagos) return { success: false, error: 'Hojas no encontradas' };
+
+  // Mapa numPedido → abono inicial real (col J = índice 9) y total (col I = 8)
+  const dataPed = sheetPed.getDataRange().getValues();
+  const infoPed = {};
+  for (let i = 1; i < dataPed.length; i++) {
+    const np = dataPed[i][0];
+    if (!np) continue;
+    infoPed[np] = { abono: parseFloat(dataPed[i][9]) || 0, total: parseFloat(dataPed[i][8]) || 0 };
+  }
+
+  const dataPagos = sheetPagos.getDataRange().getValues();
+  const cambios = [];
+  for (let i = 1; i < dataPagos.length; i++) {
+    const np = dataPagos[i][0];
+    if (!np || !infoPed[np]) continue;
+    const totalPagos = parseFloat(dataPagos[i][5]) || 0;
+    const abono1 = parseFloat(dataPagos[i][6]) || 0;
+    const abono2 = parseFloat(dataPagos[i][9]) || 0;
+    const abono3 = parseFloat(dataPagos[i][12]) || 0;
+    const abono4 = parseFloat(dataPagos[i][15]) || 0;
+    const abonoReal = infoPed[np].abono;
+
+    // Firma del bug: abono1 == total, sin abonos posteriores, y el abono real < total.
+    const firmaBug = totalPagos > 0 && Math.abs(abono1 - totalPagos) < 0.01
+                     && abono2 === 0 && abono3 === 0 && abono4 === 0
+                     && abonoReal < totalPagos;
+    if (!firmaBug) continue;
+
+    const restante = Math.max(0, totalPagos - abonoReal);
+    cambios.push({ pedido: np, antes: abono1, despues: abonoReal, restante: restante });
+    if (!dry) {
+      sheetPagos.getRange(i + 1, 7).setValue(abonoReal > 0 ? abonoReal : '');  // 1er abono
+      sheetPagos.getRange(i + 1, 9).setValue(restante);                         // restante
+      sheetPagos.getRange(i + 1, 19).setValue('');                             // detalle (ya no es pago completo)
+      if (abonoReal === 0) sheetPagos.getRange(i + 1, 8).setValue('');         // limpia fecha si no hubo abono
+    }
+  }
+  if (!dry) SpreadsheetApp.flush();
+  return { success: true, dry: !!dry, totalCorregidos: cambios.length, cambios: cambios };
+}
+
 function getPrecioSugerido(nombreProducto, vendedor, cantidad, cliente) {
   const prodNorm = normNombre_(nombreProducto);
   const vendNorm = normNombre_(vendedor);
