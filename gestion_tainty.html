@@ -568,9 +568,9 @@ function copiarProducto(numPedido){
   const insumosP=getInsumos(getTipo(p.producto));
   const cant=parseInt(p.cantidad||0).toLocaleString();
   const head=`${p.numPedido||''} · ${p.producto||''} · ${cant} und${p.cliente?' · '+p.cliente:''}`;
-  // Excluir los insumos que ya están en oficina / finalizado / noaplica —
-  // solo nos interesa exportar lo que todavía requiere acción.
-  const ESTADOS_EXCLUIR = new Set(['oficina','finalizado','noaplica']);
+  // Exportamos el estado de cada insumo aplicable, incluidos los que ya
+  // están listos (oficina / finalizado). Solo omitimos los que no aplican.
+  const ESTADOS_EXCLUIR = new Set(['noaplica']);
   const filas=insumosP
     .filter(insumo => !ESTADOS_EXCLUIR.has(getEstadoInsumo(p.numPedido, insumo)))
     .map(insumo=>{
@@ -581,7 +581,7 @@ function copiarProducto(numPedido){
       return texto ? `${emoji} ${nombre} (${texto})` : `${emoji} ${nombre}`;
     });
   if(!filas.length){
-    mostrarToast('Este pedido ya está completo (todo en oficina o no aplica)',{type:'success',duration:3000});
+    mostrarToast('Este pedido no tiene insumos aplicables',{type:'success',duration:3000});
     return;
   }
   const texto=[head,...filas].join('\n');
