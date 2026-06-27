@@ -375,11 +375,19 @@ function renderTabla(){
   if(sortCol){lista=lista.slice().sort((a,b)=>{const va=getSortValue(a,sortCol),vb=getSortValue(b,sortCol);if(va<vb)return -sortDir;if(va>vb)return sortDir;return 0;});}
   updateSortIndicators();
   renderFoot(lista);
-  // Cuenta, sobre TODOS los pagos, cuántos pedidos entregados-con-saldo tiene
-  // cada cliente. Sirve para mostrar el botón de mensaje consolidado solo a los
-  // clientes con 2+ pedidos entregados pendientes.
+  // Cuenta, sobre TODOS los pagos, cuántos pedidos con saldo pendiente tiene
+  // cada cliente, separando los YA ENTREGADOS de los que AÚN NO se han
+  // entregado. Sirve para mostrar cada botón consolidado solo a los clientes
+  // con 2+ pedidos en esa categoría.
   const entregadosPendPorCliente={};
-  pagos.forEach(p=>{if(esEntregado(p.estado)&&getRestante(p)>0){const k=p.cliente||'';entregadosPendPorCliente[k]=(entregadosPendPorCliente[k]||0)+1;}});
+  const noEntregadosPendPorCliente={};
+  pagos.forEach(p=>{
+    if(getRestante(p)>0){
+      const k=p.cliente||'';
+      if(esEntregado(p.estado)) entregadosPendPorCliente[k]=(entregadosPendPorCliente[k]||0)+1;
+      else noEntregadosPendPorCliente[k]=(noEntregadosPendPorCliente[k]||0)+1;
+    }
+  });
   if(!lista.length){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--hint)">No hay resultados</td></tr>';return;}
   document.getElementById('tabla-body').innerHTML=lista.map(p=>{
     const est=getEstadoPago(p);const restante=getRestante(p);const abonado=getTotalAbonado(p);const total=parseFloat(p.montoTotal)||0;
@@ -390,9 +398,11 @@ function renderTabla(){
     const btnCopiar=`<button class="btn-abono" style="background:var(--surface2);border-color:var(--border2);color:var(--muted)" onclick="copiarPedido('${p.numPedido}')" title="Copiar resumen del pago">&#128203;</button>`;
     const btnSaldo=restante>0?`<button class="btn-abono" style="background:var(--green-dim);border-color:rgba(62,207,142,.3);color:var(--green)" onclick="copiarSaldoCliente('${p.numPedido}')" title="Copiar mensaje de saldo para el cliente">&#128172;</button>`:'';
     const nEntregadosPend=entregadosPendPorCliente[p.cliente||'']||0;
-    const btnEntregados=nEntregadosPend>=2?`<button class="btn-abono" style="background:var(--red-dim);border-color:rgba(232,82,74,.3);color:var(--red)" onclick="copiarSaldoEntregadosCliente('${p.numPedido}')" title="Copiar mensaje: ${nEntregadosPend} pedidos entregados con saldo pendiente">&#128230; ${nEntregadosPend}</button>`:'';
+    const btnEntregados=nEntregadosPend>=2?`<button class="btn-abono" style="background:var(--red-dim);border-color:rgba(232,82,74,.3);color:var(--red)" onclick="copiarSaldoEntregadosCliente('${p.numPedido}')" title="Copiar mensaje: ${nEntregadosPend} pedidos ENTREGADOS con saldo pendiente">&#128230; ${nEntregadosPend}</button>`:'';
+    const nNoEntregadosPend=noEntregadosPendPorCliente[p.cliente||'']||0;
+    const btnNoEntregados=nNoEntregadosPend>=2?`<button class="btn-abono" style="background:var(--amber-dim);border-color:rgba(245,166,35,.3);color:var(--amber)" onclick="copiarSaldoNoEntregadosCliente('${p.numPedido}')" title="Copiar mensaje: ${nNoEntregadosPend} pedidos POR ENTREGAR con saldo pendiente">&#128666; ${nNoEntregadosPend}</button>`:'';
     const btnPrincipal=est==='realizado'?'<span style="font-size:12px;color:var(--green)">Pagado</span>':sig?`<button class="btn-abono" onclick="abrirModal('${p.numPedido}')">+ Abono</button>`:'<span style="font-size:11px;color:var(--hint)">Max</span>';
-    const accion=`<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${btnPrincipal}${btnSaldo}${btnEntregados}${btnCopiar}</div>`;
+    const accion=`<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">${btnPrincipal}${btnSaldo}${btnEntregados}${btnNoEntregados}${btnCopiar}</div>`;
     const pc2=pct===100?'var(--green)':pct>0?'var(--amber)':'var(--red)';
     const fechaStr=p.fecha?String(p.fecha).split('T')[0]:'';
     const cantidad=parseInt(p.cantidad||0);
@@ -507,6 +517,36 @@ function copiarSaldoEntregadosCliente(numPedido){
     `💰 Total pendiente: ${m(totalPend)}`,
     ``,
     `Si ya realizaste el pago, por favor envíanos el comprobante 📲. Si aún no, indícanos por favor si lo estarás abonando hoy o a más tardar mañana. ¡Gracias por confiar en nosotros! 🌿`
+  ];
+  navigator.clipboard.writeText(lineas.join('\n'))
+    .then(()=>mostrarToast(`Mensaje de ${lista.length} pedidos copiado`,{type:'success',duration:2200}))
+    .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
+}
+
+/**
+ * Igual que copiarSaldoEntregadosCliente, pero para los pedidos del cliente que
+ * tienen saldo pendiente y AÚN NO han sido entregados. El mensaje encuadra el
+ * pago como paso para coordinar la entrega.
+ */
+function copiarSaldoNoEntregadosCliente(numPedido){
+  const ref=pagos.find(x=>x.numPedido===numPedido);
+  if(!ref){mostrarToast('Pedido no encontrado',{type:'error',duration:2500});return;}
+  const lista=pagos.filter(p=>(p.cliente||'')===(ref.cliente||'')&&!esEntregado(p.estado)&&getRestante(p)>0)
+    .sort((a,b)=>{const fa=new Date(a.fecha),fb=new Date(b.fecha);if(!isNaN(fa)&&!isNaN(fb))return fa-fb;return (a.numPedido||'').localeCompare(b.numPedido||'');});
+  if(!lista.length){mostrarToast('Sin pedidos por entregar con saldo',{type:'error',duration:2500});return;}
+  const m=n=>`S/ ${(parseFloat(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const nombre=(ref.cliente||'').toString().trim().toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+  const totalPend=lista.reduce((s,p)=>s+getRestante(p),0);
+  const lineas=[
+    `Hola ${nombre} 😊`,
+    ``,
+    `Esperamos que estés muy bien. Te escribimos por tus ${lista.length} pedidos que están por entregarse y aún tienen un saldo pendiente:`,
+    ``,
+    ...lista.map(p=>`📦 ${p.producto||''} (${parseInt(p.cantidad||0).toLocaleString('en-US')} und) — Saldo pendiente: ${m(getRestante(p))}`),
+    ``,
+    `💰 Total pendiente: ${m(totalPend)}`,
+    ``,
+    `Para coordinar la entrega, si ya realizaste el pago envíanos el comprobante 📲; si aún no, indícanos si lo estarás abonando hoy o a más tardar mañana. ¡Gracias por confiar en nosotros! 🌿`
   ];
   navigator.clipboard.writeText(lineas.join('\n'))
     .then(()=>mostrarToast(`Mensaje de ${lista.length} pedidos copiado`,{type:'success',duration:2200}))
