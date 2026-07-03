@@ -771,42 +771,37 @@ function renderProveedoresPorProducto() {
 }
 
 /**
- * Copia el nombre del producto y todos sus insumos (agrupados por tipo).
+ * Copia el nombre del producto y SOLO sus insumos (tipo INSUMO).
+ * Excluye a propósito cápsulas, envases, etiquetas, cajas y lainas.
  * Distinto de copiarProveedor: aquí el foco es el PRODUCTO, no el proveedor.
  *
  *   📦 PAWSURE ORAL PET (100ml) · 500 und
  *
- *   🧪 INSUMO
  *   - Camu Camu: 0.9 kg
- *   💊 CÁPSULA
- *   - 500 Cápsula 00 vegetal
+ *   - Uña De Gato: 0.72 kg
  */
 function copiarProducto(idx, btn) {
   const p = (window._insumosPorProducto || [])[idx];
   if (!p) return;
-  const porTipo = {};
-  p.insumos.forEach(i => { const t = (i.tipo||'OTROS').toUpperCase(); (porTipo[t] = porTipo[t] || []).push(i); });
-  const tipos = Object.keys(porTipo).sort((a,b) => {
-    const ia = TIPO_ORDEN.indexOf(a), ib = TIPO_ORDEN.indexOf(b);
-    return (ia===-1?99:ia) - (ib===-1?99:ib);
-  });
-  const bloques = tipos.map(t => {
-    const meta = TIPO_META[t] || { ic:'•', label:t };
-    const items = porTipo[t].slice().sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
-    const lineas = items.map(i => {
-      const unidad = i.unidad || 'kg';
-      if (unidad === 'kg') {
-        const c = parseFloat(i.cantidadTotal.toFixed(3)).toString();
-        return `- ${i.nombre}: ${c} kg`;
-      }
-      const c = Math.round(i.cantidadTotal).toLocaleString('en-US');
-      return `- ${c} ${i.nombre}`;
-    }).join('\n');
-    return `${meta.ic} ${meta.label.toUpperCase()}\n${lineas}`;
-  });
-  const texto = `📦 ${p.producto} · ${Math.round(p.cantidad).toLocaleString('en-US')} und\n\n${bloques.join('\n\n')}`;
+  const insumos = (p.insumos || [])
+    .filter(i => (i.tipo||'').toUpperCase() === 'INSUMO')
+    .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
+  if (!insumos.length) {
+    mostrarToast('Este producto no tiene insumos para copiar', {type:'error', duration:2500});
+    return;
+  }
+  const lineas = insumos.map(i => {
+    const unidad = i.unidad || 'kg';
+    if (unidad === 'kg') {
+      const c = parseFloat(i.cantidadTotal.toFixed(3)).toString();
+      return `- ${i.nombre}: ${c} kg`;
+    }
+    const c = Math.round(i.cantidadTotal).toLocaleString('en-US');
+    return `- ${c} ${i.nombre}`;
+  }).join('\n');
+  const texto = `📦 ${p.producto} · ${Math.round(p.cantidad).toLocaleString('en-US')} und\n\n${lineas}`;
   navigator.clipboard.writeText(texto)
-    .then(() => { mostrarToast(`Copiado: ${p.producto}`, {type:'success', duration:2500}); flashCopiado(btn); })
+    .then(() => { mostrarToast(`Insumos copiados: ${p.producto}`, {type:'success', duration:2500}); flashCopiado(btn); })
     .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3000}));
 }
 
