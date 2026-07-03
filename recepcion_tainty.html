@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PWA (app instalable) -->
+<meta name="theme-color" content="#0d0d0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Tainty">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
+<title>Recepción de Insumos · Tainty</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/common.css">
+<style>
+.topbar-right{display:flex;align-items:center;gap:8px}
+.refresh-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid rgba(62,207,142,.3);background:var(--green-dim);color:var(--green);cursor:pointer}
+.main{padding:1.25rem;position:relative;z-index:1;max-width:820px;margin:0 auto}
+.intro{font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.5}
+.search-input{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;margin-bottom:.9rem}
+.search-input:focus{border-color:var(--purple)}
+.filters{display:flex;gap:8px;margin-bottom:.7rem;flex-wrap:wrap}
+.ftab{font-size:12px;padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.ftab.active{background:var(--purple-dim);color:var(--purple);border-color:rgba(124,111,239,.35)}
+.toggle-pend{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:1.1rem;cursor:pointer;user-select:none}
+.toggle-pend input{width:16px;height:16px;accent-color:var(--purple)}
+/* Card de pedido */
+.pcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px}
+.pcard-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.pcard-titulo{min-width:0}
+.pcard-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--hint)}
+.pcard-prod{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);line-height:1.2;margin-top:2px;overflow-wrap:anywhere}
+.pcard-meta{font-size:12px;color:var(--muted);margin-top:3px}
+.pcard-badge{font-size:11px;padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;border:1px solid transparent}
+.badge-full{background:var(--green-dim);color:var(--green);border-color:rgba(62,207,142,.25)}
+.badge-part{background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,.25)}
+/* Fila de insumo */
+.irow{padding:13px 16px;border-bottom:1px solid var(--border)}
+.irow:last-child{border-bottom:none}
+.irow.done{background:rgba(62,207,142,.05)}
+.irow-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.irow-name{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);font-weight:500}
+.irow-ic{font-size:17px}
+.irow-count{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);white-space:nowrap}
+.irow-count b{color:var(--text)}
+.irow-count.ok b{color:var(--green)}
+.bar{height:7px;border-radius:6px;background:var(--surface2);overflow:hidden;margin-bottom:11px}
+.bar-fill{height:100%;border-radius:6px;background:var(--purple);transition:width .25s,background .25s}
+.bar-fill.full{background:var(--green)}
+.irow-ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.qty-input{width:96px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;padding:9px 10px;font-family:'DM Mono',monospace;font-size:14px;color:var(--text);outline:none;text-align:center}
+.qty-input:focus{border-color:var(--purple)}
+.btn-mini{font-size:13px;padding:9px 12px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent}
+.btn-mini:active{transform:scale(.96)}
+.btn-guardar{border-color:rgba(124,111,239,.35);background:var(--purple-dim);color:var(--purple)}
+.btn-todo{border-color:rgba(62,207,142,.35);background:var(--green-dim);color:var(--green);font-weight:500}
+.btn-reset{color:var(--muted);padding:9px 11px}
+.si{font-size:12px;color:var(--muted);min-width:20px}
+.si.ok{color:var(--green)}
+.si.err{color:var(--red)}
+.empty{text-align:center;padding:3rem 1rem;color:var(--hint)}
+.spinner{width:30px;height:30px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin:2.5rem auto;display:block}
+@media(max-width:640px){
+  .main{padding:1rem}
+  .topbar{padding:.75rem 1rem}
+  .pcard-prod{font-size:14px}
+  .qty-input{width:84px}
+  .btn-mini{padding:10px 12px}
+}
+</style>
+<script src="./assets/config.js"></script>
+<script src="./assets/common.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Tainty <span>Labs</span> &middot; Recepción</div>
+  <div class="topbar-right">
+    <button class="refresh-btn" onclick="cargarDatos()">&#8635; Actualizar</button>
+    <a class="back-btn" href="./index.html">&#8592; Inicio</a>
+  </div>
+</div>
+
+<div class="main">
+  <p class="intro">Registra las unidades de cada insumo que <b>ya llegaron</b> por producto.
+  Cuando un insumo se recibe completo, en <b>Gestión</b> pasa automáticamente a <b>📦 En oficina</b>.</p>
+
+  <input class="search-input" id="search" placeholder="Buscar producto, cliente o N° de pedido..." oninput="render()">
+
+  <div class="filters" id="chips">
+    <button class="ftab active" data-ins="todos">Todos</button>
+    <button class="ftab" data-ins="Insumo">🧪 Insumo</button>
+    <button class="ftab" data-ins="Capsula">💊 Cápsula</button>
+    <button class="ftab" data-ins="Envase">🫙 Envase</button>
+    <button class="ftab" data-ins="Etiqueta">🏷️ Etiqueta</button>
+    <button class="ftab" data-ins="Caja">📦 Caja</button>
+  </div>
+
+  <label class="toggle-pend">
+    <input type="checkbox" id="solo-pend" onchange="render()" checked>
+    Mostrar solo lo que falta recibir
+  </label>
+
+  <div id="lista"><div class="spinner"></div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Insumos físicos que pasan por recepción (la Máquina no se recibe aquí).
+const FISICOS_ML  = ['Insumo','Envase','Etiqueta','Caja'];
+const FISICOS_CAP = ['Insumo','Capsula','Envase','Etiqueta','Caja'];
+const ICONO = {'Insumo':'🧪','Capsula':'💊','Envase':'🫙','Etiqueta':'🏷️','Caja':'📦'};
+const NOMBRE = {'Insumo':'Insumo','Capsula':'Cápsula','Envase':'Envase','Etiqueta':'Etiqueta','Caja':'Caja'};
+
+let pedidos = [], estados = {}, cantidades = {}, chipActivo = 'todos';
+
+function insumosDe(prod){ return getTipo(prod) === 'cap' ? FISICOS_CAP : FISICOS_ML; }
+function keyOf(pid, ins){ return pid + '|' + ins; }
+function getEstado(pid, ins){ return estados[keyOf(pid,ins)] || 'pendiente'; }
+function getRecibido(pid, ins){ return parseInt(cantidades[keyOf(pid,ins)]) || 0; }
+function esCompleto(pid, ins, total){
+  if (getEstado(pid,ins) === 'oficina') return true;
+  return total > 0 && getRecibido(pid,ins) >= total;
+}
+
+async function cargarDatos(){
+  document.getElementById('lista').innerHTML = '<div class="spinner"></div>';
+  try{
+    const [dp, de] = await Promise.all([
+      jsonp(`${SCRIPT_URL}?action=panel&t=${Date.now()}`),
+      jsonp(`${SCRIPT_URL}?action=estados&t=${Date.now()}`)
+    ]);
+    if (dp.success && dp.pedidos){
+      pedidos = dp.pedidos.filter(p=>{
+        const e = (p.estado||'').toLowerCase();
+        return !e.includes('entregado') && !e.includes('cancelado');
+      }).sort((a,b)=>{
+        const na = parseInt((a.numPedido||'P0').replace('P',''))||0;
+        const nb = parseInt((b.numPedido||'P0').replace('P',''))||0;
+        return nb - na;
+      });
+    }
+    if (de.success){ estados = de.estados || {}; cantidades = de.cantidades || {}; }
+    render();
+  }catch(e){
+    document.getElementById('lista').innerHTML =
+      '<div class="empty">Error al conectar. <button onclick="cargarDatos()" style="color:var(--purple);background:none;border:none;cursor:pointer">Reintentar</button></div>';
+  }
+}
+
+function render(){
+  const q = (document.getElementById('search').value||'').toLowerCase();
+  const soloPend = document.getElementById('solo-pend').checked;
+
+  const lista = pedidos.filter(p=>{
+    if (!q) return true;
+    return (p.numPedido||'').toLowerCase().includes(q)
+      || (p.cliente||'').toLowerCase().includes(q)
+      || (p.producto||'').toLowerCase().includes(q);
+  });
+
+  const cards = lista.map(p=>{
+    const total = parseInt(p.cantidad)||0;
+    // Insumos aplicables (según el tipo), respetando el chip y "No aplica" de Gestión.
+    let insumos = insumosDe(p.producto).filter(ins => getEstado(p.numPedido,ins) !== 'noaplica');
+    if (chipActivo !== 'todos') insumos = insumos.filter(ins => ins === chipActivo);
+    if (!insumos.length) return '';
+
+    const completos = insumos.filter(ins => esCompleto(p.numPedido, ins, total)).length;
+    let visibles = insumos;
+    if (soloPend) visibles = insumos.filter(ins => !esCompleto(p.numPedido, ins, total));
+    if (!visibles.length) return '';
+
+    const todoOk = completos === insumos.length;
+    const badge = todoOk
+      ? '<span class="pcard-badge badge-full">✓ Todo recibido</span>'
+      : `<span class="pcard-badge badge-part">${completos}/${insumos.length} listos</span>`;
+
+    const filas = visibles.map(ins => filaInsumo(p, ins, total)).join('');
+
+    return `<div class="pcard">
+      <div class="pcard-head">
+        <div class="pcard-titulo">
+          <div class="pcard-num">${p.numPedido||''}</div>
+          <div class="pcard-prod">${escapeHtml(p.producto||'')}</div>
+          <div class="pcard-meta">${escapeHtml(p.cliente||'')} · ${total.toLocaleString()} und</div>
+        </div>
+        ${badge}
+      </div>
+      ${filas}
+    </div>`;
+  }).filter(Boolean).join('');
+
+  document.getElementById('lista').innerHTML = cards ||
+    '<div class="empty">No hay insumos pendientes que coincidan.<br>Prueba quitar el filtro o desmarcar "solo lo que falta".</div>';
+}
+
+function filaInsumo(p, ins, total){
+  const pid = p.numPedido;
+  const completo = esCompleto(pid, ins, total);
+  let recibido = getRecibido(pid, ins);
+  // Si Gestión lo marcó "en oficina" sin cantidad, mostrarlo como recibido completo.
+  if (completo && recibido === 0 && total > 0) recibido = total;
+  const pct = total > 0 ? Math.min(100, Math.round(recibido/total*100)) : (completo?100:0);
+  const idb = pid + '-' + ins;
+  return `<div class="irow${completo?' done':''}" id="row-${idb}">
+    <div class="irow-top">
+      <div class="irow-name"><span class="irow-ic">${ICONO[ins]||''}</span>${NOMBRE[ins]||ins}</div>
+      <div class="irow-count${completo?' ok':''}" id="lbl-${idb}"><b>${recibido.toLocaleString()}</b> / ${total.toLocaleString()}</div>
+    </div>
+    <div class="bar"><div class="bar-fill${completo?' full':''}" id="bar-${idb}" style="width:${pct}%"></div></div>
+    <div class="irow-ctrl">
+      <input class="qty-input" type="number" inputmode="numeric" min="0" max="${total}" value="${recibido}"
+             id="in-${idb}" data-pid="${pid}" data-ins="${ins}" data-total="${total}">
+      <button class="btn-mini btn-guardar" data-act="save" data-pid="${pid}" data-ins="${ins}" data-total="${total}">Guardar</button>
+      <button class="btn-mini btn-todo" data-act="todo" data-pid="${pid}" data-ins="${ins}" data-total="${total}">✅ Llegó todo</button>
+      <button class="btn-mini btn-reset" data-act="reset" data-pid="${pid}" data-ins="${ins}" data-total="${total}" title="Poner en 0">↺</button>
+      <span class="si" id="si-${idb}"></span>
+    </div>
+  </div>`;
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Delegación de eventos para los botones de cada fila.
+document.getElementById('lista').addEventListener('click', e=>{
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const {act, pid, ins, total} = btn.dataset;
+  const tot = parseInt(total)||0;
+  if (act === 'todo')  return guardar(pid, ins, tot, tot);
+  if (act === 'reset') return guardar(pid, ins, tot, 0);
+  if (act === 'save'){
+    const inp = document.getElementById('in-'+pid+'-'+ins);
+    return guardar(pid, ins, tot, parseInt(inp.value)||0);
+  }
+});
+// Guardar también al presionar Enter dentro del input.
+document.getElementById('lista').addEventListener('keydown', e=>{
+  if (e.key !== 'Enter') return;
+  const inp = e.target.closest('.qty-input');
+  if (!inp) return;
+  e.preventDefault();
+  guardar(inp.dataset.pid, inp.dataset.ins, parseInt(inp.dataset.total)||0, parseInt(inp.value)||0);
+  inp.blur();
+});
+
+async function guardar(pid, ins, total, valor){
+  let v = Math.max(0, parseInt(valor)||0);
+  if (total > 0) v = Math.min(v, total);   // no se puede recibir más del total
+  const idb = pid + '-' + ins;
+  const si = document.getElementById('si-'+idb);
+  const k = keyOf(pid,ins);
+
+  // Guardamos el estado previo para poder revertir si el guardado falla.
+  const prevRecibido = getRecibido(pid, ins);
+  const prevEstado = getEstado(pid, ins);
+
+  // Actualización optimista local + UI inmediata.
+  cantidades[k] = v;
+  const completo = total > 0 && v >= total;
+  estados[k] = completo ? 'oficina' : (prevEstado === 'oficina' ? 'pendiente' : prevEstado);
+  actualizarFilaUI(pid, ins, total, v, completo);
+  if (si){ si.textContent = 'Guardando…'; si.className = 'si'; }
+
+  try{
+    const r = await jsonp(`${SCRIPT_URL}?action=recibirInsumo`
+      + `&pedido=${encodeURIComponent(pid)}&insumo=${encodeURIComponent(ins)}`
+      + `&cantidad=${v}&total=${total}&t=${Date.now()}`);
+    if (r && r.success){
+      cantidades[k] = r.recibido;
+      estados[k] = r.estado;
+      actualizarFilaUI(pid, ins, total, r.recibido, r.completo);
+      if (si){ si.textContent = '✓'; si.className = 'si ok'; }
+      if (r.completo) mostrarToast(`✓ ${NOMBRE[ins]||ins} de ${pid} recibido completo`, {type:'success', duration:2200});
+      setTimeout(()=>{ if(si) si.textContent=''; }, 1600);
+    } else {
+      throw new Error(r && r.error ? r.error : 'respuesta inválida');
+    }
+  }catch(err){
+    // Revertir la actualización optimista: no se guardó nada en el servidor.
+    cantidades[k] = prevRecibido;
+    estados[k] = prevEstado;
+    actualizarFilaUI(pid, ins, total, prevRecibido, esCompleto(pid, ins, total));
+    if (si){ si.textContent = 'Error'; si.className = 'si err'; }
+    mostrarToast('No se pudo guardar. Revisa tu conexión e intenta de nuevo.', {type:'error', duration:3500});
+    setTimeout(()=>{ if(si) si.textContent=''; }, 2500);
+  }
+}
+
+// Actualiza solo los elementos de una fila (sin re-render completo, para no
+// perder el foco ni el scroll mientras se registra).
+function actualizarFilaUI(pid, ins, total, recibido, completo){
+  const idb = pid + '-' + ins;
+  const pct = total > 0 ? Math.min(100, Math.round(recibido/total*100)) : (completo?100:0);
+  const bar = document.getElementById('bar-'+idb);
+  const lbl = document.getElementById('lbl-'+idb);
+  const row = document.getElementById('row-'+idb);
+  const inp = document.getElementById('in-'+idb);
+  if (bar){ bar.style.width = pct+'%'; bar.classList.toggle('full', completo); }
+  if (lbl){ lbl.innerHTML = `<b>${recibido.toLocaleString()}</b> / ${total.toLocaleString()}`; lbl.classList.toggle('ok', completo); }
+  if (row) row.classList.toggle('done', completo);
+  if (inp && document.activeElement !== inp) inp.value = recibido;
+}
+
+// Chips de filtro por insumo.
+document.getElementById('chips').addEventListener('click', e=>{
+  const b = e.target.closest('.ftab');
+  if (!b) return;
+  chipActivo = b.dataset.ins;
+  document.querySelectorAll('#chips .ftab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  render();
+});
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cargarDatos);
+else cargarDatos();
+</script>
+<script>
+/* Registro del Service Worker · PWA Tainty */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').catch(function (e) {
+      console.warn('SW no registrado:', e);
+    });
+  });
+}
+</script>
+</body>
+</html>

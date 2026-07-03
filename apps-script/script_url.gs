@@ -27,6 +27,9 @@ function doPost(e) {
       const ok = setEstadoInsumo(e.parameter.pedido, e.parameter.insumo, e.parameter.estado);
       return buildResponse({ success: ok });
     }
+    if (e.parameter && e.parameter.action === 'recibirInsumo') {
+      return buildResponse(recibirInsumo(e.parameter.pedido, e.parameter.insumo, e.parameter.cantidad, e.parameter.total));
+    }
     if (e.parameter && e.parameter.action === 'setEstadoTicket') {
       const ss = SpreadsheetApp.openById(SHEET_ID);
       const sheet = ss.getSheetByName(SHEET_NAME);
@@ -276,7 +279,12 @@ function doGet(e) {
     }
     result = { success: true, pedidos: pedidos };
   } else if (e && e.parameter && e.parameter.action === 'estados') {
-    result = { success: true, estados: getEstadosInsumos() };
+    // `cantidades` es adicional (mapa pedido|insumo → unidades recibidas). Gestión
+    // ignora este campo; la página de Recepción lo usa para mostrar el avance.
+    result = { success: true, estados: getEstadosInsumos(), cantidades: getCantidadesInsumos() };
+  } else if (e && e.parameter && e.parameter.action === 'recibirInsumo') {
+    // Recepción de producción: registra unidades recibidas de un insumo.
+    result = recibirInsumo(e.parameter.pedido, e.parameter.insumo, e.parameter.cantidad, e.parameter.total);
   } else if (e && e.parameter && e.parameter.action === 'analytics') {
     const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName(SHEET_NAME);
@@ -529,6 +537,67 @@ function setEstadoInsumo(pedidoId, insumo, estado) {
   }
   sheet.appendRow([pedidoId, insumo, estado, new Date()]);
   return true;
+}
+
+/**
+ * Devuelve un mapa "pedido|insumo" → unidades recibidas (columna E de
+ * INSUMOS_ESTADO). Solo incluye claves con cantidad > 0. Se expone junto a
+ * `estados` para que la página de Recepción muestre el avance por insumo.
+ */
+function getCantidadesInsumos() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName('INSUMOS_ESTADO');
+  if (!sheet) return {};
+  const data = sheet.getDataRange().getValues();
+  const out = {};
+  for (let i = 1; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    const q = parseInt(data[i][4]) || 0;
+    if (q > 0) out[data[i][0] + '|' + data[i][1]] = q;
+  }
+  return out;
+}
+
+/**
+ * Registra la cantidad TOTAL acumulada recibida de un insumo para un pedido
+ * (columna E de INSUMOS_ESTADO). `cantidad` es un valor ABSOLUTO, no un
+ * incremento — así los reintentos no duplican el conteo.
+ *
+ * Sincronización con Gestión (columna C = estado):
+ *   - Si lo recibido alcanza o supera el total del pedido → estado 'oficina'
+ *     (el insumo llegó completo).
+ *   - Si baja del total y estaba en 'oficina' → vuelve a 'pendiente'.
+ *   - En cualquier otro caso el estado no se toca (respeta ediciones de Gestión).
+ *
+ * Crea la hoja/fila si no existían. Devuelve el estado y la cantidad finales.
+ */
+function recibirInsumo(pedidoId, insumo, cantidadRecibida, cantidadTotal) {
+  if (!pedidoId || !insumo) return { success: false, error: 'Faltan pedido o insumo' };
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName('INSUMOS_ESTADO');
+  if (!sheet) {
+    sheet = ss.insertSheet('INSUMOS_ESTADO');
+    sheet.getRange(1, 1, 1, 5).setValues([['Pedido', 'Insumo', 'Estado', 'Fecha', 'Cantidad recibida']]);
+  }
+  const recibido = Math.max(0, parseInt(cantidadRecibida) || 0);
+  const total = parseInt(cantidadTotal) || 0;
+  const completo = total > 0 && recibido >= total;
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === pedidoId && data[i][1] === insumo) {
+      const estadoActual = (data[i][2] || 'pendiente').toString();
+      let nuevoEstado = estadoActual;
+      if (completo) nuevoEstado = 'oficina';
+      else if (estadoActual === 'oficina') nuevoEstado = 'pendiente';
+      sheet.getRange(i + 1, 3).setValue(nuevoEstado);
+      sheet.getRange(i + 1, 4).setValue(new Date());
+      sheet.getRange(i + 1, 5).setValue(recibido);
+      return { success: true, pedido: pedidoId, insumo: insumo, recibido: recibido, total: total, completo: completo, estado: nuevoEstado };
+    }
+  }
+  const nuevoEstado = completo ? 'oficina' : 'pendiente';
+  sheet.appendRow([pedidoId, insumo, nuevoEstado, new Date(), recibido]);
+  return { success: true, pedido: pedidoId, insumo: insumo, recibido: recibido, total: total, completo: completo, estado: nuevoEstado };
 }
 
 // =================== CATÁLOGOS ===================

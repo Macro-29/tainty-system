@@ -7,7 +7,7 @@
    - Llamadas al backend de Apps Script (script.google.com): NUNCA se cachean.
    Sube CACHE_VERSION cada vez que quieras forzar la actualización del cache. */
 
-const CACHE_VERSION = 'tainty-v3';
+const CACHE_VERSION = 'tainty-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGES_CACHE = `${CACHE_VERSION}-pages`;
 
@@ -15,6 +15,7 @@ const PAGES_CACHE = `${CACHE_VERSION}-pages`;
 const PRECACHE = [
   './',
   './index.html',
+  './recepcion_tainty.html',
   './assets/common.css',
   './assets/common.js',
   './assets/auth.js',

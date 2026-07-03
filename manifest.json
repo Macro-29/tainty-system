@@ -33,6 +33,10 @@
   ],
   "shortcuts": [
     {
+      "name": "Recepción de insumos",
+      "url": "./recepcion_tainty.html"
+    },
+    {
       "name": "Panel de producción",
       "url": "./panel_produccion_tainty.html"
     },
