@@ -238,6 +238,7 @@ td{padding:10px 14px;color:var(--text);white-space:nowrap}
         <div class="seg-toggle" id="orden-proveedores">
           <button class="seg-btn active" id="ord-prov" onclick="setOrdenProveedores('proveedor',this)">📦 Por proveedor</button>
           <button class="seg-btn" id="ord-tipo" onclick="setOrdenProveedores('tipo',this)">🧪 Por tipo</button>
+          <button class="seg-btn" id="ord-producto" onclick="setOrdenProveedores('producto',this)">🧾 Por producto</button>
         </div>
         <button class="btn-copy" onclick="copiarTodo(this)" title="Copiar la lista completa: insumos, cápsulas, envases, etiquetas y cajas agrupadas por tipo">&#128203; Copiar todo</button>
         <button class="btn-secondary" onclick="volverAInsumos()">&#8592; Volver</button>
@@ -562,6 +563,7 @@ function normalizarNombre(valor) {
 function calcularCompras() {
   if (!pedidosActivos.length) { document.getElementById('compras-result').style.display = 'none'; actualizarBarraTotal('hidden'); return; }
   const insumos = {};
+  const porProducto = {};
   const noEncontrados = [];
   for (const ped of pedidosActivos) {
     const objetivo = normalizarNombre(ped.producto);
@@ -572,6 +574,9 @@ function calcularCompras() {
     }
     const escala = getEscalaCercana(ped.cantidad);
     const factor = ped.cantidad / escala;
+    const prodKey = normalizarNombre(prod.nombre);
+    if (!porProducto[prodKey]) porProducto[prodKey] = { producto: prod.nombre, cantidad: 0, insumos: {}, costo: 0 };
+    porProducto[prodKey].cantidad += ped.cantidad;
     for (const ins of prod.insumos) {
       const config = getTipoConfig(ins.tipo);
       const key = ins.nombre + '|||' + ins.proveedor + '|||' + ins.tipo;
@@ -600,6 +605,13 @@ function calcularCompras() {
       }
       insumos[key].cantidadTotal += cantTotal;
       insumos[key].costoTotal += costoTotal;
+
+      // Desglose por producto (para la vista "Por producto", sin combinar entre productos)
+      const pb = porProducto[prodKey].insumos;
+      if (!pb[key]) pb[key] = { nombre: ins.nombre, tipo: ins.tipo, proveedor: ins.proveedor||'', cantidadTotal: 0, costoTotal: 0, unidad };
+      pb[key].cantidadTotal += cantTotal;
+      pb[key].costoTotal += costoTotal;
+      porProducto[prodKey].costo += costoTotal;
     }
   }
   const lista = Object.values(insumos).sort((a,b) => (a.proveedor||'').localeCompare(b.proveedor||''));
@@ -621,6 +633,9 @@ function calcularCompras() {
   document.getElementById('compras-result').style.display = 'block';
   document.getElementById('proveedores-result').style.display = 'none';
   window._insumosCalculados = lista;
+  window._insumosPorProducto = Object.values(porProducto).map(p => ({
+    producto: p.producto, cantidad: p.cantidad, costo: p.costo, insumos: Object.values(p.insumos)
+  })).sort((a,b) => (a.producto||'').localeCompare(b.producto||'', 'es'));
   actualizarBarraTotal('insumos');
 }
 
@@ -644,7 +659,7 @@ let ordenProveedoresActual = 'proveedor';
 
 function setOrdenProveedores(modo, btn) {
   ordenProveedoresActual = modo;
-  document.querySelectorAll('#orden-proveedores .ftab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#orden-proveedores .seg-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   mostrarProveedores();
 }
@@ -673,6 +688,8 @@ function mostrarProveedores() {
 
   if (ordenProveedoresActual === 'tipo') {
     renderProveedoresPorTipo(lista, porProv);
+  } else if (ordenProveedoresActual === 'producto') {
+    renderProveedoresPorProducto();
   } else {
     renderProveedoresPorProveedor(porProv);
   }
@@ -712,6 +729,85 @@ function renderProveedoresPorProveedor(porProv) {
         </div>`).join('')}
       </div>
     </div>`).join('');
+}
+
+// Vista "Por producto": una tarjeta por producto con sus insumos (sin combinar
+// entre productos), agrupados por tipo. Resuelve el caso de 2-3 pedidos a la vez.
+function renderProveedoresPorProducto() {
+  const productos = window._insumosPorProducto || [];
+  const cont = document.getElementById('proveedores-cards');
+  if (!productos.length) { cont.innerHTML = '<div class="empty">No hay productos para mostrar</div>'; return; }
+  cont.innerHTML = productos.map((p, idx) => {
+    const porTipo = {};
+    p.insumos.forEach(i => { const t = (i.tipo||'').toUpperCase(); (porTipo[t] = porTipo[t] || []).push(i); });
+    const tipos = Object.keys(porTipo).sort((a,b) => {
+      const ia = TIPO_ORDEN.indexOf(a), ib = TIPO_ORDEN.indexOf(b);
+      return (ia===-1?99:ia) - (ib===-1?99:ib);
+    });
+    const cuerpo = tipos.map(t => {
+      const meta = TIPO_META[t] || { ic:'•', label:t };
+      const items = porTipo[t].slice().sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
+      const itemsHtml = items.map(i => `<div class="prov-item">
+        <span class="prov-item-name">${i.nombre}</span>
+        <span class="prov-item-qty">${formatCantidad(i.cantidadTotal, i.unidad)}</span>
+        <span class="prov-item-cost">S/ ${i.costoTotal.toLocaleString('es-PE',{minimumFractionDigits:2})}</span>
+      </div>`).join('');
+      return `<div style="margin-top:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${meta.ic} ${meta.label}</div>
+        ${itemsHtml}
+      </div>`;
+    }).join('');
+    return `<div class="prov-card">
+      <div class="prov-header">
+        <div class="prov-name">🧾 ${p.producto} <span style="font-family:DM Mono,monospace;font-size:12px;color:var(--amber);font-weight:400">· ${Math.round(p.cantidad).toLocaleString('en-US')} und</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="prov-total">S/ ${p.costo.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
+          <button class="btn-copy" onclick="copiarProducto(${idx},this)" title="Copiar el nombre del producto y todos sus insumos">&#128203; Copiar</button>
+        </div>
+      </div>
+      <div class="prov-body">${cuerpo}</div>
+    </div>`;
+  }).join('');
+}
+
+/**
+ * Copia el nombre del producto y todos sus insumos (agrupados por tipo).
+ * Distinto de copiarProveedor: aquí el foco es el PRODUCTO, no el proveedor.
+ *
+ *   📦 PAWSURE ORAL PET (100ml) · 500 und
+ *
+ *   🧪 INSUMO
+ *   - Camu Camu: 0.9 kg
+ *   💊 CÁPSULA
+ *   - 500 Cápsula 00 vegetal
+ */
+function copiarProducto(idx, btn) {
+  const p = (window._insumosPorProducto || [])[idx];
+  if (!p) return;
+  const porTipo = {};
+  p.insumos.forEach(i => { const t = (i.tipo||'OTROS').toUpperCase(); (porTipo[t] = porTipo[t] || []).push(i); });
+  const tipos = Object.keys(porTipo).sort((a,b) => {
+    const ia = TIPO_ORDEN.indexOf(a), ib = TIPO_ORDEN.indexOf(b);
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+  const bloques = tipos.map(t => {
+    const meta = TIPO_META[t] || { ic:'•', label:t };
+    const items = porTipo[t].slice().sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
+    const lineas = items.map(i => {
+      const unidad = i.unidad || 'kg';
+      if (unidad === 'kg') {
+        const c = parseFloat(i.cantidadTotal.toFixed(3)).toString();
+        return `- ${i.nombre}: ${c} kg`;
+      }
+      const c = Math.round(i.cantidadTotal).toLocaleString('en-US');
+      return `- ${c} ${i.nombre}`;
+    }).join('\n');
+    return `${meta.ic} ${meta.label.toUpperCase()}\n${lineas}`;
+  });
+  const texto = `📦 ${p.producto} · ${Math.round(p.cantidad).toLocaleString('en-US')} und\n\n${bloques.join('\n\n')}`;
+  navigator.clipboard.writeText(texto)
+    .then(() => { mostrarToast(`Copiado: ${p.producto}`, {type:'success', duration:2500}); flashCopiado(btn); })
+    .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3000}));
 }
 
 function renderProveedoresPorTipo(lista, porProv) {
