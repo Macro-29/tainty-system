@@ -3,6 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PWA (app instalable) -->
+<meta name="theme-color" content="#0d0d0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Tainty">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
 <title>Pagos · Tainty Labs</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./assets/common.css">
@@ -616,6 +625,16 @@ document.addEventListener('visibilitychange', ()=>{
 const _origCargarPagos = cargarPagos;
 cargarPagos = async function(){ await _origCargarPagos.apply(this, arguments); startAutoRefresh(); };
 
+</script>
+<script>
+/* Registro del Service Worker · PWA Tainty */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').catch(function (e) {
+      console.warn('SW no registrado:', e);
+    });
+  });
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,48 @@
+{
+  "name": "Tainty · Sistema de Gestión",
+  "short_name": "Tainty",
+  "description": "Panel de producción, dashboard, costeo, formulario, gestión y pagos de Tainty Corporation.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d0f",
+  "theme_color": "#0d0d0f",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "./assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Panel de producción",
+      "url": "./panel_produccion_tainty.html"
+    },
+    {
+      "name": "Pagos",
+      "url": "./pagos_tainty.html"
+    },
+    {
+      "name": "Gestión",
+      "url": "./gestion_tainty.html"
+    }
+  ]
+}
