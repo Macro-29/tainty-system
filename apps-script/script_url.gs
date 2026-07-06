@@ -46,20 +46,45 @@ function doPost(e) {
       const ss = SpreadsheetApp.openById(SHEET_ID);
       const sheet = ss.getSheetByName('PAGOS');
       const data = sheet.getDataRange().getValues();
-      const num = parseInt(e.parameter.numAbono);
       const monto = parseFloat(e.parameter.monto);
       const fecha = e.parameter.fecha;
-      const colAbono = num === 1 ? 7 : num === 2 ? 10 : num === 3 ? 13 : 16;
-      const colFecha = colAbono + 1;
-      const colRestante = colAbono + 2;
+
+      // Abono inicial del pedido (MONTO ABONADO en NUEVO PEDIDO, col 10 / índice 9).
+      // Si PAGOS aún no lo tiene reflejado, lo materializamos en la 1ª casilla
+      // antes de agregar el nuevo abono, para que el saldo cuadre.
+      let abonoInicial = 0;
+      const sheetPed = ss.getSheetByName(SHEET_NAME);
+      if (sheetPed) {
+        const dataPed = sheetPed.getDataRange().getValues();
+        for (let i = 1; i < dataPed.length; i++) {
+          if (dataPed[i][0] === e.parameter.pedido) { abonoInicial = parseFloat(dataPed[i][9]) || 0; break; }
+        }
+      }
+
+      // Casillas físicas de abono en PAGOS: cols 7,10,13,16 (índices 6,9,12,15).
+      const slots = [6, 9, 12, 15];
       for (let i = 1; i < data.length; i++) {
         if (data[i][0] === e.parameter.pedido) {
           const total = parseFloat(data[i][5]) || 0;
-          const prevAbonos = [data[i][6],data[i][9],data[i][12],data[i][15]].map(a=>parseFloat(a)||0).reduce((s,a)=>s+a,0);
-          const nuevoRestante = Math.max(0, total - prevAbonos - monto);
+          const abonos = slots.map(c => parseFloat(data[i][c]) || 0);
+
+          // Materializar el abono inicial en la casilla 1 si PAGOS no tiene abonos.
+          if (abonos.every(a => a === 0) && abonoInicial > 0) {
+            sheet.getRange(i+1, 7).setValue(abonoInicial);
+            if (!data[i][7]) sheet.getRange(i+1, 8).setValue(data[i][1]); // fecha del pedido
+            abonos[0] = abonoInicial;
+          }
+
+          // Primera casilla libre (cálculo del lado servidor, robusto).
+          const idx = abonos.findIndex(a => a === 0);
+          if (idx === -1) return buildResponse({ success: false, error: 'Máximo 4 abonos' });
+          const colAbono = slots[idx] + 1;
           sheet.getRange(i+1, colAbono).setValue(monto);
-          sheet.getRange(i+1, colFecha).setValue(fecha);
-          sheet.getRange(i+1, colRestante).setValue(nuevoRestante);
+          sheet.getRange(i+1, colAbono + 1).setValue(fecha);
+          abonos[idx] = monto;
+
+          const nuevoRestante = Math.max(0, total - abonos.reduce((s,a)=>s+a,0));
+          sheet.getRange(i+1, colAbono + 2).setValue(nuevoRestante);
           if (nuevoRestante <= 0) sheet.getRange(i+1, 19).setValue('PAGO REALIZADO');
           return buildResponse({ success: true });
         }
@@ -316,6 +341,7 @@ function doGet(e) {
     // requerir un segundo request desde el cliente.
     const estadosPedido = {};
     const condicionPedido = {};
+    const abonoInicialPedido = {}; // numPedido -> MONTO ABONADO del pedido (col 10)
     const sheetPed = ss.getSheetByName(SHEET_NAME);
     if (sheetPed) {
       const dataPed = sheetPed.getDataRange().getValues();
@@ -324,6 +350,7 @@ function doGet(e) {
         if (np) {
           estadosPedido[np] = (dataPed[i][13] || '').toString();
           condicionPedido[np] = (dataPed[i][15] || '').toString();
+          abonoInicialPedido[np] = parseFloat(dataPed[i][9]) || 0; // col J = MONTO ABONADO
         }
       }
     }
@@ -332,10 +359,24 @@ function doGet(e) {
     for (let i = 1; i < data.length; i++) {
       const r = data[i];
       if (!r[0]) continue;
+
+      // Auto-sincronización del abono inicial: si en PAGOS no hay ningún abono
+      // registrado (abono1..4 vacíos/0) pero el pedido sí tiene un MONTO ABONADO
+      // en NUEVO PEDIDO, lo reflejamos como 1er abono. Cubre los pedidos donde el
+      // "espejo" de escritura no llegó a correr. Nunca pisa abonos ya existentes.
+      let abono1 = r[6], fecha1 = r[7], restante1 = r[8];
+      const sinAbonosEnPagos = ![r[6], r[9], r[12], r[15]].some(a => (parseFloat(a) || 0) > 0);
+      const abonoIni = abonoInicialPedido[r[0]] || 0;
+      if (sinAbonosEnPagos && abonoIni > 0) {
+        abono1 = abonoIni;
+        fecha1 = r[7] || r[1]; // fecha del abono si existe, sino la del pedido
+        restante1 = Math.max(0, (parseFloat(r[5]) || 0) - abonoIni);
+      }
+
       pagos.push({
         numPedido:r[0], fecha:r[1], cliente:r[2],
         cantidad:r[3], producto:r[4], montoTotal:r[5],
-        abono1:r[6], fecha1:r[7], restante1:r[8],
+        abono1:abono1, fecha1:fecha1, restante1:restante1,
         abono2:r[9], fecha2:r[10], restante2:r[11],
         abono3:r[12], fecha3:r[13], restante3:r[14],
         abono4:r[15], fecha4:r[16], restante4:r[17],
