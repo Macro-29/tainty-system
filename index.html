@@ -103,6 +103,36 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
 .guest-hint a{color:var(--purple);text-decoration:none}
 .guest-hint a:hover{text-decoration:underline}
 
+/* ---------- Acceso administrador (abre el PIN) ---------- */
+.admin-access{
+  width:100%;display:flex;align-items:center;gap:14px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:16px;padding:1rem 1.25rem;cursor:pointer;
+  color:var(--text);font-family:'DM Sans',sans-serif;text-align:left;
+  transition:transform .18s cubic-bezier(.2,.7,.3,1),border-color .18s,background .18s,box-shadow .18s;
+}
+.admin-access:hover{border-color:var(--purple);background:var(--surface2);transform:translateY(-2px);box-shadow:0 10px 28px -12px var(--purple-dim),0 0 0 1px var(--purple-dim)}
+.admin-access:active{transform:translateY(0)}
+.admin-avatar{
+  width:48px;height:48px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:23px;
+  background:radial-gradient(circle at 32% 28%,rgba(124,111,239,.4),var(--purple-dim));
+  border:1px solid rgba(124,111,239,.4);
+}
+.admin-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.admin-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700}
+.admin-sub{font-size:12px;color:var(--muted)}
+.admin-access .card-arrow{font-size:22px;color:var(--hint);flex-shrink:0;transition:transform .18s,color .18s}
+.admin-access:hover .card-arrow{color:var(--purple);transform:translateX(4px)}
+
+/* Botón de cerrar el overlay del PIN */
+.pin-close{
+  position:absolute;top:14px;right:16px;
+  background:none;border:none;color:var(--muted);
+  font-size:19px;cursor:pointer;padding:4px 8px;line-height:1;border-radius:8px;
+}
+.pin-close:hover{color:var(--text)}
+
 /* PIN unlock success flourish */
 .pin-card.success{animation:popOk .35s ease}
 @keyframes popOk{0%{transform:scale(1)}45%{transform:scale(1.04)}100%{transform:scale(1)}}
@@ -125,11 +155,12 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
 </head>
 <body>
 
-<!-- LOGIN OVERLAY -->
-<div class="pin-overlay" id="pin-overlay">
+<!-- LOGIN OVERLAY (oculto por defecto; se abre desde "Acceso administrador") -->
+<div class="pin-overlay hidden" id="pin-overlay">
   <div class="pin-card" id="pin-card">
+    <button class="pin-close" onclick="cerrarAdmin()" aria-label="Cerrar">&#10005;</button>
     <div class="pin-logo">Tainty <span>Labs</span></div>
-    <div class="pin-sub">Ingresa tu PIN para acceder</div>
+    <div class="pin-sub">Acceso administrador · ingresa tu código</div>
     <div class="pin-dots" id="pin-dots-wrap">
       <div class="pin-dot" id="pd0"></div>
       <div class="pin-dot" id="pd1"></div>
@@ -153,13 +184,6 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
       <div></div>
     </div>
     <div class="pin-err" id="pin-err"></div>
-    <div class="guest-hint">
-      <div>o entrar sin clave a:</div>
-      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
-        <a href="./recepcion_tainty.html">📥 Recepción de Insumos &rarr;</a>
-        <a href="./panel_produccion_tainty.html">📺 Panel de Producción &rarr;</a>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -191,6 +215,19 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
     </a>
   </div>
 
+  <!-- Acceso administrador: abre el teclado del PIN. Se oculta si ya hay sesión. -->
+  <div class="section-label has-top" id="label-admin">Administración</div>
+  <button class="admin-access" id="admin-access" onclick="abrirAdmin()">
+    <span class="admin-avatar">🔐</span>
+    <span class="admin-text">
+      <span class="admin-title">Acceso administrador</span>
+      <span class="admin-sub">Ingresa tu código para ver los módulos internos</span>
+    </span>
+    <span class="card-arrow">›</span>
+  </button>
+
+  <!-- Módulos internos: ocultos hasta ingresar el código de administrador. -->
+  <div id="seccion-admin" style="display:none">
   <div class="section-label has-top">Gestión interna</div>
   <div class="grid anim" id="grid-modulos">
     <a class="card c-green needs-login" href="./formulario_tainty.html">
@@ -239,6 +276,7 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
       <span class="card-lock">🔒 Requiere PIN</span>
     </a>
   </div>
+  </div><!-- /#seccion-admin -->
 </div>
 
 <script>
@@ -275,8 +313,27 @@ function onPinOk() {
   card.classList.add('success');
   setTimeout(() => {
     document.getElementById('pin-overlay').classList.add('hidden');
+    card.classList.remove('success');
+    document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('ok'));
     renderEstadoSesion();
   }, 380);
+}
+
+/** Abre el teclado del PIN (desde el botón "Acceso administrador"). */
+function abrirAdmin() {
+  pinBuf = '';
+  pinLocked = false;
+  updDots();
+  document.getElementById('pin-err').textContent = '';
+  document.getElementById('pin-overlay').classList.remove('hidden');
+}
+
+/** Cierra el teclado del PIN sin iniciar sesión. */
+function cerrarAdmin() {
+  pinBuf = '';
+  pinLocked = false;
+  updDots();
+  document.getElementById('pin-overlay').classList.add('hidden');
 }
 
 function onPinErr() {
@@ -312,6 +369,11 @@ function renderEstadoSesion() {
   document.querySelectorAll('.card.needs-login').forEach(c => {
     c.classList.toggle('locked', !logged);
   });
+  // Con sesión: se muestran los módulos internos y se oculta el acceso admin.
+  // Sin sesión: solo los accesos públicos + el botón para ingresar el código.
+  document.getElementById('seccion-admin').style.display = logged ? '' : 'none';
+  document.getElementById('admin-access').style.display = logged ? 'none' : '';
+  document.getElementById('label-admin').style.display = logged ? 'none' : '';
 }
 
 /** Saludo según la hora + fecha/hora en vivo. */
