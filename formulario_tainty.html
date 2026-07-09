@@ -397,6 +397,17 @@ input.invalid, select.invalid, textarea.invalid{
 .ui-modal-btn.primary:hover{background:var(--purple-dark)}
 .ui-modal-btn.danger{background:var(--red);border-color:var(--red);color:#fff}
 .ui-modal-btn.danger:hover{background:#a32f22}
+
+/* Líneas de producto (varios pedidos por cliente) */
+.linea{position:relative}
+.linea-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:1.1rem}
+.linea-title{font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--hint);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.linea-num{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--purple-light);color:var(--purple-dark);font-size:11px;font-weight:700;letter-spacing:0}
+.linea-del{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--red);cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.linea-del:hover{background:var(--red-light);border-color:var(--red)}
+.linea-total{font-size:12px;font-family:'DM Mono',monospace;color:var(--purple-dark);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);display:none}
+.btn-add-linea{width:100%;padding:13px;margin-bottom:1rem;border:1.5px dashed var(--border);background:var(--card);color:var(--purple);border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-add-linea:hover{border-color:var(--purple);background:var(--purple-light)}
 </style>
 <script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>
@@ -426,8 +437,8 @@ input.invalid, select.invalid, textarea.invalid{
 
     <div class="progress-wrap">
       <div class="progress-head">
-        <span class="progress-label">Progreso del pedido</span>
-        <span class="progress-count" id="progress-count">0 de 5</span>
+        <span class="progress-label">Productos listos</span>
+        <span class="progress-count" id="progress-count">0 de 1</span>
       </div>
       <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
     </div>
@@ -442,7 +453,7 @@ input.invalid, select.invalid, textarea.invalid{
         </div>
         <div class="field">
           <label>Vendedor <span class="req">*</span></label>
-          <select id="f-vendedor" onchange="clearFieldError('f-vendedor');onProducto();updateProgress()">
+          <select id="f-vendedor" onchange="onVendedorChange()">
             <option value="">Elige...</option>
             <option>Carlos Esparza</option>
             <option>Miguel Chozo</option>
@@ -452,67 +463,22 @@ input.invalid, select.invalid, textarea.invalid{
       </div>
       <div class="field">
         <label>Cliente <span class="req">*</span></label>
-        <input type="text" id="f-cliente" list="clientes-list" placeholder="Escribe o elige cliente..." autocomplete="off" oninput="onClienteInput()" onchange="onClienteInput();sugerirPrecio()">
+        <input type="text" id="f-cliente" list="clientes-list" placeholder="Escribe o elige cliente..." autocomplete="off" oninput="onClienteInput()" onchange="onClienteChange()">
         <datalist id="clientes-list"></datalist>
         <div class="catalog-hint" id="hint-clientes"><span class="dot"></span>Cargando clientes...</div>
         <div class="field-error" id="err-f-cliente">⚠ Ingresa el cliente</div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">Producto y cantidad</div>
-      <div class="field">
-        <label>Producto <span class="req">*</span></label>
-        <input type="text" id="f-producto" list="productos-list" placeholder="Escribe o elige producto..." autocomplete="off" oninput="onProductoInput()" onchange="onProducto()">
-        <datalist id="productos-list"></datalist>
-        <div class="catalog-hint" id="hint-productos"><span class="dot"></span>Cargando productos...</div>
-        <div class="field-error" id="err-f-producto">⚠ Ingresa el producto</div>
-        <div id="tipo-wrap"></div>
-      </div>
-      <div class="field">
-        <label>Cantidad (unidades) <span class="req">*</span></label>
-        <input type="number" id="f-cantidad" min="1" placeholder="Ej: 300" oninput="onCantidad()">
-        <div class="chips" id="chips-cantidad">
-          <span class="chip" onclick="setCantidad(100)">100</span>
-          <span class="chip" onclick="setCantidad(300)">300</span>
-          <span class="chip" onclick="setCantidad(500)">500</span>
-          <span class="chip" onclick="setCantidad(1000)">1000</span>
-        </div>
-        <div class="field-error" id="err-f-cantidad">⚠ Ingresa una cantidad válida</div>
-      </div>
-    </div>
+    <datalist id="productos-list"></datalist>
+    <div class="catalog-hint" id="hint-productos" style="margin:0 0 8px 2px"><span class="dot"></span>Cargando productos...</div>
 
-    <div class="card">
-      <div class="card-title">Precios</div>
-      <div class="field">
-        <label>Precio de venta por unidad (S/) <span class="req">*</span></label>
-        <input type="number" id="f-precio" step="0.01" min="0" placeholder="S/ 0.00" oninput="precioAutollenado=false;clearFieldError('f-precio');updatePreview()">
-        <div class="field-error" id="err-f-precio">⚠ Ingresa el precio por unidad</div>
-        <div class="price-suggest" id="price-suggest">
-          <div class="ps-label">Último precio registrado en Sheets</div>
-          <div class="ps-value" id="ps-val"></div>
-          <div class="ps-hint">Puedes modificarlo en el campo de arriba</div>
-        </div>
-      </div>
-      <div class="field">
-        <label>Monto abonado (S/)</label>
-        <input type="number" id="f-abono" step="0.01" min="0" placeholder="S/ 0.00 (opcional)" oninput="updatePreview()">
-        <div class="chips" id="chips-abono">
-          <span class="chip" onclick="setAbono(0)">Sin abono</span>
-          <span class="chip" onclick="setAbono(50)">50%</span>
-          <span class="chip" onclick="setAbono(100)">100%</span>
-          <span class="chip credito" onclick="setCredito()">A crédito</span>
-        </div>
-      </div>
-    </div>
+    <!-- Líneas de producto: cada una es un pedido independiente para el mismo cliente -->
+    <div id="lineas-wrap"></div>
 
-    <div class="card">
-      <div class="card-title">Adicional</div>
-      <div class="field">
-        <label>Observaciones</label>
-        <textarea id="f-obs" placeholder="Ej: verificar precio, entrega urgente, coordinar con cliente..."></textarea>
-      </div>
-    </div>
+    <button type="button" class="btn-add-linea" id="btn-add-linea" onclick="agregarLinea(true)">
+      + Agregar otro producto
+    </button>
 
     <div class="preview-card" id="preview">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
@@ -551,12 +517,11 @@ if (!requireLogin()) {
   // El navegador ya esta yendo al index; lo siguiente no se ejecuta.
 }
 const preciosCache = {};
-// true cuando el precio del campo lo puso una sugerencia (no el usuario).
-// Permite reemplazarlo o limpiarlo al cambiar los datos sin pisar un
-// monto escrito a mano.
-let precioAutollenado = false;
-// true cuando el pedido se marca como venta a crédito (abono 0, sin pago inicial).
-let esCredito = false;
+// === Estado de las líneas de producto (varios pedidos por cliente) ===
+// Cada línea es un pedido independiente que comparte cliente, fecha y vendedor.
+let lineas = [];         // ids de línea, en orden de aparición
+let lineaSeq = 0;        // contador incremental para ids únicos
+const estadoLinea = {};  // id -> { credito:bool, autollenado:bool }
 
 function getTipo(nombre) {
   const n = nombre.toLowerCase();
@@ -585,81 +550,197 @@ function clearFieldError(id) {
   if (err) err.classList.remove('show');
 }
 
-// === Chips rápidos ===
-function setCantidad(n) {
-  document.getElementById('f-cantidad').value = n;
-  clearFieldError('f-cantidad');
-  syncChips('chips-cantidad', String(n));
-  onCantidad();
-  updateProgress();
-}
-function setAbono(pct) {
-  esCredito = false;
-  const ab = document.getElementById('f-abono');
-  ab.disabled = false;
-  const precio = parseFloat(document.getElementById('f-precio').value) || 0;
-  const cant = parseInt(document.getElementById('f-cantidad').value) || 0;
-  const total = precio * cant;
-  if (pct === 0) ab.value = '';
-  else ab.value = (total * pct / 100).toFixed(2);
-  syncChips('chips-abono', pct === 0 ? 'Sin abono' : pct + '%');
-  updatePreview();
-}
-
-// Marca el pedido como venta a crédito: abono 0 y campo de abono bloqueado.
-function setCredito() {
-  esCredito = true;
-  const ab = document.getElementById('f-abono');
-  ab.value = '';
-  ab.disabled = true;
-  syncChips('chips-abono', 'A crédito');
-  updatePreview();
-}
 function syncChips(containerId, activeText) {
   document.querySelectorAll('#' + containerId + ' .chip').forEach(c => {
     c.classList.toggle('active', c.textContent.trim() === activeText);
   });
 }
 
-// === Barra de progreso (5 campos obligatorios) ===
-function updateProgress() {
-  const reqs = ['f-fecha','f-vendedor','f-cliente','f-producto','f-cantidad','f-precio'];
-  const filled = reqs.filter(id => {
-    const v = (document.getElementById(id).value || '').trim();
-    if (id === 'f-cantidad' || id === 'f-precio') return parseFloat(v) > 0;
-    return !!v;
-  }).length;
-  const total = reqs.length;
-  const pct = Math.round((filled / total) * 100);
-  const fill = document.getElementById('progress-fill');
-  fill.style.width = pct + '%';
-  fill.classList.toggle('done', filled === total);
-  document.getElementById('progress-count').textContent = filled + ' de ' + total;
+// === Gestión de líneas de producto ===
+function plantillaLinea(n, num) {
+  return `
+  <div class="card linea" id="linea-${n}" data-linea="${n}">
+    <div class="linea-head">
+      <div class="linea-title">Producto <span class="linea-num">${num}</span></div>
+      <button type="button" class="linea-del" title="Quitar este producto" onclick="removerLinea(${n})">✕</button>
+    </div>
+    <div class="field">
+      <label>Producto <span class="req">*</span></label>
+      <input type="text" id="prod-${n}" list="productos-list" placeholder="Escribe o elige producto..." autocomplete="off" oninput="onProductoLineInput(${n})" onchange="onProductoLine(${n})">
+      <div class="field-error" id="err-prod-${n}">⚠ Ingresa el producto</div>
+      <div id="tipo-${n}"></div>
+    </div>
+    <div class="field">
+      <label>Cantidad (unidades) <span class="req">*</span></label>
+      <input type="number" id="cant-${n}" min="1" placeholder="Ej: 300" oninput="onCantidadLine(${n})">
+      <div class="chips" id="chips-cant-${n}">
+        <span class="chip" onclick="setCantidadLine(${n},100)">100</span>
+        <span class="chip" onclick="setCantidadLine(${n},300)">300</span>
+        <span class="chip" onclick="setCantidadLine(${n},500)">500</span>
+        <span class="chip" onclick="setCantidadLine(${n},1000)">1000</span>
+      </div>
+      <div class="field-error" id="err-cant-${n}">⚠ Ingresa una cantidad válida</div>
+    </div>
+    <div class="field">
+      <label>Precio de venta por unidad (S/) <span class="req">*</span></label>
+      <input type="number" id="precio-${n}" step="0.01" min="0" placeholder="S/ 0.00" oninput="onPrecioLineInput(${n})">
+      <div class="field-error" id="err-precio-${n}">⚠ Ingresa el precio por unidad</div>
+      <div class="price-suggest" id="ps-${n}">
+        <div class="ps-label">Precio sugerido</div>
+        <div class="ps-value" id="psval-${n}"></div>
+        <div class="ps-hint">Puedes modificarlo arriba</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Monto abonado (S/)</label>
+      <input type="number" id="abono-${n}" step="0.01" min="0" placeholder="S/ 0.00 (opcional)" oninput="onAbonoLineInput(${n})">
+      <div class="chips" id="chips-abono-${n}">
+        <span class="chip" onclick="setAbonoLine(${n},0)">Sin abono</span>
+        <span class="chip" onclick="setAbonoLine(${n},50)">50%</span>
+        <span class="chip" onclick="setAbonoLine(${n},100)">100%</span>
+        <span class="chip credito" onclick="setCreditoLine(${n})">A crédito</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Observaciones</label>
+      <textarea id="obs-${n}" placeholder="Ej: entrega urgente, coordinar con cliente..."></textarea>
+    </div>
+    <div class="linea-total" id="ltotal-${n}"></div>
+  </div>`;
 }
 
-// === Total en vivo en la barra de acción ===
-function updateActionTotal() {
-  const cant = parseInt(document.getElementById('f-cantidad').value);
-  const precio = parseFloat(document.getElementById('f-precio').value);
-  const abono = parseFloat(document.getElementById('f-abono').value) || 0;
+function agregarLinea(foco) {
+  const n = ++lineaSeq;
+  lineas.push(n);
+  estadoLinea[n] = { credito: false, autollenado: false };
+  document.getElementById('lineas-wrap').insertAdjacentHTML('beforeend', plantillaLinea(n, lineas.length));
+  renumerarLineas();
+  actualizarTotales();
+  if (foco) {
+    const el = document.getElementById('prod-' + n);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => el.focus(), 200); }
+  }
+}
+
+function removerLinea(n) {
+  if (lineas.length <= 1) return; // siempre queda al menos una línea
+  lineas = lineas.filter(x => x !== n);
+  delete estadoLinea[n];
+  const el = document.getElementById('linea-' + n);
+  if (el) el.remove();
+  renumerarLineas();
+  actualizarTotales();
+}
+
+function renumerarLineas() {
+  lineas.forEach((n, i) => {
+    const numEl = document.querySelector('#linea-' + n + ' .linea-num');
+    if (numEl) numEl.textContent = i + 1;
+    const delBtn = document.querySelector('#linea-' + n + ' .linea-del');
+    if (delBtn) delBtn.style.display = lineas.length > 1 ? 'inline-flex' : 'none';
+  });
+}
+
+// Lee los datos actuales de una línea como objeto.
+function leerLinea(n) {
+  const prod = (document.getElementById('prod-' + n).value || '').trim();
+  const cant = parseInt(document.getElementById('cant-' + n).value) || 0;
+  const precio = parseFloat(document.getElementById('precio-' + n).value) || 0;
+  const credito = !!(estadoLinea[n] && estadoLinea[n].credito);
+  const abono = credito ? 0 : (parseFloat(document.getElementById('abono-' + n).value) || 0);
+  const obs = document.getElementById('obs-' + n).value || '';
+  return { n, prod, cant, precio, credito, abono, obs, total: precio * cant, completa: !!prod && cant > 0 && precio > 0 };
+}
+
+// === Chips rápidos por línea ===
+function setCantidadLine(n, v) {
+  document.getElementById('cant-' + n).value = v;
+  clearFieldError('cant-' + n);
+  syncChips('chips-cant-' + n, String(v));
+  onCantidadLine(n);
+}
+function setAbonoLine(n, pct) {
+  estadoLinea[n].credito = false;
+  const ab = document.getElementById('abono-' + n);
+  ab.disabled = false;
+  const L = leerLinea(n);
+  ab.value = pct === 0 ? '' : (L.precio * L.cant * pct / 100).toFixed(2);
+  syncChips('chips-abono-' + n, pct === 0 ? 'Sin abono' : pct + '%');
+  actualizarTotales();
+}
+function setCreditoLine(n) {
+  estadoLinea[n].credito = true;
+  const ab = document.getElementById('abono-' + n);
+  ab.value = ''; ab.disabled = true;
+  syncChips('chips-abono-' + n, 'A crédito');
+  actualizarTotales();
+}
+
+// === Progreso (líneas completas) ===
+function updateProgress() {
+  const total = lineas.length;
+  const completas = lineas.filter(n => leerLinea(n).completa).length;
+  const pct = total ? Math.round(completas / total * 100) : 0;
+  const fill = document.getElementById('progress-fill');
+  fill.style.width = pct + '%';
+  fill.classList.toggle('done', total > 0 && completas === total);
+  document.getElementById('progress-count').textContent = completas + ' de ' + total;
+}
+
+// === Totales: subtotales por línea, barra de acción y vista previa combinada ===
+function actualizarTotales() {
+  let granTotal = 0, granAbono = 0, completas = 0;
+  lineas.forEach(n => {
+    const L = leerLinea(n);
+    const ltotalEl = document.getElementById('ltotal-' + n);
+    if (L.completa) {
+      completas++; granTotal += L.total; granAbono += L.credito ? 0 : L.abono;
+      if (ltotalEl) {
+        const extra = L.credito ? ' · A crédito' : (L.abono > 0 ? ' · abonó S/ ' + L.abono.toLocaleString('es-PE', {minimumFractionDigits:2}) : '');
+        ltotalEl.textContent = 'Subtotal: S/ ' + L.total.toLocaleString('es-PE', {minimumFractionDigits:2}) + extra;
+        ltotalEl.style.display = 'block';
+      }
+    } else if (ltotalEl) { ltotalEl.style.display = 'none'; }
+  });
   const valEl = document.getElementById('at-value');
   const subEl = document.getElementById('at-sub');
-  if (!cant || !precio) {
+  if (completas === 0) {
     valEl.textContent = 'S/ 0.00';
     subEl.textContent = 'Completa producto, cantidad y precio';
-    return;
-  }
-  const total = precio * cant;
-  valEl.textContent = 'S/ ' + total.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-  if (esCredito) {
-    subEl.textContent = 'A crédito · saldo total S/ ' + total.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-  } else if (abono > 0) {
-    const pct = Math.round((abono / total) * 100);
-    const saldo = total - abono;
-    subEl.textContent = 'Abonado ' + pct + '% · saldo S/ ' + saldo.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
   } else {
-    subEl.textContent = cant.toLocaleString() + ' und × S/ ' + precio.toFixed(2);
+    valEl.textContent = 'S/ ' + granTotal.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const saldo = granTotal - granAbono;
+    subEl.textContent = completas + ' producto' + (completas > 1 ? 's' : '') + ' · saldo S/ ' + saldo.toLocaleString('es-PE', {minimumFractionDigits:2});
   }
+  const btn = document.getElementById('btn-submit');
+  if (btn) btn.textContent = completas > 1 ? ('Registrar ' + completas + ' pedidos') : 'Registrar pedido';
+  updateProgress();
+  updatePreviewMulti();
+}
+
+function updatePreviewMulti() {
+  const preview = document.getElementById('preview');
+  const completas = lineas.map(leerLinea).filter(L => L.completa);
+  if (!completas.length) { preview.style.display = 'none'; return; }
+  preview.style.display = 'block';
+  let granTotal = 0, granAbono = 0;
+  const rows = completas.map((L, i) => {
+    granTotal += L.total; granAbono += L.credito ? 0 : L.abono;
+    const cond = L.credito ? '<span style="color:var(--amber)">A crédito</span>'
+      : (L.abono > 0 ? 'abonó S/ ' + L.abono.toLocaleString('es-PE', {minimumFractionDigits:2}) : 'sin abono');
+    return `<div class="preview-row"><span class="preview-key">${i + 1}. ${L.prod}</span><span class="preview-val">${L.cant.toLocaleString()} und × S/ ${L.precio.toFixed(2)} = S/ ${L.total.toLocaleString('es-PE', {minimumFractionDigits:2})}<br><span style="font-size:11px;color:var(--muted)">${cond}</span></span></div>`;
+  }).join('');
+  const saldo = granTotal - granAbono;
+  const resumen = `
+    <div class="preview-row" style="border-top:2px solid var(--border);margin-top:4px;padding-top:8px"><span class="preview-key" style="font-weight:600;color:var(--text)">Total (${completas.length} pedido${completas.length > 1 ? 's' : ''})</span><span class="preview-val" style="font-weight:600">S/ ${granTotal.toLocaleString('es-PE', {minimumFractionDigits:2})}</span></div>
+    <div class="preview-row"><span class="preview-key">Abonado total</span><span class="preview-val">S/ ${granAbono.toLocaleString('es-PE', {minimumFractionDigits:2})}</span></div>
+    <div class="preview-row"><span class="preview-key">Saldo total</span><span class="preview-val">S/ ${saldo.toLocaleString('es-PE', {minimumFractionDigits:2})}</span></div>`;
+  document.getElementById('preview-rows').innerHTML = rows + resumen;
+  const tipos = new Set(completas.map(L => getTipo(L.prod)));
+  const insumos = new Set();
+  tipos.forEach(t => getInsumos(t).forEach(x => insumos.add(x)));
+  document.getElementById('preview-insumos').innerHTML = [...insumos]
+    .map(x => `<span class="insumo-item"><span class="insumo-dot"></span>${x}</span>`).join('');
 }
 
 // === Modal genérico (reemplaza prompt/confirm nativos) ===
@@ -739,79 +820,86 @@ function renderDatalist(id, items) {
   dl.innerHTML = items.map(v => `<option value="${v.replace(/"/g, '&quot;')}">`).join('');
 }
 
+// Cliente (compartido por todas las líneas). En cada tecla solo forzamos
+// mayúsculas; el recálculo de precios se hace al salir del campo (onchange)
+// para no disparar una consulta por cada tecla.
 function onClienteInput() {
-  const v = (document.getElementById('f-cliente').value || '').trim().toUpperCase();
-  document.getElementById('f-cliente').value = v; // forzar mayúsculas
-  if (v) clearFieldError('f-cliente');
-  updateProgress();
+  const el = document.getElementById('f-cliente');
+  el.value = (el.value || '').trim().toUpperCase();
+  if (el.value) clearFieldError('f-cliente');
+  actualizarTotales();
+}
+function onClienteChange() {
+  onClienteInput();
+  recalcularLineas();
+}
+function onVendedorChange() {
+  clearFieldError('f-vendedor');
+  recalcularLineas();
+}
+// El cliente y el vendedor afectan el precio sugerido de TODAS las líneas.
+function recalcularLineas() {
+  lineas.forEach(n => sugerirPrecioLine(n));
+  actualizarTotales();
 }
 
-function onProductoInput() {
-  const v = (document.getElementById('f-producto').value || '').trim();
-  if (v) clearFieldError('f-producto');
-  updateProgress();
+// === Handlers por línea (producto, cantidad, precio, abono) ===
+function onProductoLineInput(n) {
+  const v = (document.getElementById('prod-' + n).value || '').trim();
+  if (v) clearFieldError('prod-' + n);
+  actualizarTotales();
 }
-
-// Llamado al cambiar producto o vendedor. Refresca tipo-badge y dispara
-// la sugerencia de precio en función de (producto, vendedor, cantidad).
-async function onProducto() {
-  const tipoWrap = document.getElementById('tipo-wrap');
-  const ps = document.getElementById('price-suggest');
-  const prod = document.getElementById('f-producto').value;
-
-  onProductoInput(); // aviso "producto nuevo"
-
-  if (!prod) { tipoWrap.innerHTML = ''; ps.style.display = 'none'; updatePreview(); return; }
-
+async function onProductoLine(n) {
+  const prod = document.getElementById('prod-' + n).value;
+  const tipoWrap = document.getElementById('tipo-' + n);
+  onProductoLineInput(n);
+  if (!prod) { tipoWrap.innerHTML = ''; document.getElementById('ps-' + n).style.display = 'none'; actualizarTotales(); return; }
   const tipo = getTipo(prod);
   const labels = { ml: 'Líquido (ml)', gr: 'Polvo (gr)', cap: 'Cápsula (cap)' };
   const cls = { ml: 'tipo-ml', gr: 'tipo-gr', cap: 'tipo-cap' };
   tipoWrap.innerHTML = `<span class="tipo-badge ${cls[tipo]}">${labels[tipo]}</span>`;
-
-  await sugerirPrecio();
+  await sugerirPrecioLine(n);
 }
-
-// Llamado al cambiar la cantidad. Re-dispara la sugerencia de precio
-// porque el precio puede variar por escala (más unidades = mejor precio).
-async function onCantidad() {
-  const v = document.getElementById('f-cantidad').value;
-  if (parseFloat(v) > 0) clearFieldError('f-cantidad');
-  syncChips('chips-cantidad', v);
-  await sugerirPrecio();
-  updatePreview();
+async function onCantidadLine(n) {
+  const v = document.getElementById('cant-' + n).value;
+  if (parseFloat(v) > 0) clearFieldError('cant-' + n);
+  syncChips('chips-cant-' + n, v);
+  await sugerirPrecioLine(n);
+  actualizarTotales();
+}
+function onPrecioLineInput(n) {
+  if (estadoLinea[n]) estadoLinea[n].autollenado = false;
+  clearFieldError('precio-' + n);
+  actualizarTotales();
+}
+function onAbonoLineInput(n) {
+  actualizarTotales();
 }
 
 /**
- * Sugiere el precio SOLO cuando existe una venta previa idéntica en los
- * cuatro datos: producto + vendedor + cliente + cantidad (fuente='exacto').
- * El server hace la búsqueda; si no hay coincidencia exacta devuelve
- * fuente='ninguno' y el campo de precio queda en blanco para ingresarlo
- * a mano. Se recalcula al cambiar cualquiera de esos cuatro campos.
+ * Sugiere el precio de una línea SOLO cuando existe una venta previa idéntica
+ * en los cuatro datos: producto + vendedor + cliente + cantidad. Cliente y
+ * vendedor son compartidos; producto y cantidad son de la línea.
  */
-async function sugerirPrecio() {
-  const ps = document.getElementById('price-suggest');
-  const prod = document.getElementById('f-producto').value;
+async function sugerirPrecioLine(n) {
+  const ps = document.getElementById('ps-' + n);
+  if (!ps) return;
+  const prod = document.getElementById('prod-' + n).value;
+  const cantidad = parseInt(document.getElementById('cant-' + n).value) || 0;
   const vendedor = document.getElementById('f-vendedor').value;
   const cliente = (document.getElementById('f-cliente').value || '').trim().toUpperCase();
-  const cantidad = parseInt(document.getElementById('f-cantidad').value) || 0;
 
   ps.style.display = 'none';
-  // Solo se sugiere precio con los 4 datos completos: producto, vendedor,
-  // cliente y cantidad. La sugerencia corresponde a una venta previa
-  // IDÉNTICA en esos 4 datos; si no existe, el campo queda en blanco.
   if (!prod || !vendedor || !cliente || cantidad <= 0) {
-    if (precioAutollenado) { document.getElementById('f-precio').value = ''; precioAutollenado = false; }
-    updatePreview();
+    if (estadoLinea[n] && estadoLinea[n].autollenado) { document.getElementById('precio-' + n).value = ''; estadoLinea[n].autollenado = false; }
+    actualizarTotales();
     return;
   }
-
-  // Cache por (vendedor, cliente, producto, cantidad)
   const cacheKey = vendedor + '||' + cliente + '||' + prod + '||' + cantidad;
   if (preciosCache[cacheKey] !== undefined) {
     const c = preciosCache[cacheKey];
-    if (c.precio > 0) mostrarPrecio(c.precio, c.fuente);
-    else mostrarSinSugerencia();
-    updatePreview();
+    if (c.precio > 0) mostrarPrecioLine(n, c.precio, c.fuente); else mostrarSinSugerenciaLine(n);
+    actualizarTotales();
     return;
   }
   try {
@@ -823,89 +911,48 @@ async function sugerirPrecio() {
     const data = await jsonp(url);
     if (data && data.success && data.precio > 0) {
       preciosCache[cacheKey] = { precio: data.precio, fuente: data.fuente };
-      mostrarPrecio(data.precio, data.fuente);
+      mostrarPrecioLine(n, data.precio, data.fuente);
     } else {
       preciosCache[cacheKey] = { precio: 0, fuente: null };
-      mostrarSinSugerencia();
+      mostrarSinSugerenciaLine(n);
     }
   } catch(e) {
     console.warn('Error precio:', e.message);
-    mostrarSinSugerencia();
+    mostrarSinSugerenciaLine(n);
   }
-  updatePreview();
+  actualizarTotales();
 }
 
-function mostrarPrecio(precio, fuente) {
-  // 'exacto' = venta previa idéntica en vendedor + cliente + producto + cantidad
-  const labelMap = {
-    exacto: 'Mismo precio de una venta previa idéntica (vendedor, cliente y cantidad)'
-  };
-  const label = labelMap[fuente] || 'Precio de una venta previa';
-  document.getElementById('ps-val').textContent = 'S/ ' + parseFloat(precio).toFixed(2) + ' por unidad';
-  const lbl = document.querySelector('#price-suggest .ps-label');
+function mostrarPrecioLine(n, precio, fuente) {
+  const ps = document.getElementById('ps-' + n);
+  const label = fuente === 'exacto' ? 'Mismo precio de una venta previa idéntica' : 'Precio de una venta previa';
+  const lbl = ps.querySelector('.ps-label');
   if (lbl) lbl.textContent = label;
-  const ps = document.getElementById('price-suggest');
+  document.getElementById('psval-' + n).textContent = 'S/ ' + parseFloat(precio).toFixed(2) + ' por unidad';
   ps.style.display = 'block';
   ps.style.opacity = '1';
-  const precioInput = document.getElementById('f-precio');
-  // Rellena si está vacío, o reemplaza si el valor previo también fue
-  // autollenado (p.ej. al cambiar la cantidad a otra con match distinto).
+  const precioInput = document.getElementById('precio-' + n);
+  // Rellena si está vacío, o reemplaza si el valor previo también fue autollenado.
   // No pisa nunca un precio escrito a mano.
-  if (!precioInput.value || precioAutollenado) {
+  if (!precioInput.value || (estadoLinea[n] && estadoLinea[n].autollenado)) {
     precioInput.value = parseFloat(precio).toFixed(2);
-    precioAutollenado = true;
-    clearFieldError('f-precio');
+    estadoLinea[n].autollenado = true;
+    clearFieldError('precio-' + n);
   }
-  updatePreview();
+  actualizarTotales();
 }
 
-/**
- * Muestra el panel con un mensaje suave indicando que no hay precio
- * histórico para esta combinación. Antes simplemente se ocultaba el
- * badge, lo que hacía pensar al usuario que el sistema no respondió.
- */
-function mostrarSinSugerencia() {
-  const ps = document.getElementById('price-suggest');
-  // Si el precio actual venía de una sugerencia, lo limpiamos para que no
-  // quede un monto que ya no corresponde a esta combinación.
-  if (precioAutollenado) {
-    document.getElementById('f-precio').value = '';
-    precioAutollenado = false;
+function mostrarSinSugerenciaLine(n) {
+  const ps = document.getElementById('ps-' + n);
+  if (estadoLinea[n] && estadoLinea[n].autollenado) {
+    document.getElementById('precio-' + n).value = '';
+    estadoLinea[n].autollenado = false;
   }
   const lbl = ps.querySelector('.ps-label');
   if (lbl) lbl.textContent = 'No hay una venta previa idéntica';
-  document.getElementById('ps-val').textContent = 'Ingresa el precio manualmente';
+  document.getElementById('psval-' + n).textContent = 'Ingresa el precio manualmente';
   ps.style.display = 'block';
   ps.style.opacity = '0.55';
-}
-
-function updatePreview() {
-  const prod = document.getElementById('f-producto').value;
-  const cant = parseInt(document.getElementById('f-cantidad').value);
-  const precio = parseFloat(document.getElementById('f-precio').value);
-  const abono = parseFloat(document.getElementById('f-abono').value) || 0;
-  const preview = document.getElementById('preview');
-
-  updateActionTotal();
-  updateProgress();
-
-  if (!prod || !cant || !precio) { preview.style.display = 'none'; return; }
-
-  preview.style.display = 'block';
-  const total = precio * cant;
-  const pct = abono > 0 ? Math.round((abono / total) * 100) + '%' : '0%';
-  const tipo = getTipo(prod);
-
-  document.getElementById('preview-rows').innerHTML = `
-    <div class="preview-row"><span class="preview-key">Producto</span><span class="preview-val">${prod}</span></div>
-    <div class="preview-row"><span class="preview-key">Cantidad</span><span class="preview-val">${cant.toLocaleString()} und</span></div>
-    <div class="preview-row"><span class="preview-key">Precio unitario</span><span class="preview-val">S/ ${precio.toFixed(2)}</span></div>
-    <div class="preview-row"><span class="preview-key">Monto total</span><span class="preview-val">S/ ${total.toLocaleString('es-PE', {minimumFractionDigits:2})}</span></div>
-    <div class="preview-row"><span class="preview-key">${esCredito ? 'Condición' : 'Abonado'}</span><span class="preview-val">${esCredito ? 'A crédito (saldo total pendiente)' : (abono > 0 ? 'S/ ' + abono.toFixed(2) + ' (' + pct + ')' : '—')}</span></div>
-  `;
-
-  document.getElementById('preview-insumos').innerHTML = getInsumos(tipo)
-    .map(i => `<span class="insumo-item"><span class="insumo-dot"></span>${i}</span>`).join('');
 }
 
 /**
@@ -914,33 +961,34 @@ function updatePreview() {
  */
 function copiarPreview() {
   const fecha = document.getElementById('f-fecha').value;
-  const cliente = (document.getElementById('f-cliente').value || '').trim();
-  const prod = (document.getElementById('f-producto').value || '').trim();
-  const cant = parseInt(document.getElementById('f-cantidad').value);
-  const precio = parseFloat(document.getElementById('f-precio').value);
-  const abono = parseFloat(document.getElementById('f-abono').value) || 0;
-  if (!prod || !cant || !precio) {
-    mostrarToast('Completa producto, cantidad y precio antes de copiar', { type:'error', duration:3000 });
+  const cliente = (document.getElementById('f-cliente').value || '').trim().toUpperCase();
+  const completas = lineas.map(leerLinea).filter(L => L.completa);
+  if (!completas.length) {
+    mostrarToast('Completa al menos un producto (con cantidad y precio) antes de copiar', { type:'error', duration:3000 });
     return;
   }
-  const total = precio * cant;
-  const pct = abono > 0 ? Math.round((abono / total) * 100) : 0;
   const money = n => 'S/ ' + (parseFloat(n)||0).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 });
-  // Convertimos la fecha YYYY-MM-DD del input a DD/MM/YYYY para que se lea natural
   let fechaTxt = '';
   if (fecha) {
     const m = String(fecha).match(/^(\d{4})-(\d{2})-(\d{2})/);
     fechaTxt = m ? `${m[3]}/${m[2]}/${m[1]}` : fecha;
   }
-  const lineas = [
+  let granTotal = 0, granAbono = 0;
+  const items = completas.map((L, i) => {
+    granTotal += L.total; granAbono += L.credito ? 0 : L.abono;
+    const cond = L.credito ? ' (a crédito)' : (L.abono > 0 ? ` (abonó ${money(L.abono)})` : '');
+    return `${i + 1}. ${L.prod} — ${L.cant.toLocaleString()} und × ${money(L.precio)} = ${money(L.total)}${cond}`;
+  });
+  const saldo = granTotal - granAbono;
+  const texto = [
     fechaTxt ? `📅 Fecha: ${fechaTxt}` : null,
-    cliente ? `👤 Cliente: ${cliente.toUpperCase()}` : null,
-    `📦 Producto: ${prod} - ${cant.toLocaleString()} und`,
-    `💵 Precio unitario: ${money(precio)}`,
-    `💰 Monto total: ${money(total)}`,
-    esCredito ? `🧾 A crédito (saldo total: ${money(total)})` : (abono > 0 ? `💸 Abonado: ${money(abono)} (${pct}%)` : null)
-  ].filter(Boolean);
-  const texto = lineas.join('\n');
+    cliente ? `👤 Cliente: ${cliente}` : null,
+    `📦 Pedidos (${completas.length}):`,
+    ...items,
+    `💰 Total: ${money(granTotal)}`,
+    granAbono > 0 ? `💸 Abonado total: ${money(granAbono)}` : null,
+    `⚠️ Saldo total: ${money(saldo)}`
+  ].filter(Boolean).join('\n');
   navigator.clipboard.writeText(texto)
     .then(() => mostrarToast('Resumen del pedido copiado', { type:'success', duration:2500 }))
     .catch(() => mostrarToast('No se pudo copiar', { type:'error', duration:3000 }));
@@ -960,104 +1008,115 @@ async function estimarNumeroPedido() {
 async function submitForm() {
   const fecha = document.getElementById('f-fecha').value;
   const clienteRaw = (document.getElementById('f-cliente').value || '').trim().toUpperCase();
-  const prod = (document.getElementById('f-producto').value || '').trim();
-  const cant = document.getElementById('f-cantidad').value;
-  const precio = document.getElementById('f-precio').value;
-  const abono = document.getElementById('f-abono').value;
   const vendedor = document.getElementById('f-vendedor').value;
-  const obs = document.getElementById('f-obs').value;
 
   const errEl = document.getElementById('error-msg');
   errEl.style.display = 'none';
 
-  // El cliente y el producto deben existir en el catálogo (gestionado con la tuerca ⚙)
   const clienteExiste = listaClientes.some(c => c.toUpperCase() === clienteRaw);
-  const prodExiste = listaProductos.includes(prod);
 
-  // Validación campo por campo: marca cada campo faltante y enfoca el primero.
-  // Cada entrada: [id, condición de fallo, mensaje]. La primera que falle por id se muestra.
-  const checks = [
-    ['f-fecha', !fecha, 'Selecciona una fecha'],
-    ['f-vendedor', !vendedor, 'Elige un vendedor'],
-    ['f-cliente', !clienteRaw, 'Ingresa el cliente'],
-    ['f-cliente', clienteRaw && !clienteExiste, 'Cliente no registrado. Agrégalo con la tuerca ⚙'],
-    ['f-producto', !prod, 'Ingresa el producto'],
-    ['f-producto', prod && !prodExiste, 'Producto no registrado. Agrégalo con la tuerca ⚙'],
-    ['f-cantidad', !cant || parseFloat(cant) <= 0, 'Ingresa una cantidad válida'],
-    ['f-precio', !precio || parseFloat(precio) <= 0, 'Ingresa el precio por unidad']
-  ];
-  const errados = new Set();
+  // Validación: primero los campos compartidos, luego cada línea de producto.
   let primerError = null;
-  checks.forEach(([id, falla, msg]) => {
-    if (falla && !errados.has(id)) { showFieldError(id, msg); errados.add(id); if (!primerError) primerError = id; }
+  const marcar = (id, msg) => { showFieldError(id, msg); if (!primerError) primerError = id; };
+
+  if (!fecha) marcar('f-fecha', 'Selecciona una fecha'); else clearFieldError('f-fecha');
+  if (!vendedor) marcar('f-vendedor', 'Elige un vendedor'); else clearFieldError('f-vendedor');
+  if (!clienteRaw) marcar('f-cliente', 'Ingresa el cliente');
+  else if (!clienteExiste) marcar('f-cliente', 'Cliente no registrado. Agrégalo con la tuerca ⚙');
+  else clearFieldError('f-cliente');
+
+  const datos = [];
+  lineas.forEach(n => {
+    const L = leerLinea(n);
+    const prodExiste = listaProductos.includes(L.prod);
+    if (!L.prod) marcar('prod-' + n, 'Ingresa el producto');
+    else if (!prodExiste) marcar('prod-' + n, 'Producto no registrado. Agrégalo con la tuerca ⚙');
+    else clearFieldError('prod-' + n);
+    if (!(L.cant > 0)) marcar('cant-' + n, 'Ingresa una cantidad válida'); else clearFieldError('cant-' + n);
+    if (!(L.precio > 0)) marcar('precio-' + n, 'Ingresa el precio por unidad'); else clearFieldError('precio-' + n);
+    datos.push(L);
   });
-  ['f-fecha','f-vendedor','f-cliente','f-producto','f-cantidad','f-precio'].forEach(id => {
-    if (!errados.has(id)) clearFieldError(id);
-  });
+
   if (primerError) {
     const el = document.getElementById(primerError);
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => el.focus(), 300);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => el.focus(), 300); }
     return;
   }
 
   document.getElementById('btn-submit').disabled = true;
-  document.getElementById('loading').style.display = 'block';
+  const loading = document.getElementById('loading');
+  loading.style.display = 'block';
 
-  const payload = {
-    action: 'guardarPedido',
-    fecha, cliente: clienteRaw, producto: prod,
-    cantidad: cant, precio, abono: abono || 0,
-    vendedor, observaciones: obs,
-    condicion: esCredito ? 'A CRÉDITO' : 'CONTADO'
-  };
-
+  // Registro SECUENCIAL: cada línea es un pedido. Se envían uno a uno (no en
+  // paralelo) porque el backend calcula el N° y la fila a partir del pedido
+  // anterior; en paralelo colisionarían.
+  const registrados = [];
   try {
-    // Construir querystring para JSONP
-    const params = Object.keys(payload).map(k =>
-      encodeURIComponent(k) + '=' + encodeURIComponent(payload[k])
-    ).join('&');
-    const url = `${SCRIPT_URL}?${params}&t=${Date.now()}`;
-    const data = await jsonp(url, 15000);
-
-    if (!data || data.success === false) {
-      throw new Error((data && data.error) || 'Error desconocido del servidor');
+    for (let i = 0; i < datos.length; i++) {
+      const L = datos[i];
+      loading.innerHTML = `<span class="spinner"></span> Registrando pedido ${i + 1} de ${datos.length}...`;
+      const payload = {
+        action: 'guardarPedido',
+        fecha, cliente: clienteRaw, producto: L.prod,
+        cantidad: L.cant, precio: L.precio, abono: L.credito ? 0 : L.abono,
+        vendedor, observaciones: L.obs,
+        condicion: L.credito ? 'A CRÉDITO' : 'CONTADO'
+      };
+      const params = Object.keys(payload).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(payload[k])).join('&');
+      const data = await jsonp(`${SCRIPT_URL}?${params}&t=${Date.now()}`, 15000);
+      if (!data || data.success === false) {
+        throw new Error((data && data.error) || ('Error al registrar el pedido ' + (i + 1)));
+      }
+      registrados.push({ num: data.numPedido || '(registrado)', total: L.total });
     }
 
-    document.getElementById('loading').style.display = 'none';
+    loading.style.display = 'none';
+    loading.innerHTML = '<span class="spinner"></span> Registrando pedido en Google Sheets...';
     document.getElementById('form-wrap').style.display = 'none';
-    document.getElementById('success-num').textContent = data.numPedido || '(registrado)';
-    const total = (parseFloat(precio) * parseInt(cant)).toLocaleString('es-PE', {minimumFractionDigits:2});
-    document.getElementById('success-det').textContent = `${prod} · ${parseInt(cant).toLocaleString()} und · S/ ${total} · ${clienteRaw}${esCredito ? ' · A crédito' : ''}`;
-    document.getElementById('success-card').style.display = 'block';
+    mostrarExito(registrados, clienteRaw);
 
   } catch(err) {
-    document.getElementById('loading').style.display = 'none';
+    loading.style.display = 'none';
+    loading.innerHTML = '<span class="spinner"></span> Registrando pedido en Google Sheets...';
     document.getElementById('btn-submit').disabled = false;
-    errEl.textContent = 'Error al registrar: ' + err.message + '. Verifica tu conexión e intenta de nuevo.';
+    let msg = 'Error al registrar: ' + err.message + '.';
+    if (registrados.length) {
+      msg += ' Ya se registraron ' + registrados.length + ' pedido(s): ' + registrados.map(r => r.num).join(', ')
+           + '. Revisa en el panel antes de reintentar para no duplicarlos.';
+    } else {
+      msg += ' Verifica tu conexión e intenta de nuevo.';
+    }
+    errEl.textContent = msg;
     errEl.style.display = 'block';
   }
 }
 
+// Muestra la tarjeta de éxito con todos los pedidos registrados.
+function mostrarExito(registrados, cliente) {
+  document.getElementById('success-num').textContent = registrados.map(r => r.num).join('   ·   ');
+  const titulo = document.querySelector('.success-title');
+  if (titulo) titulo.textContent = registrados.length > 1 ? (registrados.length + ' pedidos registrados') : 'Pedido registrado';
+  const granTotal = registrados.reduce((s, r) => s + (r.total || 0), 0);
+  document.getElementById('success-det').textContent =
+    `${cliente} · ${registrados.length} pedido${registrados.length > 1 ? 's' : ''} · Total S/ ${granTotal.toLocaleString('es-PE', {minimumFractionDigits:2})}`;
+  document.getElementById('success-card').style.display = 'block';
+}
+
 function resetForm() {
-  ['f-fecha','f-cliente','f-producto','f-cantidad','f-precio','f-abono','f-obs','f-vendedor'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
+  document.getElementById('f-cliente').value = '';
+  document.getElementById('f-vendedor').value = '';
+  ['f-fecha','f-vendedor','f-cliente'].forEach(clearFieldError);
+  // Vaciar y reiniciar las líneas de producto
+  document.getElementById('lineas-wrap').innerHTML = '';
+  lineas = [];
+  lineaSeq = 0;
+  for (const k in estadoLinea) delete estadoLinea[k];
   document.getElementById('success-card').style.display = 'none';
   document.getElementById('form-wrap').style.display = 'block';
   document.getElementById('btn-submit').disabled = false;
-  precioAutollenado = false;
-  esCredito = false;
-  document.getElementById('f-abono').disabled = false;
-  document.getElementById('tipo-wrap').innerHTML = '';
-  document.getElementById('price-suggest').style.display = 'none';
   document.getElementById('preview').style.display = 'none';
-  ['f-fecha','f-vendedor','f-cliente','f-producto','f-cantidad','f-precio'].forEach(clearFieldError);
-  document.querySelectorAll('.chip.active').forEach(c => c.classList.remove('active'));
   document.getElementById('f-fecha').value = fechaHoy();
-  updateActionTotal();
-  updateProgress();
+  agregarLinea(); // arranca con una línea vacía
 }
 
 function fechaHoy(){
@@ -1067,8 +1126,8 @@ function fechaHoy(){
 const now = new Date();
 document.getElementById('fecha-chip').textContent = now.toLocaleDateString('es-PE', {weekday:'short', day:'numeric', month:'short', year:'numeric'});
 document.getElementById('f-fecha').value = fechaHoy();
-updateProgress();
-updateActionTotal();
+agregarLinea(); // primera línea de producto al cargar
+actualizarTotales();
 
 // ADMIN GESTOR DE PRODUCTOS
 function getProductos() {
