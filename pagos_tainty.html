@@ -547,7 +547,10 @@ function copiarTodosCliente(listaArg,titulo,vacioMsg){
     });
     const header = `👤 ${(nombre||'SIN CLIENTE').toUpperCase()} (${pedidosCli.length} pedido${pedidosCli.length===1?'':'s'})`;
     const cuerpo = pedidosOrdenados.map(bloquePedido).join('\n\n');
-    return `${header}\n\n${cuerpo}`;
+    // Subtotal por cliente: cuánto debe esta persona sumando sus pedidos.
+    const subtotalCli = pedidosCli.reduce((s,p)=>s+getRestante(p),0);
+    const subtotal = `💰 Total que debe: ${money(subtotalCli)}`;
+    return `${header}\n\n${cuerpo}\n\n${subtotal}`;
   }
 
   const totalPendiente=lista.reduce((s,p)=>s+getRestante(p),0);
