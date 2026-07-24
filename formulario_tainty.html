@@ -989,9 +989,39 @@ function copiarPreview() {
     granAbono > 0 ? `💸 Abonado total: ${money(granAbono)}` : null,
     `⚠️ Saldo total: ${money(saldo)}`
   ].filter(Boolean).join('\n');
-  navigator.clipboard.writeText(texto)
+  copiarAlPortapapeles(texto)
     .then(() => mostrarToast('Resumen del pedido copiado', { type:'success', duration:2500 }))
     .catch(() => mostrarToast('No se pudo copiar', { type:'error', duration:3000 }));
+}
+
+/**
+ * Copia texto al portapapeles de forma robusta. navigator.clipboard solo
+ * existe en contexto seguro (HTTPS o localhost); si no está disponible o
+ * falla, usa el respaldo clásico (textarea temporal + execCommand('copy')),
+ * que funciona también en HTTP.
+ */
+function copiarAlPortapapeles(texto) {
+  const respaldo = () => new Promise((resolve, reject) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('No se pudo copiar'));
+    } catch (e) { reject(e); }
+  });
+  if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+    return navigator.clipboard.writeText(texto).catch(() => respaldo());
+  }
+  return respaldo();
 }
 
 async function estimarNumeroPedido() {
