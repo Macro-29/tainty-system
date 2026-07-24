@@ -104,6 +104,38 @@ function ocultarLoading() {
 }
 
 /**
+ * Copia texto al portapapeles de forma robusta.
+ * navigator.clipboard solo existe en contexto seguro (HTTPS o localhost);
+ * si no está disponible o falla, usa el respaldo clásico (textarea temporal
+ * + execCommand('copy')), que funciona también en HTTP.
+ * @param {string} texto
+ * @returns {Promise<void>}
+ */
+function copiarAlPortapapeles(texto) {
+  const respaldo = () => new Promise((resolve, reject) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('No se pudo copiar'));
+    } catch (e) { reject(e); }
+  });
+  if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+    return navigator.clipboard.writeText(texto).catch(() => respaldo());
+  }
+  return respaldo();
+}
+
+/**
  * Wrap an async call (jsonp or fetch) with a standardized error toast.
  * Throws the error after toasting, so callers can still react via try/catch.
  * @param {Promise<any>} promise

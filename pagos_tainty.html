@@ -451,7 +451,7 @@ function copiarPedido(numPedido){
       : `✅ Pagado completo`
   ];
   const texto=lineas.join('\n');
-  navigator.clipboard.writeText(texto)
+  copiarAlPortapapeles(texto)
     .then(()=>mostrarToast('Resumen copiado',{type:'success',duration:2000}))
     .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
 }
@@ -482,7 +482,7 @@ function copiarSaldoCliente(numPedido){
     ``,
     `Si ya realizaste el pago, por favor envíanos el comprobante 📲. Si aún no, indícanos por favor si lo estarás abonando hoy o a más tardar mañana. ¡Gracias por confiar en nosotros! 🌿`
   ];
-  navigator.clipboard.writeText(lineas.join('\n'))
+  copiarAlPortapapeles(lineas.join('\n'))
     .then(()=>mostrarToast('Mensaje de saldo copiado',{type:'success',duration:2200}))
     .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
 }
@@ -577,7 +577,7 @@ function copiarTodosCliente(listaArg,titulo,vacioMsg){
   }
 
   if(titulo)texto=`${titulo}\n\n${texto}`;
-  navigator.clipboard.writeText(texto)
+  copiarAlPortapapeles(texto)
     .then(()=>mostrarToast(`${lista.length} pedido(s) copiado(s)`,{type:'success',duration:2500}))
     .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
 }

@@ -448,7 +448,7 @@ function copiarMensajeCliente(numPedido){
     '',
     '¡Gracias por su preferencia! 🙌'
   ].join('\n');
-  navigator.clipboard.writeText(texto)
+  copiarAlPortapapeles(texto)
     .then(()=>mostrarToast('Mensaje para '+(p.cliente||'cliente')+' copiado',{type:'success',duration:2500}))
     .catch(()=>mostrarToast('No se pudo copiar',{type:'error',duration:3000}));
 }

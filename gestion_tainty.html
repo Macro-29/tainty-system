@@ -475,7 +475,7 @@ function copiarSeccion(insumo){
     return`${emoji}${p.producto||''}\t${cant}`;
   }).join('\n');
 
-  navigator.clipboard.writeText(texto).then(()=>{
+  copiarAlPortapapeles(texto).then(()=>{
     mostrarToast(`✓ ${insumo} copiado (${pedidosSeccion.length} pedido${pedidosSeccion.length===1?'':'s'})`,{type:'success',duration:2500});
   }).catch(()=>{
     mostrarToast('No se pudo copiar al portapapeles',{type:'error',duration:3500});
@@ -594,7 +594,7 @@ function copiarProducto(numPedido){
     return;
   }
   const texto=[head,...filas].join('\n');
-  navigator.clipboard.writeText(texto).then(()=>{
+  copiarAlPortapapeles(texto).then(()=>{
     mostrarToast('✓ Estado de '+p.numPedido+' copiado',{type:'success',duration:2500});
   }).catch(()=>{
     mostrarToast('No se pudo copiar al portapapeles',{type:'error',duration:3500});

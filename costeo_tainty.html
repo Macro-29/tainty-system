@@ -800,7 +800,7 @@ function copiarProducto(idx, btn) {
     return `- ${c} ${i.nombre}`;
   }).join('\n');
   const texto = `📦 ${p.producto} · ${Math.round(p.cantidad).toLocaleString('en-US')} und\n\n${lineas}`;
-  navigator.clipboard.writeText(texto)
+  copiarAlPortapapeles(texto)
     .then(() => { mostrarToast(`Insumos copiados: ${p.producto}`, {type:'success', duration:2500}); flashCopiado(btn); })
     .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3000}));
 }
@@ -882,7 +882,7 @@ function copiarTipo(tipo, btn) {
     const cant = Math.round(i.cantidadTotal).toLocaleString('en-US');
     return `- ${cant} ${i.nombre}`;
   }).join('\n');
-  navigator.clipboard.writeText(texto)
+  copiarAlPortapapeles(texto)
     .then(() => { mostrarToast(`${meta.label} copiado (${items.length} insumos)`, {type:'success', duration:2500}); flashCopiado(btn); })
     .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3000}));
 }
@@ -905,7 +905,7 @@ function copiarProveedor(prov, btn) {
     return `- ${cantidad} ${i.nombre}`;
   }).join('\n');
   const texto = `Buen día, podría cotizarme lo siguiente:\n\n${insumosStr}`;
-  navigator.clipboard.writeText(texto).then(() => { mostrarToast('¡Copiado para WhatsApp!'); flashCopiado(btn); }).catch(() => mostrarToast('No se pudo copiar', {type:'error',duration:3500}));
+  copiarAlPortapapeles(texto).then(() => { mostrarToast('¡Copiado para WhatsApp!'); flashCopiado(btn); }).catch(() => mostrarToast('No se pudo copiar', {type:'error',duration:3500}));
 }
 
 /**
@@ -976,7 +976,7 @@ function copiarTodo(btn) {
   const totalLine = `💰 Total estimado: S/ ${total.toLocaleString('es-PE',{minimumFractionDigits:2})}`;
   const texto = `📋 LISTA COMPLETA DE COMPRAS\n\n${bloques.join('\n\n')}\n\n${totalLine}`;
 
-  navigator.clipboard.writeText(texto)
+  copiarAlPortapapeles(texto)
     .then(() => { mostrarToast(`Lista completa copiada (${lista.length} insumos)`, {type:'success', duration:2500}); flashCopiado(btn); })
     .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3500}));
 }
