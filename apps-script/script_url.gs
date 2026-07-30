@@ -342,6 +342,9 @@ function doGet(e) {
     const estadosPedido = {};
     const condicionPedido = {};
     const abonoInicialPedido = {}; // numPedido -> MONTO ABONADO del pedido (col 10)
+    const cantidadPedido = {};     // numPedido -> CANTIDAD del pedido (col 6)
+    const precioPedido = {};       // numPedido -> PRECIO DE VENTA del pedido (col 8)
+    const totalPedido = {};        // numPedido -> MONTO TOTAL del pedido (col 9)
     const sheetPed = ss.getSheetByName(SHEET_NAME);
     if (sheetPed) {
       const dataPed = sheetPed.getDataRange().getValues();
@@ -351,6 +354,9 @@ function doGet(e) {
           estadosPedido[np] = (dataPed[i][13] || '').toString();
           condicionPedido[np] = (dataPed[i][15] || '').toString();
           abonoInicialPedido[np] = parseFloat(dataPed[i][9]) || 0; // col J = MONTO ABONADO
+          cantidadPedido[np] = parseFloat(dataPed[i][5]) || 0;     // col F = CANTIDAD
+          precioPedido[np] = parseFloat(dataPed[i][7]) || 0;       // col H = PRECIO DE VENTA
+          totalPedido[np] = parseFloat(dataPed[i][8]) || 0;        // col I = MONTO TOTAL
         }
       }
     }
@@ -359,6 +365,18 @@ function doGet(e) {
     for (let i = 1; i < data.length; i++) {
       const r = data[i];
       if (!r[0]) continue;
+
+      // Cantidad / precio / total EFECTIVOS: se toman del pedido (NUEVO PEDIDO)
+      // porque es donde se edita el precio de venta. El total se recalcula como
+      // cantidad × precio para reflejar cambios de precio, en vez de usar la copia
+      // (posiblemente desactualizada) de la hoja PAGOS. Se cae con seguridad al
+      // total del pedido y, en último caso, al de PAGOS.
+      const cantEff = cantidadPedido[r[0]] || parseFloat(r[3]) || 0;
+      const precioEff = precioPedido[r[0]] || 0;
+      let totalEff;
+      if (precioEff > 0 && cantEff > 0) totalEff = cantEff * precioEff;
+      else if (totalPedido[r[0]] > 0) totalEff = totalPedido[r[0]];
+      else totalEff = parseFloat(r[5]) || 0;
 
       // Auto-sincronización del abono inicial: si en PAGOS no hay ningún abono
       // registrado (abono1..4 vacíos/0) pero el pedido sí tiene un MONTO ABONADO
@@ -370,12 +388,13 @@ function doGet(e) {
       if (sinAbonosEnPagos && abonoIni > 0) {
         abono1 = abonoIni;
         fecha1 = r[7] || r[1]; // fecha del abono si existe, sino la del pedido
-        restante1 = Math.max(0, (parseFloat(r[5]) || 0) - abonoIni);
+        restante1 = Math.max(0, totalEff - abonoIni);
       }
 
       pagos.push({
         numPedido:r[0], fecha:r[1], cliente:r[2],
-        cantidad:r[3], producto:r[4], montoTotal:r[5],
+        cantidad:cantEff, producto:r[4], montoTotal:totalEff,
+        precioVenta: precioEff > 0 ? precioEff : (cantEff > 0 ? totalEff / cantEff : 0),
         abono1:abono1, fecha1:fecha1, restante1:restante1,
         abono2:r[9], fecha2:r[10], restante2:r[11],
         abono3:r[12], fecha3:r[13], restante3:r[14],

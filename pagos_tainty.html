@@ -400,7 +400,9 @@ function renderTabla(){
     const pc2=pct===100?'var(--green)':pct>0?'var(--amber)':'var(--red)';
     const fechaStr=p.fecha?String(p.fecha).split('T')[0]:'';
     const cantidad=parseInt(p.cantidad||0);
-    const precioUnd=cantidad>0&&total>0?(total/cantidad):0;
+    // Precio unitario: usa el precio de venta real del pedido si el backend lo
+    // envía; si no, lo deriva de total/cantidad como respaldo.
+    const precioUnd=(p.precioVenta!=null&&p.precioVenta!=='')?parseFloat(p.precioVenta):(cantidad>0&&total>0?(total/cantidad):0);
     const condTxt=(p.condicion||'').toString().trim().toUpperCase();
     const esCredito=condTxt&&condTxt!=='CONTADO';
     const badgeCredito=esCredito?'<div class="badge-credito">A cr&eacute;dito</div>':'';
