@@ -771,21 +771,26 @@ async function descargarPDF(){
 
     y = Math.max(hy, boxY + boxH) + 14;
 
-    // --- Bloque cliente / fechas ---
-    pdf.setDrawColor(236,236,240); pdf.setFillColor(247,247,250);
-    const metaH = 58; pdf.roundedRect(M, y, W - 2*M, metaH, 4, 4, 'FD');
+    // --- Bloque cliente + vendedor (izq) / fechas (der) ---
+    // Cliente y vendedor van juntos a la izquierda; el recuadro crece
+    // según cuántas líneas haya (mínimo las 3 fijas de la derecha).
+    const leftItems = [['Cliente:', q.cliente.nombre || '—']];
+    if (q.cliente.doc) leftItems.push(['DNI/RUC:', q.cliente.doc]);
+    if (q.cliente.dir) leftItems.push(['Dirección:', q.cliente.dir]);
+    if (q.vendedor)    leftItems.push(['Vendedor:', q.vendedor]);
+    const metaRows = Math.max(leftItems.length, 3);
+    const metaH = 14 + metaRows * 13;
+    pdf.setDrawColor(236,236,240); pdf.setFillColor(247,247,250); pdf.setLineWidth(0.5);
+    pdf.roundedRect(M, y, W - 2*M, metaH, 4, 4, 'FD');
     pdf.setFontSize(9);
-    // Cliente (izquierda)
+    // Cliente + vendedor (izquierda)
     let cy0 = y + 16;
-    pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,35); pdf.text('Cliente:', M+12, cy0);
-    pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY);
-    pdf.text(pdf.splitTextToSize(q.cliente.nombre || '—', 200), M+12+50, cy0);
-    cy0 += 13;
-    if (q.cliente.doc){ pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,35); pdf.text('DNI/RUC:', M+12, cy0);
-      pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY); pdf.text(q.cliente.doc, M+12+50, cy0); cy0 += 13; }
-    if (q.cliente.dir){ pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,35); pdf.text('Dirección:', M+12, cy0);
+    leftItems.forEach(([k, v]) => {
+      pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,35); pdf.text(k, M + 12, cy0);
       pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY);
-      pdf.text(pdf.splitTextToSize(q.cliente.dir, 200), M+12+50, cy0); }
+      pdf.text(pdf.splitTextToSize(v, 230), M + 12 + 54, cy0);
+      cy0 += 13;
+    });
     // Fechas (derecha)
     const rx = W - M - 12; let ry = y + 16;
     const rline = (k, v) => {
@@ -797,7 +802,6 @@ async function descargarPDF(){
     rline('Emisión:', fechaLarga(q.emision));
     rline('Válida hasta:', fechaLarga(q.venc));
     rline('Moneda:', sym === 'S/' ? 'Soles' : 'Dólares');
-    if (q.vendedor) rline('Vendedor:', q.vendedor);
 
     y += metaH + 16;
 
@@ -814,23 +818,30 @@ async function descargarPDF(){
       columnStyles:{ 0:{halign:'center',cellWidth:26}, 2:{halign:'center',cellWidth:48},
         3:{halign:'right',cellWidth:80}, 4:{halign:'right',cellWidth:88} }
     });
-    y = pdf.lastAutoTable.finalY + 14;
+    y = pdf.lastAutoTable.finalY + 24;
 
     // --- Totales (derecha) ---
-    const tx = W - M; const lblX = W - M - 150;
-    pdf.setFontSize(10);
-    const totLine = (k, v, big) => {
-      pdf.setFont('helvetica', big?'bold':'normal');
-      pdf.setFontSize(big?13:10);
-      pdf.setTextColor(big?20:110, big?20:110, big?25:120);
-      if (big){ pdf.setTextColor(...PURPLE); }
+    const tx = W - M; const lblX = W - M - 160;
+    const totLine = (k, v) => {
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(10); pdf.setTextColor(110,110,120);
       pdf.text(k, lblX, y);
-      pdf.setTextColor(big?20:70, big?20:70, big?25:75);
-      pdf.text(v, tx, y, {align:'right'}); y += big?20:15;
+      pdf.setTextColor(70,70,75);
+      pdf.text(v, tx, y, {align:'right'}); y += 15;
     };
-    if (c.conIGV){ totLine('Subtotal', money(c.subtotal,sym)); totLine('IGV (18%)', money(c.igv,sym)); }
-    pdf.setDrawColor(220,220,220); pdf.line(lblX, y-4, tx, y-4);
-    totLine('TOTAL', money(c.total,sym), true);
+    // Subtotal + IGV solo cuando aplica; la línea separadora únicamente si hay desglose.
+    if (c.conIGV){
+      totLine('Subtotal', money(c.subtotal, sym));
+      totLine('IGV (18%)', money(c.igv, sym));
+      pdf.setDrawColor(220,220,220); pdf.setLineWidth(0.6);
+      pdf.line(lblX, y - 4, tx, y - 4);
+      y += 13;
+    }
+    // TOTAL destacado
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...PURPLE);
+    pdf.text('TOTAL', lblX, y);
+    pdf.setTextColor(20,20,25);
+    pdf.text(money(c.total, sym), tx, y, {align:'right'});
+    y += 8;
 
     // --- Observaciones ---
     if (q.obs){
