@@ -62,6 +62,11 @@ details.emp .emp-body{background:var(--surface);border:1px solid var(--border);b
 .linea-total b{color:var(--green);font-size:14px;font-family:'Syne',sans-serif}
 .ps-tip{font-size:11px;color:var(--teal);margin-top:4px;display:none}
 .ps-tip.show{display:block}
+.qty-chips{display:flex;align-items:center;gap:6px;margin-top:.55rem;flex-wrap:wrap}
+.qty-chips-lbl{font-size:11px;color:var(--muted);margin-right:2px}
+.qty-chips button{background:var(--surface);border:1px solid var(--border2);color:var(--muted);border-radius:8px;padding:5px 13px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;transition:all .15s}
+.qty-chips button:hover{border-color:var(--purple);color:var(--purple)}
+.qty-chips button.active{background:var(--purple-dim);border-color:var(--purple);color:var(--purple)}
 
 .btn-add{width:100%;background:var(--purple-dim);border:1px dashed rgba(124,111,239,.4);color:var(--purple);
   border-radius:11px;padding:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .15s}
@@ -196,7 +201,7 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
       <div class="row3">
         <div class="field"><label>N&uacute;mero <span style="color:var(--hint)">(autom&aacute;tico)</span></label><input class="inp" id="q-num" readonly tabindex="-1" title="Se genera solo al exportar (a&ntilde;o+d&iacute;a+mes+hora+minuto)" style="color:var(--muted)"></div>
         <div class="field"><label>Fecha emisi&oacute;n</label><input class="inp" type="date" id="q-fecha"></div>
-        <div class="field"><label>V&aacute;lida (d&iacute;as)</label><input class="inp" type="number" id="q-dias" value="7" min="0" onchange="render()" oninput="render()"></div>
+        <div class="field"><label>V&aacute;lida (d&iacute;as)</label><input class="inp" type="number" id="q-dias" value="1" min="0" onchange="render()" oninput="render()"></div>
       </div>
       <div class="row2">
         <div class="field"><label>Vendedor</label><input class="inp" id="q-vend" placeholder="Opcional"></div>
@@ -361,11 +366,18 @@ function agregarLinea(prefill){
       </div>
       <div class="linea-nums">
         <div><span class="mini-lbl">Cantidad</span>
-          <input class="inp" type="number" id="cant-${n}" min="0" step="1" value="1" oninput="render()"></div>
+          <input class="inp" type="number" id="cant-${n}" min="0" step="1" value="100" oninput="onCantInput(${n})"></div>
         <div><span class="mini-lbl">P. unit.</span>
           <input class="inp" type="number" id="precio-${n}" min="0" step="0.01" placeholder="0.00" oninput="render()"></div>
         <div><span class="mini-lbl">Total</span>
           <input class="inp" id="tot-${n}" readonly tabindex="-1" style="background:var(--surface);color:var(--muted)"></div>
+      </div>
+      <div class="qty-chips">
+        <span class="qty-chips-lbl">Cantidad r&aacute;pida:</span>
+        <button type="button" data-q="100" onclick="setCant(${n},100)">100</button>
+        <button type="button" data-q="300" onclick="setCant(${n},300)">300</button>
+        <button type="button" data-q="500" onclick="setCant(${n},500)">500</button>
+        <button type="button" data-q="1000" onclick="setCant(${n},1000)">1000</button>
       </div>
     </div>`;
   document.getElementById('lineas').appendChild(div);
@@ -374,7 +386,7 @@ function agregarLinea(prefill){
     if (prefill.cant)  document.getElementById('cant-'+n).value = prefill.cant;
     if (prefill.precio)document.getElementById('precio-'+n).value = prefill.precio;
   }
-  render();
+  onCantInput(n);
 }
 
 function removerLinea(n){
@@ -415,6 +427,20 @@ function onProdChange(n){
     tip.textContent = 'Sin precio previo — ingrésalo manualmente';
     tip.classList.add('show');
   }
+  render();
+}
+
+/** Fija la cantidad de una línea desde los botones rápidos (100/300/500/1000). */
+function setCant(n, v){
+  const el = document.getElementById('cant-' + n);
+  if (el){ el.value = v; onCantInput(n); }
+}
+/** Al escribir/elegir cantidad: resalta el botón que coincide y recalcula. */
+function onCantInput(n){
+  const val = parseInt(document.getElementById('cant-' + n)?.value) || '';
+  document.querySelectorAll('#linea-' + n + ' .qty-chips button').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-q') === String(val));
+  });
   render();
 }
 
@@ -562,6 +588,9 @@ function cargarEmpresa(){
   try { e = JSON.parse(localStorage.getItem(EMP_KEY) || '{}'); } catch(_){}
   if (!e.nombre) e.nombre = 'TAINTY CORPORATION TRADING S.A.C.';
   if (!e.ruc)    e.ruc = '20613069179';
+  if (!e.tel)    e.tel = '+51 912564249';
+  if (!e.dir)    e.dir = 'JR. LORETO NRO. 475 URB. CHACRA COLORADA LIMA - LIMA - BREÑA';
+  if (!e.email)  e.email = 'tainty.corporation@gmail.com';
   if (!e.web)    e.web = 'www.taintycorporation.pe';
   if (!e.bancos) e.bancos = 'Titular: TAINTY CORPORATION TRADING S.A.C.\nBCP Soles: 191-7068841-0-32 (1917068841032)\nCCI: 00219100706884103256';
   ['nombre','ruc','tel','dir','email','web','bancos'].forEach(k => {
