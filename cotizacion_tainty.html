@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d0d0f">
+<title>Tainty Labs · Cotizaciones</title>
+<link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/common.css">
+<style>
+body{padding-bottom:4rem}
+.wrap{max-width:1180px;margin:0 auto;padding:1.25rem 1rem}
+
+/* ---------- Layout de 2 columnas: formulario + vista previa ---------- */
+.cot-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start}
+@media(max-width:960px){.cot-grid{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.15rem;margin-bottom:1rem}
+.panel-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:.9rem}
+.panel-title .num{width:22px;height:22px;border-radius:7px;background:var(--purple-dim);color:var(--purple);font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.panel-title .hint{font-size:11px;font-weight:400;color:var(--hint);margin-left:auto;letter-spacing:0}
+
+/* Campos */
+.field{margin-bottom:.7rem}
+.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.field .req{color:var(--red)}
+.inp{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;
+  padding:9px 11px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;transition:border-color .15s}
+.inp:focus{outline:none;border-color:var(--purple)}
+.inp::placeholder{color:var(--hint)}
+textarea.inp{resize:vertical;min-height:56px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem}
+@media(max-width:560px){.row2,.row3{grid-template-columns:1fr}}
+
+/* Detalles colapsables (datos de empresa) */
+details.emp{margin-bottom:1rem}
+details.emp>summary{list-style:none;cursor:pointer;background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:.85rem 1.1rem;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);
+  display:flex;align-items:center;gap:9px}
+details.emp>summary::-webkit-details-marker{display:none}
+details.emp>summary .chev{margin-left:auto;color:var(--hint);transition:transform .2s}
+details.emp[open]>summary .chev{transform:rotate(90deg)}
+details.emp[open]>summary{border-radius:14px 14px 0 0;border-bottom:none}
+details.emp .emp-body{background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 14px 14px;padding:1.1rem}
+
+/* Líneas de producto */
+.linea{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:.8rem;margin-bottom:.7rem;position:relative}
+.linea-head{display:flex;align-items:center;margin-bottom:.6rem}
+.linea-tag{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--purple)}
+.linea-del{margin-left:auto;background:none;border:1px solid var(--border2);color:var(--muted);border-radius:8px;
+  width:26px;height:26px;cursor:pointer;font-size:13px;line-height:1;transition:all .15s}
+.linea-del:hover{color:var(--red);border-color:var(--red)}
+.linea-grid{display:grid;grid-template-columns:1fr;gap:.55rem}
+.linea-nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.55rem}
+@media(max-width:560px){.linea-nums{grid-template-columns:1fr 1fr}}
+.mini-lbl{font-size:11px;color:var(--muted);margin-bottom:4px;display:block}
+.linea-total{font-size:12px;color:var(--muted);text-align:right;margin-top:.5rem}
+.linea-total b{color:var(--green);font-size:14px;font-family:'Syne',sans-serif}
+.ps-tip{font-size:11px;color:var(--teal);margin-top:4px;display:none}
+.ps-tip.show{display:block}
+
+.btn-add{width:100%;background:var(--purple-dim);border:1px dashed rgba(124,111,239,.4);color:var(--purple);
+  border-radius:11px;padding:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .15s}
+.btn-add:hover{background:rgba(124,111,239,.2)}
+
+/* Toggle IGV */
+.igv-box{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:12px;padding:.85rem 1rem}
+.igv-box .igv-info{flex:1;min-width:0}
+.igv-box .igv-info .t{font-size:13px;color:var(--text);font-weight:500}
+.igv-box .igv-info .s{font-size:11px;color:var(--muted);margin-top:2px}
+.switch{position:relative;width:46px;height:26px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--border2);border-radius:26px;cursor:pointer;transition:.2s}
+.slider::before{content:'';position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+.slider{background:var(--purple)}
+.switch input:checked+.slider::before{transform:translateX(20px)}
+
+/* Botones de acción */
+.actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+.btn{flex:1;min-width:130px;border:none;border-radius:11px;padding:12px 14px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:7px}
+.btn-pdf{background:var(--purple);color:#fff}
+.btn-pdf:hover{opacity:.88}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border2);flex:0 0 auto;min-width:auto;padding:12px 16px}
+.btn-ghost:hover{border-color:var(--purple);color:var(--purple)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- Vista previa (réplica del PDF, sobre fondo blanco) ---------- */
+.preview-sticky{position:sticky;top:1rem}
+.doc{background:#fff;color:#222;border-radius:12px;overflow:hidden;box-shadow:0 10px 40px -12px rgba(0,0,0,.5);font-size:12px;line-height:1.4}
+.doc *{box-sizing:border-box}
+.doc-head{display:flex;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:2px solid #ececec}
+.doc-emp .en{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:#111;letter-spacing:.02em}
+.doc-emp .el{color:#666;font-size:10.5px;margin-top:3px;line-height:1.5}
+.doc-badge{text-align:right;min-width:150px}
+.doc-badge .ruc{font-size:10px;color:#333;font-weight:600}
+.doc-badge .cot{margin-top:6px;border:1.5px solid #7c6fef;border-radius:8px;padding:7px 10px}
+.doc-badge .cot .l{font-family:'Syne',sans-serif;font-weight:700;color:#7c6fef;font-size:12px;letter-spacing:.08em}
+.doc-badge .cot .n{font-size:13px;font-weight:700;color:#111;margin-top:1px}
+.doc-meta{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:#f7f7fa;font-size:11px}
+.doc-meta .cli{flex:1;min-width:0}
+.doc-meta .cli .kv{margin-bottom:2px}
+.doc-meta .cli .kv b,.doc-meta .fch .kv b{color:#111}
+.doc-meta .cli .kv span,.doc-meta .fch .kv span{color:#555}
+.doc-meta .fch{text-align:right;white-space:nowrap}
+table.doc-tbl{width:100%;border-collapse:collapse;font-size:11px}
+table.doc-tbl th{background:#2a2a33;color:#fff;padding:7px 8px;text-align:left;font-size:10px;letter-spacing:.03em;font-weight:600}
+table.doc-tbl th.r,table.doc-tbl td.r{text-align:right}
+table.doc-tbl th.c,table.doc-tbl td.c{text-align:center}
+table.doc-tbl td{padding:7px 8px;border-bottom:1px solid #eee;color:#333}
+table.doc-tbl tr:nth-child(even) td{background:#fafafa}
+.doc-tot{display:flex;justify-content:flex-end;padding:10px 18px}
+.doc-tot table{font-size:12px}
+.doc-tot td{padding:3px 0 3px 22px;text-align:right;color:#444}
+.doc-tot td.lbl{color:#666}
+.doc-tot tr.grand td{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:#111;border-top:1.5px solid #ddd;padding-top:7px}
+.doc-tot tr.grand td.lbl{color:#7c6fef}
+.doc-obs{padding:2px 18px 10px;font-size:10.5px;color:#555}
+.doc-obs b{color:#111}
+.doc-bank{margin:0 18px 14px;background:#f7f7fa;border-radius:8px;padding:10px 12px;font-size:10px;color:#444}
+.doc-bank .bt{font-weight:700;color:#111;margin-bottom:4px;font-size:10px}
+.doc-foot{border-top:1px solid #ececec;padding:10px 18px;text-align:center;font-size:10px;color:#888}
+.doc-empty{padding:26px 18px;text-align:center;color:#aaa;font-size:12px}
+
+.preview-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--hint);margin:0 2px 10px;display:flex;align-items:center;gap:8px}
+.preview-label::after{content:'';flex:1;height:1px;background:var(--border)}
+</style>
+<script src="./assets/auth.js"></script>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo">Tainty <span>Labs</span> &middot; Cotizaciones</div>
+  <div class="topbar-right">
+    <button class="lock-btn" id="btn-refresh" onclick="recargarCatalogos()" title="Recargar productos y precios">&#x21bb; Refrescar</button>
+    <a class="back-btn" href="./index.html">&#8592; Inicio</a>
+    <button class="lock-btn" onclick="cerrarSesion()">&#128274; Salir</button>
+  </div>
+</div>
+
+<div class="wrap">
+<div class="cot-grid">
+
+  <!-- ============ COLUMNA IZQUIERDA: FORMULARIO ============ -->
+  <div>
+    <!-- Datos de mi empresa (editables, se guardan en el navegador) -->
+    <details class="emp" id="emp-details">
+      <summary>&#127970; Datos de mi empresa <span style="font-weight:400;color:var(--hint);font-size:11px">(salen en el PDF)</span> <span class="chev">&#8250;</span></summary>
+      <div class="emp-body">
+        <div class="field"><label>Raz&oacute;n social</label><input class="inp" id="e-nombre" placeholder="TAINTY CORPORATION TRADING SAC"></div>
+        <div class="row2">
+          <div class="field"><label>RUC</label><input class="inp" id="e-ruc" placeholder="20xxxxxxxxx"></div>
+          <div class="field"><label>Tel&eacute;fono</label><input class="inp" id="e-tel" placeholder="+51 9xx xxx xxx"></div>
+        </div>
+        <div class="field"><label>Direcci&oacute;n</label><input class="inp" id="e-dir" placeholder="Av. ... - Lima"></div>
+        <div class="row2">
+          <div class="field"><label>Email</label><input class="inp" id="e-email" placeholder="ventas@tainty.pe"></div>
+          <div class="field"><label>Web</label><input class="inp" id="e-web" placeholder="www.tainty.pe"></div>
+        </div>
+        <div class="field"><label>Cuentas bancarias <span style="color:var(--hint)">(una por l&iacute;nea)</span></label>
+          <textarea class="inp" id="e-bancos" rows="3" placeholder="BCP Soles: 193-xxxxxxx-0-xx  ·  CCI: 002-193-..."></textarea></div>
+        <div style="font-size:11px;color:var(--hint);margin-top:4px">Se guarda solo en este navegador. Ll&eacute;nalo una vez.</div>
+      </div>
+    </details>
+
+    <!-- Cliente -->
+    <div class="panel">
+      <div class="panel-title"><span class="num">1</span>Cliente</div>
+      <div class="field"><label>Raz&oacute;n social / Nombre <span class="req">*</span></label>
+        <input class="inp" id="c-nombre" list="clientes-list" placeholder="Cliente..." autocomplete="off"></div>
+      <datalist id="clientes-list"></datalist>
+      <div class="row2">
+        <div class="field"><label>DNI / RUC</label><input class="inp" id="c-doc" placeholder="Opcional"></div>
+        <div class="field"><label>Direcci&oacute;n</label><input class="inp" id="c-dir" placeholder="Opcional"></div>
+      </div>
+    </div>
+
+    <!-- Datos de la cotización -->
+    <div class="panel">
+      <div class="panel-title"><span class="num">2</span>Cotizaci&oacute;n</div>
+      <div class="row3">
+        <div class="field"><label>N&uacute;mero</label><input class="inp" id="q-num" placeholder="COT-000001"></div>
+        <div class="field"><label>Fecha emisi&oacute;n</label><input class="inp" type="date" id="q-fecha"></div>
+        <div class="field"><label>V&aacute;lida (d&iacute;as)</label><input class="inp" type="number" id="q-dias" value="7" min="0" onchange="render()" oninput="render()"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Vendedor</label><input class="inp" id="q-vend" placeholder="Opcional"></div>
+        <div class="field"><label>Moneda</label>
+          <select class="inp" id="q-moneda" onchange="render()"><option value="S/">Soles (S/)</option><option value="US$">D&oacute;lares (US$)</option></select></div>
+      </div>
+    </div>
+
+    <!-- Productos -->
+    <div class="panel">
+      <div class="panel-title"><span class="num">3</span>Productos
+        <span class="hint" id="hint-prod">Cargando cat&aacute;logo...</span></div>
+      <datalist id="productos-list"></datalist>
+      <div id="lineas"></div>
+      <button class="btn-add" onclick="agregarLinea()">+ Agregar producto</button>
+    </div>
+
+    <!-- IGV + Observaciones -->
+    <div class="panel">
+      <div class="panel-title"><span class="num">4</span>Total y opciones</div>
+      <div class="igv-box" style="margin-bottom:.85rem">
+        <div class="igv-info">
+          <div class="t">Agregar IGV (18%)</div>
+          <div class="s" id="igv-sub">Los precios se toman netos; al activar se suma 18%.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="chk-igv" onchange="render()"><span class="slider"></span></label>
+      </div>
+      <div class="field"><label>Observaciones</label>
+        <textarea class="inp" id="q-obs" placeholder="Condiciones, tiempo de entrega, etc. (opcional)" oninput="render()"></textarea></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-pdf" id="btn-pdf" onclick="descargarPDF()">&#128196; Descargar PDF</button>
+      <button class="btn btn-ghost" onclick="copiarTexto()" title="Copiar cotizaci&oacute;n como texto">&#128203; Copiar</button>
+      <button class="btn btn-ghost" onclick="nuevaCotizacion()" title="Limpiar y empezar de cero">&#10012; Nueva</button>
+    </div>
+  </div>
+
+  <!-- ============ COLUMNA DERECHA: VISTA PREVIA ============ -->
+  <div>
+    <div class="preview-sticky">
+      <div class="preview-label">Vista previa</div>
+      <div class="doc" id="doc"></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script src="./assets/config.js"></script>
+<script src="./assets/common.js"></script>
+<script>
+/* =========================================================
+   Cotizaciones rápidas — Tainty Labs
+   - Productos y clientes se cargan del backend (JSONP).
+   - El precio unitario se autocompleta con el ÚLTIMO precio
+     de venta de ese producto en el historial (action=analytics),
+     y siempre es editable.
+   - IGV: precios netos + 18% opcional.
+   - PDF: descarga directa con jsPDF + autotable (CDN, carga diferida).
+   ========================================================= */
+
+// Auth gate: si no hay sesión, redirige al index.
+if (!requireLogin()) { throw new Error('sin sesión'); }
+
+const IGV_RATE = 0.18;
+const EMP_KEY = 'tainty_empresa';
+const NUM_KEY = 'tainty_cot_num';
+
+let listaProductos = [];
+let listaClientes  = [];
+let precioPorProducto = {};   // nombreNorm -> { precio, fecha }
+let lineaSeq = 0;
+let lineas = [];              // ids activos, en orden
+
+/* ---------- Utilidades ---------- */
+function norm(s){
+  let v = (s == null ? '' : s.toString()).trim().toUpperCase();
+  if (v.normalize) v = v.normalize('NFD').replace(/[̀-ͯ]/g,'');
+  return v.replace(/\s+/g,' ');
+}
+function money(n, sym){
+  const cur = sym || document.getElementById('q-moneda').value || 'S/';
+  return cur + ' ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function esc(s){ return (s==null?'':s.toString()).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fechaLarga(d){
+  return d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+/* ---------- Carga de catálogos y precios ---------- */
+async function cargarCatalogos(){
+  const hint = document.getElementById('hint-prod');
+  try {
+    const [resP, resC, resA] = await Promise.all([
+      jsonp(`${SCRIPT_URL}?action=productos`),
+      jsonp(`${SCRIPT_URL}?action=clientes`),
+      jsonp(`${SCRIPT_URL}?action=analytics`)
+    ]);
+    if (resP && resP.success && Array.isArray(resP.data)) {
+      listaProductos = resP.data;
+      renderDatalist('productos-list', listaProductos);
+    }
+    if (resC && resC.success && Array.isArray(resC.data)) {
+      listaClientes = resC.data;
+      renderDatalist('clientes-list', listaClientes);
+    }
+    if (resA && resA.success && Array.isArray(resA.rows)) {
+      construirPrecios(resA.rows);
+    }
+    const nP = listaProductos.length, nPr = Object.keys(precioPorProducto).length;
+    hint.textContent = `${nP} productos · ${nPr} con precio`;
+  } catch (e) {
+    hint.textContent = 'No se pudo cargar el catálogo';
+    mostrarToast('Error al cargar catálogo: ' + (e.message||''), {type:'error',duration:3500});
+  }
+}
+
+/** Construye el mapa nombre→último precio de venta (>0) usando la fecha más reciente. */
+function construirPrecios(rows){
+  const map = {};
+  rows.forEach((r, i) => {
+    const nom = norm(r.producto);
+    const precio = parseFloat(r.precio) || 0;
+    if (!nom || precio <= 0) return;
+    const t = r.fecha ? new Date(r.fecha).getTime() : 0;
+    const orden = isNaN(t) ? i : t;      // sin fecha válida: gana la fila más nueva
+    if (!map[nom] || orden >= map[nom].orden) {
+      map[nom] = { precio, orden, fecha: r.fecha };
+    }
+  });
+  precioPorProducto = map;
+}
+
+function renderDatalist(id, items){
+  const dl = document.getElementById(id);
+  if (dl) dl.innerHTML = items.map(v => `<option value="${esc(v).replace(/"/g,'&quot;')}">`).join('');
+}
+
+/* ---------- Líneas de producto ---------- */
+function agregarLinea(prefill){
+  const n = ++lineaSeq;
+  lineas.push(n);
+  const div = document.createElement('div');
+  div.className = 'linea';
+  div.id = 'linea-' + n;
+  div.innerHTML = `
+    <div class="linea-head">
+      <span class="linea-tag">Producto ${lineas.length}</span>
+      <button class="linea-del" title="Quitar" onclick="removerLinea(${n})">&#10005;</button>
+    </div>
+    <div class="linea-grid">
+      <div>
+        <span class="mini-lbl">Producto / descripci&oacute;n</span>
+        <input class="inp" id="prod-${n}" list="productos-list" placeholder="Escribe o elige..." autocomplete="off"
+               oninput="onProdInput(${n})" onchange="onProdChange(${n})">
+        <div class="ps-tip" id="tip-${n}"></div>
+      </div>
+      <div class="linea-nums">
+        <div><span class="mini-lbl">Cantidad</span>
+          <input class="inp" type="number" id="cant-${n}" min="0" step="1" value="1" oninput="render()"></div>
+        <div><span class="mini-lbl">P. unit.</span>
+          <input class="inp" type="number" id="precio-${n}" min="0" step="0.01" placeholder="0.00" oninput="render()"></div>
+        <div><span class="mini-lbl">Total</span>
+          <input class="inp" id="tot-${n}" readonly tabindex="-1" style="background:var(--surface);color:var(--muted)"></div>
+      </div>
+    </div>`;
+  document.getElementById('lineas').appendChild(div);
+  if (prefill){
+    if (prefill.prod)  document.getElementById('prod-'+n).value = prefill.prod;
+    if (prefill.cant)  document.getElementById('cant-'+n).value = prefill.cant;
+    if (prefill.precio)document.getElementById('precio-'+n).value = prefill.precio;
+  }
+  render();
+}
+
+function removerLinea(n){
+  const el = document.getElementById('linea-'+n);
+  if (el) el.remove();
+  lineas = lineas.filter(x => x !== n);
+  if (lineas.length === 0) agregarLinea();
+  reetiquetar();
+  render();
+}
+
+function reetiquetar(){
+  lineas.forEach((n, i) => {
+    const tag = document.querySelector('#linea-'+n+' .linea-tag');
+    if (tag) tag.textContent = 'Producto ' + (i+1);
+  });
+}
+
+function onProdInput(n){
+  const inp = document.getElementById('prod-'+n);
+  inp.value = inp.value.toUpperCase();
+  render();
+}
+
+/** Al elegir producto: si el precio está vacío, autocompleta con el histórico. */
+function onProdChange(n){
+  const prod = document.getElementById('prod-'+n).value.trim();
+  const precioInp = document.getElementById('precio-'+n);
+  const tip = document.getElementById('tip-'+n);
+  const hit = precioPorProducto[norm(prod)];
+  if (hit && hit.precio > 0){
+    if (!precioInp.value || parseFloat(precioInp.value) === 0){
+      precioInp.value = hit.precio.toFixed(2);
+    }
+    tip.textContent = '↳ Último precio de venta: ' + money(hit.precio);
+    tip.classList.add('show');
+  } else {
+    tip.textContent = 'Sin precio previo — ingrésalo manualmente';
+    tip.classList.add('show');
+  }
+  render();
+}
+
+/* ---------- Cálculo + vista previa ---------- */
+function leerLineas(){
+  return lineas.map(n => {
+    const prod = (document.getElementById('prod-'+n)?.value || '').trim();
+    const cant = parseFloat(document.getElementById('cant-'+n)?.value) || 0;
+    const precio = parseFloat(document.getElementById('precio-'+n)?.value) || 0;
+    const total = cant * precio;
+    const totEl = document.getElementById('tot-'+n);
+    if (totEl) totEl.value = total > 0 ? money(total) : '';
+    return { n, prod, cant, precio, total, valida: !!prod && cant > 0 && precio > 0 };
+  });
+}
+
+function calcular(){
+  const items = leerLineas().filter(l => l.valida);
+  const subtotal = items.reduce((s,l) => s + l.total, 0);
+  const conIGV = document.getElementById('chk-igv').checked;
+  const igv = conIGV ? subtotal * IGV_RATE : 0;
+  return { items, subtotal, conIGV, igv, total: subtotal + igv };
+}
+
+function datosEmpresa(){
+  return {
+    nombre: document.getElementById('e-nombre').value.trim() || 'TAINTY CORPORATION TRADING SAC',
+    ruc:    document.getElementById('e-ruc').value.trim(),
+    tel:    document.getElementById('e-tel').value.trim(),
+    dir:    document.getElementById('e-dir').value.trim(),
+    email:  document.getElementById('e-email').value.trim(),
+    web:    document.getElementById('e-web').value.trim(),
+    bancos: document.getElementById('e-bancos').value.trim()
+  };
+}
+
+function datosCotizacion(){
+  const emisionStr = document.getElementById('q-fecha').value;
+  const emision = emisionStr ? new Date(emisionStr + 'T00:00:00') : new Date();
+  const dias = parseInt(document.getElementById('q-dias').value) || 0;
+  const venc = new Date(emision); venc.setDate(venc.getDate() + dias);
+  return {
+    num: document.getElementById('q-num').value.trim(),
+    emision, venc, dias,
+    moneda: document.getElementById('q-moneda').value,
+    vendedor: document.getElementById('q-vend').value.trim(),
+    obs: document.getElementById('q-obs').value.trim(),
+    cliente: {
+      nombre: document.getElementById('c-nombre').value.trim(),
+      doc: document.getElementById('c-doc').value.trim(),
+      dir: document.getElementById('c-dir').value.trim()
+    }
+  };
+}
+
+function render(){
+  const c = calcular();
+  const q = datosCotizacion();
+  const e = datosEmpresa();
+  const sym = q.moneda;
+  const doc = document.getElementById('doc');
+
+  if (c.items.length === 0){
+    doc.innerHTML = `<div class="doc-head">
+        <div class="doc-emp"><div class="en">${esc(e.nombre)}</div>
+          <div class="el">${[e.ruc?('RUC '+esc(e.ruc)):'', esc(e.dir)].filter(Boolean).join('<br>')}</div></div>
+        <div class="doc-badge"><div class="cot"><div class="l">COTIZACI&Oacute;N</div><div class="n">${esc(q.num)||'—'}</div></div></div>
+      </div>
+      <div class="doc-empty">Agrega al menos un producto con cantidad y precio para ver la cotizaci&oacute;n.</div>`;
+    return;
+  }
+
+  const filas = c.items.map((l,i) => `<tr>
+      <td class="c">${i+1}</td>
+      <td>${esc(l.prod)}</td>
+      <td class="c">${l.cant.toLocaleString('es-PE')}</td>
+      <td class="r">${money(l.precio, sym)}</td>
+      <td class="r">${money(l.total, sym)}</td>
+    </tr>`).join('');
+
+  const totFilas = `
+    ${c.conIGV ? `<tr><td class="lbl">Subtotal</td><td>${money(c.subtotal,sym)}</td></tr>
+      <tr><td class="lbl">IGV (18%)</td><td>${money(c.igv,sym)}</td></tr>` : ''}
+    <tr class="grand"><td class="lbl">TOTAL</td><td>${money(c.total,sym)}</td></tr>`;
+
+  const bancos = e.bancos ? `<div class="doc-bank"><div class="bt">Cuentas bancarias</div>${esc(e.bancos).replace(/\n/g,'<br>')}</div>` : '';
+  const obs = q.obs ? `<div class="doc-obs"><b>Observaciones:</b> ${esc(q.obs)}</div>` : '';
+  const igvNota = c.conIGV ? 'Precios incluyen IGV' : 'Precios no incluyen IGV';
+
+  const elReng = [e.ruc?('RUC '+esc(e.ruc)):'', esc(e.dir),
+    [e.tel?('Tel. '+esc(e.tel)):'', e.email?esc(e.email):''].filter(Boolean).join(' · ')
+  ].filter(Boolean).join('<br>');
+
+  doc.innerHTML = `
+    <div class="doc-head">
+      <div class="doc-emp"><div class="en">${esc(e.nombre)}</div><div class="el">${elReng}</div></div>
+      <div class="doc-badge">
+        <div class="cot"><div class="l">COTIZACI&Oacute;N</div><div class="n">${esc(q.num)||'—'}</div></div>
+      </div>
+    </div>
+    <div class="doc-meta">
+      <div class="cli">
+        <div class="kv"><b>Cliente:</b> <span>${esc(q.cliente.nombre)||'—'}</span></div>
+        ${q.cliente.doc ? `<div class="kv"><b>DNI/RUC:</b> <span>${esc(q.cliente.doc)}</span></div>`:''}
+        ${q.cliente.dir ? `<div class="kv"><b>Direcci&oacute;n:</b> <span>${esc(q.cliente.dir)}</span></div>`:''}
+        ${q.vendedor ? `<div class="kv"><b>Vendedor:</b> <span>${esc(q.vendedor)}</span></div>`:''}
+      </div>
+      <div class="fch">
+        <div class="kv"><b>Emisi&oacute;n:</b> <span>${fechaLarga(q.emision)}</span></div>
+        <div class="kv"><b>V&aacute;lida hasta:</b> <span>${fechaLarga(q.venc)}</span></div>
+        <div class="kv"><b>Moneda:</b> <span>${sym==='S/'?'Soles':'D&oacute;lares'}</span></div>
+      </div>
+    </div>
+    <table class="doc-tbl">
+      <thead><tr><th class="c">#</th><th>Descripci&oacute;n</th><th class="c">Cant.</th><th class="r">P. Unit.</th><th class="r">Total</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div class="doc-tot"><table>${totFilas}</table></div>
+    ${obs}
+    ${bancos}
+    <div class="doc-foot">${esc(igvNota)}${e.web?(' &middot; '+esc(e.web)):''}</div>`;
+}
+
+/* ---------- Persistencia de datos de empresa + número ---------- */
+function guardarEmpresa(){
+  const e = {
+    nombre:document.getElementById('e-nombre').value, ruc:document.getElementById('e-ruc').value,
+    tel:document.getElementById('e-tel').value, dir:document.getElementById('e-dir').value,
+    email:document.getElementById('e-email').value, web:document.getElementById('e-web').value,
+    bancos:document.getElementById('e-bancos').value
+  };
+  try { localStorage.setItem(EMP_KEY, JSON.stringify(e)); } catch(_){}
+  render();
+}
+function cargarEmpresa(){
+  let e = {};
+  try { e = JSON.parse(localStorage.getItem(EMP_KEY) || '{}'); } catch(_){}
+  if (!e.nombre) e.nombre = 'TAINTY CORPORATION TRADING SAC';
+  ['nombre','ruc','tel','dir','email','web','bancos'].forEach(k => {
+    const el = document.getElementById('e-'+k);
+    if (el && e[k] != null) el.value = e[k];
+  });
+}
+function siguienteNumero(){
+  let n = parseInt(localStorage.getItem(NUM_KEY) || '0') || 0;
+  return 'COT-' + String(n + 1).padStart(6, '0');
+}
+function consumirNumero(){
+  let n = parseInt(localStorage.getItem(NUM_KEY) || '0') || 0;
+  try { localStorage.setItem(NUM_KEY, String(n + 1)); } catch(_){}
+}
+
+/* ---------- Copiar como texto ---------- */
+function copiarTexto(){
+  const c = calcular();
+  if (c.items.length === 0){ mostrarToast('Agrega al menos un producto', {type:'error',duration:3000}); return; }
+  const q = datosCotizacion(); const e = datosEmpresa(); const sym = q.moneda;
+  const L = [];
+  L.push(`*${e.nombre}*`);
+  if (e.ruc) L.push(`RUC ${e.ruc}`);
+  L.push(`COTIZACIÓN ${q.num}`.trim());
+  L.push(`Fecha: ${fechaLarga(q.emision)}  ·  Válida hasta: ${fechaLarga(q.venc)}`);
+  if (q.cliente.nombre) L.push(`Cliente: ${q.cliente.nombre}${q.cliente.doc?' ('+q.cliente.doc+')':''}`);
+  L.push('');
+  c.items.forEach((l,i) => L.push(`${i+1}. ${l.prod} — ${l.cant} und × ${money(l.precio,sym)} = ${money(l.total,sym)}`));
+  L.push('');
+  if (c.conIGV){ L.push(`Subtotal: ${money(c.subtotal,sym)}`); L.push(`IGV (18%): ${money(c.igv,sym)}`); }
+  L.push(`TOTAL: ${money(c.total,sym)} (${c.conIGV?'IGV incluido':'sin IGV'})`);
+  if (q.obs) { L.push(''); L.push('Obs: ' + q.obs); }
+  copiarAlPortapapeles(L.join('\n'))
+    .then(() => mostrarToast('Cotización copiada', {type:'success',duration:2500}))
+    .catch(() => mostrarToast('No se pudo copiar', {type:'error',duration:3000}));
+}
+
+/* ---------- Generación de PDF (jsPDF + autotable, carga diferida) ---------- */
+let _pdfLibsReady = false;
+function cargarScript(src){
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = src;
+    s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar '+src));
+    document.head.appendChild(s);
+  });
+}
+async function asegurarLibsPDF(){
+  if (_pdfLibsReady && window.jspdf) return;
+  await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+  _pdfLibsReady = true;
+}
+
+async function descargarPDF(){
+  const c = calcular();
+  if (c.items.length === 0){ mostrarToast('Agrega al menos un producto con cantidad y precio', {type:'error',duration:3200}); return; }
+  const btn = document.getElementById('btn-pdf');
+  const q = datosCotizacion(); const e = datosEmpresa(); const sym = q.moneda;
+  btn.disabled = true; const prev = btn.innerHTML; btn.innerHTML = '⏳ Generando...';
+  try {
+    await asegurarLibsPDF();
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit:'pt', format:'a4' });
+    const W = pdf.internal.pageSize.getWidth();
+    const M = 40; let y = 44;
+    const PURPLE = [124,111,239], DARK = [34,34,40], GREY = [110,110,120];
+
+    // --- Cabecera: empresa (izq) + recuadro cotización (der) ---
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(15); pdf.setTextColor(20,20,25);
+    pdf.text(e.nombre, M, y);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...GREY);
+    let hy = y + 15;
+    const empLineas = [
+      e.ruc ? 'RUC ' + e.ruc : '', e.dir,
+      [e.tel?('Tel. '+e.tel):'', e.email].filter(Boolean).join('  ·  ')
+    ].filter(Boolean);
+    empLineas.forEach(t => { pdf.text(t, M, hy); hy += 12; });
+
+    // Recuadro COTIZACIÓN (derecha)
+    const boxW = 165, boxH = 46, boxX = W - M - boxW, boxY = 30;
+    pdf.setDrawColor(...PURPLE); pdf.setLineWidth(1.2);
+    pdf.roundedRect(boxX, boxY, boxW, boxH, 5, 5);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor(...PURPLE);
+    pdf.text('COTIZACIÓN', boxX + boxW/2, boxY + 18, {align:'center'});
+    pdf.setFontSize(12); pdf.setTextColor(20,20,25);
+    pdf.text(q.num || '—', boxX + boxW/2, boxY + 34, {align:'center'});
+
+    y = Math.max(hy, boxY + boxH) + 14;
+
+    // --- Bloque cliente / fechas ---
+    pdf.setDrawColor(236,236,240); pdf.setFillColor(247,247,250);
+    const metaH = 58; pdf.roundedRect(M, y, W - 2*M, metaH, 4, 4, 'FD');
+    pdf.setFontSize(9);
+    // Cliente (izquierda)
+    let cy0 = y + 16;
+    pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,35); pdf.text('Cliente:', M+12, cy0);
+    pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY);
+    pdf.text(pdf.splitTextToSize(q.cliente.nombre || '—', 200), M+12+50, cy0);
+    cy0 += 13;
+    if (q.cliente.doc){ pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,35); pdf.text('DNI/RUC:', M+12, cy0);
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY); pdf.text(q.cliente.doc, M+12+50, cy0); cy0 += 13; }
+    if (q.cliente.dir){ pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,35); pdf.text('Dirección:', M+12, cy0);
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY);
+      pdf.text(pdf.splitTextToSize(q.cliente.dir, 200), M+12+50, cy0); }
+    // Fechas (derecha)
+    const rx = W - M - 12; let ry = y + 16;
+    const rline = (k, v) => {
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY);
+      pdf.text(k + '  ', rx - pdf.getTextWidth(v), ry, {align:'right'});
+      pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,35);
+      pdf.text(v, rx, ry, {align:'right'}); ry += 13;
+    };
+    rline('Emisión:', fechaLarga(q.emision));
+    rline('Válida hasta:', fechaLarga(q.venc));
+    rline('Moneda:', sym === 'S/' ? 'Soles' : 'Dólares');
+    if (q.vendedor) rline('Vendedor:', q.vendedor);
+
+    y += metaH + 16;
+
+    // --- Tabla de items ---
+    const body = c.items.map((l,i) => [ String(i+1), l.prod,
+      l.cant.toLocaleString('es-PE'), money(l.precio,sym), money(l.total,sym) ]);
+    pdf.autoTable({
+      startY: y, margin:{left:M, right:M},
+      head: [['#','Descripción','Cant.','P. Unit.','Total']],
+      body,
+      styles:{ font:'helvetica', fontSize:9, cellPadding:6, textColor:[50,50,50], lineColor:[235,235,235], lineWidth:0.5 },
+      headStyles:{ fillColor:DARK, textColor:[255,255,255], fontStyle:'bold', fontSize:9 },
+      alternateRowStyles:{ fillColor:[250,250,250] },
+      columnStyles:{ 0:{halign:'center',cellWidth:26}, 2:{halign:'center',cellWidth:48},
+        3:{halign:'right',cellWidth:80}, 4:{halign:'right',cellWidth:88} }
+    });
+    y = pdf.lastAutoTable.finalY + 14;
+
+    // --- Totales (derecha) ---
+    const tx = W - M; const lblX = W - M - 150;
+    pdf.setFontSize(10);
+    const totLine = (k, v, big) => {
+      pdf.setFont('helvetica', big?'bold':'normal');
+      pdf.setFontSize(big?13:10);
+      pdf.setTextColor(big?20:110, big?20:110, big?25:120);
+      if (big){ pdf.setTextColor(...PURPLE); }
+      pdf.text(k, lblX, y);
+      pdf.setTextColor(big?20:70, big?20:70, big?25:75);
+      pdf.text(v, tx, y, {align:'right'}); y += big?20:15;
+    };
+    if (c.conIGV){ totLine('Subtotal', money(c.subtotal,sym)); totLine('IGV (18%)', money(c.igv,sym)); }
+    pdf.setDrawColor(220,220,220); pdf.line(lblX, y-4, tx, y-4);
+    totLine('TOTAL', money(c.total,sym), true);
+
+    // --- Observaciones ---
+    if (q.obs){
+      y += 6; pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(30,30,35);
+      pdf.text('Observaciones:', M, y);
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY);
+      const ow = pdf.splitTextToSize(q.obs, W - 2*M - 80);
+      pdf.text(ow, M + 78, y); y += ow.length * 12 + 4;
+    }
+
+    // --- Cuentas bancarias ---
+    if (e.bancos){
+      y += 8;
+      const bl = e.bancos.split('\n').filter(Boolean);
+      const bh = 16 + bl.length*12;
+      pdf.setFillColor(247,247,250); pdf.setDrawColor(236,236,240);
+      pdf.roundedRect(M, y, W - 2*M, bh, 4, 4, 'FD');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(30,30,35);
+      pdf.text('CUENTAS BANCARIAS', M+10, y+13);
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY);
+      let by = y + 25; bl.forEach(t => { pdf.text(t, M+10, by); by += 12; });
+      y += bh;
+    }
+
+    // --- Pie ---
+    const foot = (c.conIGV ? 'Precios incluyen IGV' : 'Precios no incluyen IGV') + (e.web ? '  ·  ' + e.web : '');
+    pdf.setFontSize(8.5); pdf.setTextColor(150,150,155);
+    pdf.text(foot, W/2, pdf.internal.pageSize.getHeight() - 28, {align:'center'});
+
+    const nombreArch = (q.num || 'cotizacion').replace(/[^\w\-]+/g,'_')
+      + (q.cliente.nombre ? '_' + q.cliente.nombre.replace(/[^\w]+/g,'_').slice(0,24) : '') + '.pdf';
+    pdf.save(nombreArch);
+
+    // Consumir el correlativo solo si el número no fue editado a mano.
+    if (q.num === siguienteNumero()){
+      consumirNumero();
+      document.getElementById('q-num').value = siguienteNumero();
+    }
+    mostrarToast('PDF generado', {type:'success',duration:2500});
+  } catch (err){
+    console.error(err);
+    mostrarToast('No se pudo generar el PDF: ' + (err.message||''), {type:'error',duration:4000});
+  } finally {
+    btn.disabled = false; btn.innerHTML = prev;
+  }
+}
+
+/* ---------- Nueva cotización ---------- */
+function nuevaCotizacion(){
+  ['c-nombre','c-doc','c-dir','q-vend','q-obs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('chk-igv').checked = false;
+  document.getElementById('lineas').innerHTML = '';
+  lineas = [];
+  document.getElementById('q-num').value = siguienteNumero();
+  document.getElementById('q-fecha').valueAsDate = new Date();
+  agregarLinea();
+  render();
+  mostrarToast('Cotización nueva lista', {duration:1800});
+}
+
+function recargarCatalogos(){
+  document.getElementById('hint-prod').textContent = 'Recargando...';
+  cargarCatalogos();
+}
+
+/* ---------- Init ---------- */
+cargarEmpresa();
+// Guarda los datos de empresa al escribir
+['nombre','ruc','tel','dir','email','web','bancos'].forEach(k => {
+  const el = document.getElementById('e-'+k);
+  if (el) el.addEventListener('input', guardarEmpresa);
+});
+document.getElementById('q-num').value = siguienteNumero();
+document.getElementById('q-fecha').valueAsDate = new Date();
+['c-nombre','c-doc','c-dir','q-num','q-vend'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', render);
+});
+agregarLinea();
+render();
+cargarCatalogos();
+</script>
+</body>
+</html>
