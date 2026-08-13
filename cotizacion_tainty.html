@@ -204,7 +204,12 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
         <div class="field"><label>V&aacute;lida (d&iacute;as)</label><input class="inp" type="number" id="q-dias" value="1" min="0" onchange="render()" oninput="render()"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>Vendedor</label><input class="inp" id="q-vend" placeholder="Opcional"></div>
+        <div class="field"><label>Vendedor</label>
+          <select class="inp" id="q-vend" onchange="render()">
+            <option value="">— Selecciona —</option>
+            <option value="Miguel">Miguel</option>
+            <option value="Carlos">Carlos</option>
+          </select></div>
         <div class="field"><label>Moneda</label>
           <select class="inp" id="q-moneda" onchange="render()"><option value="S/">Soles (S/)</option><option value="US$">D&oacute;lares (US$)</option></select></div>
       </div>
