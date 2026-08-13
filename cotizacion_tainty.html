@@ -122,6 +122,7 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
 .doc-tot tr.grand td.lbl{color:#7c6fef}
 .doc-obs{padding:2px 18px 10px;font-size:10.5px;color:#555}
 .doc-obs b{color:#111}
+.doc-note{margin:2px 18px 10px;background:#fff7ec;border:1px solid #f5d9a8;border-radius:8px;padding:8px 11px;font-size:10px;color:#8a5a12;line-height:1.5}
 .doc-bank{margin:0 18px 14px;background:#f7f7fa;border-radius:8px;padding:10px 12px;font-size:10px;color:#444}
 .doc-bank .bt{font-weight:700;color:#111;margin-bottom:4px;font-size:10px}
 .doc-foot{border-top:1px solid #ececec;padding:10px 18px;text-align:center;font-size:10px;color:#888}
@@ -151,7 +152,15 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
     <details class="emp" id="emp-details">
       <summary>&#127970; Datos de mi empresa <span style="font-weight:400;color:var(--hint);font-size:11px">(salen en el PDF)</span> <span class="chev">&#8250;</span></summary>
       <div class="emp-body">
-        <div class="field"><label>Raz&oacute;n social</label><input class="inp" id="e-nombre" placeholder="TAINTY CORPORATION TRADING SAC"></div>
+        <div class="field"><label>Logo <span style="color:var(--hint)">(PNG, ideal con fondo transparente)</span></label>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div id="logo-prev" style="width:70px;height:46px;border:1px solid var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--surface2);overflow:hidden;color:var(--hint);font-size:10px;flex-shrink:0">sin logo</div>
+            <label class="btn-add" style="width:auto;padding:9px 14px;margin:0;cursor:pointer">Subir logo
+              <input type="file" id="e-logo" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="onLogoFile(event)"></label>
+            <button type="button" class="linea-del" id="btn-logo-del" title="Quitar logo" onclick="quitarLogo()" style="display:none">&#10005;</button>
+          </div>
+        </div>
+        <div class="field"><label>Raz&oacute;n social</label><input class="inp" id="e-nombre" placeholder="TAINTY CORPORATION TRADING S.A.C."></div>
         <div class="row2">
           <div class="field"><label>RUC</label><input class="inp" id="e-ruc" placeholder="20xxxxxxxxx"></div>
           <div class="field"><label>Tel&eacute;fono</label><input class="inp" id="e-tel" placeholder="+51 9xx xxx xxx"></div>
@@ -254,12 +263,15 @@ if (!requireLogin()) { throw new Error('sin sesión'); }
 const IGV_RATE = 0.18;
 const EMP_KEY = 'tainty_empresa';
 const NUM_KEY = 'tainty_cot_num';
+const LOGO_KEY = 'tainty_logo';
+const NOTA_SIN_IGV = 'Los precios mostrados NO incluyen IGV, por lo que no se emite factura. Si necesitas factura, se agrega el 18% de IGV al precio por unidad.';
 
 let listaProductos = [];
 let listaClientes  = [];
 let precioPorProducto = {};   // nombreNorm -> { precio, fecha }
 let lineaSeq = 0;
 let lineas = [];              // ids activos, en orden
+let logo = null;              // { dataUrl, w, h } o null
 
 /* ---------- Utilidades ---------- */
 function norm(s){
@@ -426,7 +438,7 @@ function calcular(){
 
 function datosEmpresa(){
   return {
-    nombre: document.getElementById('e-nombre').value.trim() || 'TAINTY CORPORATION TRADING SAC',
+    nombre: document.getElementById('e-nombre').value.trim() || 'TAINTY CORPORATION TRADING S.A.C.',
     ruc:    document.getElementById('e-ruc').value.trim(),
     tel:    document.getElementById('e-tel').value.trim(),
     dir:    document.getElementById('e-dir').value.trim(),
@@ -461,10 +473,11 @@ function render(){
   const e = datosEmpresa();
   const sym = q.moneda;
   const doc = document.getElementById('doc');
+  const logoImg = logo ? `<img src="${logo.dataUrl}" alt="logo" style="max-height:48px;max-width:190px;display:block;margin-bottom:6px">` : '';
 
   if (c.items.length === 0){
     doc.innerHTML = `<div class="doc-head">
-        <div class="doc-emp"><div class="en">${esc(e.nombre)}</div>
+        <div class="doc-emp">${logoImg}<div class="en">${esc(e.nombre)}</div>
           <div class="el">${[e.ruc?('RUC '+esc(e.ruc)):'', esc(e.dir)].filter(Boolean).join('<br>')}</div></div>
         <div class="doc-badge"><div class="cot"><div class="l">COTIZACI&Oacute;N</div><div class="n">${esc(q.num)||'—'}</div></div></div>
       </div>
@@ -487,7 +500,8 @@ function render(){
 
   const bancos = e.bancos ? `<div class="doc-bank"><div class="bt">Cuentas bancarias</div>${esc(e.bancos).replace(/\n/g,'<br>')}</div>` : '';
   const obs = q.obs ? `<div class="doc-obs"><b>Observaciones:</b> ${esc(q.obs)}</div>` : '';
-  const igvNota = c.conIGV ? 'Precios incluyen IGV' : 'Precios no incluyen IGV';
+  const notaIGV = !c.conIGV ? `<div class="doc-note">${esc(NOTA_SIN_IGV)}</div>` : '';
+  const igvNota = c.conIGV ? 'Precios incluyen IGV' : 'Precios sin IGV';
 
   const elReng = [e.ruc?('RUC '+esc(e.ruc)):'', esc(e.dir),
     [e.tel?('Tel. '+esc(e.tel)):'', e.email?esc(e.email):''].filter(Boolean).join(' · ')
@@ -495,7 +509,7 @@ function render(){
 
   doc.innerHTML = `
     <div class="doc-head">
-      <div class="doc-emp"><div class="en">${esc(e.nombre)}</div><div class="el">${elReng}</div></div>
+      <div class="doc-emp">${logoImg}<div class="en">${esc(e.nombre)}</div><div class="el">${elReng}</div></div>
       <div class="doc-badge">
         <div class="cot"><div class="l">COTIZACI&Oacute;N</div><div class="n">${esc(q.num)||'—'}</div></div>
       </div>
@@ -518,6 +532,7 @@ function render(){
       <tbody>${filas}</tbody>
     </table>
     <div class="doc-tot"><table>${totFilas}</table></div>
+    ${notaIGV}
     ${obs}
     ${bancos}
     <div class="doc-foot">${esc(igvNota)}${e.web?(' &middot; '+esc(e.web)):''}</div>`;
@@ -537,12 +552,82 @@ function guardarEmpresa(){
 function cargarEmpresa(){
   let e = {};
   try { e = JSON.parse(localStorage.getItem(EMP_KEY) || '{}'); } catch(_){}
-  if (!e.nombre) e.nombre = 'TAINTY CORPORATION TRADING SAC';
+  if (!e.nombre) e.nombre = 'TAINTY CORPORATION TRADING S.A.C.';
+  if (!e.ruc)    e.ruc = '20613069179';
   ['nombre','ruc','tel','dir','email','web','bancos'].forEach(k => {
     const el = document.getElementById('e-'+k);
     if (el && e[k] != null) el.value = e[k];
   });
 }
+/* ---------- Logo (subido por el usuario, persistido en el navegador) ---------- */
+function aplicarLogo(dataUrl, persist){
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      logo = { dataUrl, w: img.naturalWidth, h: img.naturalHeight };
+      if (persist){ try { localStorage.setItem(LOGO_KEY, dataUrl); } catch(_){} }
+      renderLogoPrev(); render(); resolve(true);
+    };
+    img.onerror = () => resolve(false);
+    img.src = dataUrl;
+  });
+}
+function onLogoFile(ev){
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  if (f.size > 3 * 1024 * 1024){ mostrarToast('El logo debe pesar menos de 3 MB', {type:'error',duration:3500}); return; }
+  const r = new FileReader();
+  r.onload = () => {
+    // Normaliza a PNG (conserva transparencia) y limita el tamaño para el PDF.
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 600;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const sc = Math.min(1, maxDim / Math.max(w, h));
+      w = Math.round(w * sc); h = Math.round(h * sc);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      aplicarLogo(cv.toDataURL('image/png'), true)
+        .then(ok => { if (ok) mostrarToast('Logo actualizado', {type:'success',duration:2000}); });
+    };
+    img.onerror = () => mostrarToast('No se pudo leer la imagen', {type:'error',duration:3000});
+    img.src = r.result;
+  };
+  r.readAsDataURL(f);
+}
+function quitarLogo(){
+  logo = null;
+  try { localStorage.removeItem(LOGO_KEY); } catch(_){}
+  const inp = document.getElementById('e-logo'); if (inp) inp.value = '';
+  renderLogoPrev(); render();
+}
+function renderLogoPrev(){
+  const prev = document.getElementById('logo-prev');
+  const del = document.getElementById('btn-logo-del');
+  if (!prev) return;
+  if (logo){
+    prev.innerHTML = `<img src="${logo.dataUrl}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+    if (del) del.style.display = '';
+  } else {
+    prev.textContent = 'sin logo';
+    if (del) del.style.display = 'none';
+  }
+}
+async function cargarLogo(){
+  let stored = null;
+  try { stored = localStorage.getItem(LOGO_KEY); } catch(_){}
+  if (stored){ await aplicarLogo(stored, false); return; }
+  // Logo por defecto si existe en el repo (./assets/logo.png).
+  try {
+    const res = await fetch('./assets/logo.png', { cache:'no-store' });
+    if (res.ok){
+      const blob = await res.blob();
+      const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+      await aplicarLogo(dataUrl, false);
+    }
+  } catch(_){}
+}
+
 function siguienteNumero(){
   let n = parseInt(localStorage.getItem(NUM_KEY) || '0') || 0;
   return 'COT-' + String(n + 1).padStart(6, '0');
@@ -568,6 +653,7 @@ function copiarTexto(){
   L.push('');
   if (c.conIGV){ L.push(`Subtotal: ${money(c.subtotal,sym)}`); L.push(`IGV (18%): ${money(c.igv,sym)}`); }
   L.push(`TOTAL: ${money(c.total,sym)} (${c.conIGV?'IGV incluido':'sin IGV'})`);
+  if (!c.conIGV) { L.push(''); L.push(NOTA_SIN_IGV); }
   if (q.obs) { L.push(''); L.push('Obs: ' + q.obs); }
   copiarAlPortapapeles(L.join('\n'))
     .then(() => mostrarToast('Cotización copiada', {type:'success',duration:2500}))
@@ -601,14 +687,25 @@ async function descargarPDF(){
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit:'pt', format:'a4' });
     const W = pdf.internal.pageSize.getWidth();
+    const H = pdf.internal.pageSize.getHeight();
     const M = 40; let y = 44;
     const PURPLE = [124,111,239], DARK = [34,34,40], GREY = [110,110,120];
+    const ensure = (need) => { if (y + need > H - 50){ pdf.addPage(); y = 44; } };
 
-    // --- Cabecera: empresa (izq) + recuadro cotización (der) ---
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(15); pdf.setTextColor(20,20,25);
-    pdf.text(e.nombre, M, y);
+    // --- Cabecera: logo + empresa (izq) + recuadro cotización (der) ---
+    let textTop = 44;
+    if (logo){
+      const maxH = 46, maxW = 175;
+      const sc = Math.min(maxW / logo.w, maxH / logo.h);
+      const lw = logo.w * sc, lh = logo.h * sc;
+      const fmt = logo.dataUrl.indexOf('image/jpeg') >= 0 ? 'JPEG' : 'PNG';
+      try { pdf.addImage(logo.dataUrl, fmt, M, 26, lw, lh); } catch(err){ console.warn('logo PDF:', err); }
+      textTop = 26 + lh + 15;
+    }
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(logo ? 12 : 15); pdf.setTextColor(20,20,25);
+    pdf.text(e.nombre, M, textTop);
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...GREY);
-    let hy = y + 15;
+    let hy = textTop + 14;
     const empLineas = [
       e.ruc ? 'RUC ' + e.ruc : '', e.dir,
       [e.tel?('Tel. '+e.tel):'', e.email].filter(Boolean).join('  ·  ')
@@ -689,16 +786,31 @@ async function descargarPDF(){
 
     // --- Observaciones ---
     if (q.obs){
-      y += 6; pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(30,30,35);
+      y += 6; ensure(30);
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(30,30,35);
       pdf.text('Observaciones:', M, y);
       pdf.setFont('helvetica','normal'); pdf.setTextColor(...GREY);
       const ow = pdf.splitTextToSize(q.obs, W - 2*M - 80);
       pdf.text(ow, M + 78, y); y += ow.length * 12 + 4;
     }
 
+    // --- Nota automática cuando NO se incluye IGV ---
+    if (!c.conIGV){
+      y += 8;
+      const nw = pdf.splitTextToSize(NOTA_SIN_IGV, W - 2*M - 20);
+      const nh = 14 + nw.length * 11;
+      ensure(nh);
+      pdf.setFillColor(255,247,236); pdf.setDrawColor(245,217,168); pdf.setLineWidth(0.7);
+      pdf.roundedRect(M, y, W - 2*M, nh, 4, 4, 'FD');
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(138,90,18);
+      let ny = y + 15; nw.forEach(t => { pdf.text(t, M + 10, ny); ny += 11; });
+      y += nh;
+    }
+
     // --- Cuentas bancarias ---
     if (e.bancos){
       y += 8;
+      ensure(16 + e.bancos.split('\n').filter(Boolean).length * 12);
       const bl = e.bancos.split('\n').filter(Boolean);
       const bh = 16 + bl.length*12;
       pdf.setFillColor(247,247,250); pdf.setDrawColor(236,236,240);
@@ -711,7 +823,7 @@ async function descargarPDF(){
     }
 
     // --- Pie ---
-    const foot = (c.conIGV ? 'Precios incluyen IGV' : 'Precios no incluyen IGV') + (e.web ? '  ·  ' + e.web : '');
+    const foot = (c.conIGV ? 'Precios incluyen IGV' : 'Precios sin IGV') + (e.web ? '  ·  ' + e.web : '');
     pdf.setFontSize(8.5); pdf.setTextColor(150,150,155);
     pdf.text(foot, W/2, pdf.internal.pageSize.getHeight() - 28, {align:'center'});
 
@@ -766,6 +878,7 @@ document.getElementById('q-fecha').valueAsDate = new Date();
 });
 agregarLinea();
 render();
+cargarLogo();
 cargarCatalogos();
 </script>
 </body>
