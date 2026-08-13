@@ -563,6 +563,7 @@ function cargarEmpresa(){
   if (!e.nombre) e.nombre = 'TAINTY CORPORATION TRADING S.A.C.';
   if (!e.ruc)    e.ruc = '20613069179';
   if (!e.web)    e.web = 'www.taintycorporation.pe';
+  if (!e.bancos) e.bancos = 'Titular: TAINTY CORPORATION TRADING S.A.C.\nBCP Soles: 191-7068841-0-32 (1917068841032)\nCCI: 00219100706884103256';
   ['nombre','ruc','tel','dir','email','web','bancos'].forEach(k => {
     const el = document.getElementById('e-'+k);
     if (el && e[k] != null) el.value = e[k];
