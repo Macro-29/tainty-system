@@ -125,7 +125,9 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
 .doc-note{margin:2px 18px 10px;background:#fff7ec;border:1px solid #f5d9a8;border-radius:8px;padding:8px 11px;font-size:10px;color:#8a5a12;line-height:1.5}
 .doc-bank{margin:0 18px 14px;background:#f7f7fa;border-radius:8px;padding:10px 12px;font-size:10px;color:#444}
 .doc-bank .bt{font-weight:700;color:#111;margin-bottom:4px;font-size:10px}
-.doc-foot{border-top:1px solid #ececec;padding:10px 18px;text-align:center;font-size:10px;color:#888}
+.doc-foot{border-top:1px solid #ececec;padding:11px 18px;text-align:center;font-size:10px;color:#888;line-height:1.5}
+.doc-foot .doc-web{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:#7c6fef;margin-bottom:3px}
+.doc-foot .doc-foot-igv{margin-top:4px;color:#b3b3bb;font-size:9px}
 .doc-empty{padding:26px 18px;text-align:center;color:#aaa;font-size:12px}
 
 .preview-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--hint);margin:0 2px 10px;display:flex;align-items:center;gap:8px}
@@ -192,7 +194,7 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
     <div class="panel">
       <div class="panel-title"><span class="num">2</span>Cotizaci&oacute;n</div>
       <div class="row3">
-        <div class="field"><label>N&uacute;mero</label><input class="inp" id="q-num" placeholder="COT-000001"></div>
+        <div class="field"><label>N&uacute;mero <span style="color:var(--hint)">(autom&aacute;tico)</span></label><input class="inp" id="q-num" readonly tabindex="-1" title="Se genera solo al exportar (a&ntilde;o+d&iacute;a+mes+hora+minuto)" style="color:var(--muted)"></div>
         <div class="field"><label>Fecha emisi&oacute;n</label><input class="inp" type="date" id="q-fecha"></div>
         <div class="field"><label>V&aacute;lida (d&iacute;as)</label><input class="inp" type="number" id="q-dias" value="7" min="0" onchange="render()" oninput="render()"></div>
       </div>
@@ -262,9 +264,10 @@ if (!requireLogin()) { throw new Error('sin sesión'); }
 
 const IGV_RATE = 0.18;
 const EMP_KEY = 'tainty_empresa';
-const NUM_KEY = 'tainty_cot_num';
 const LOGO_KEY = 'tainty_logo';
 const NOTA_SIN_IGV = 'Los precios mostrados NO incluyen IGV, por lo que no se emite factura. Si necesitas factura, se agrega el 18% de IGV al precio por unidad.';
+const AVISO_L1 = 'Por favor, revisar los detalles del producto, cantidad y precio unitario.';
+const AVISO_L2 = 'No aceptamos cambios o devoluciones.';
 
 let listaProductos = [];
 let listaClientes  = [];
@@ -535,7 +538,12 @@ function render(){
     ${notaIGV}
     ${obs}
     ${bancos}
-    <div class="doc-foot">${esc(igvNota)}${e.web?(' &middot; '+esc(e.web)):''}</div>`;
+    <div class="doc-foot">
+      ${e.web ? `<div class="doc-web">${esc(e.web)}</div>` : ''}
+      <div>${esc(AVISO_L1)}</div>
+      <div>${esc(AVISO_L2)}</div>
+      <div class="doc-foot-igv">${esc(igvNota)}</div>
+    </div>`;
 }
 
 /* ---------- Persistencia de datos de empresa + número ---------- */
@@ -554,6 +562,7 @@ function cargarEmpresa(){
   try { e = JSON.parse(localStorage.getItem(EMP_KEY) || '{}'); } catch(_){}
   if (!e.nombre) e.nombre = 'TAINTY CORPORATION TRADING S.A.C.';
   if (!e.ruc)    e.ruc = '20613069179';
+  if (!e.web)    e.web = 'www.taintycorporation.pe';
   ['nombre','ruc','tel','dir','email','web','bancos'].forEach(k => {
     const el = document.getElementById('e-'+k);
     if (el && e[k] != null) el.value = e[k];
@@ -628,13 +637,14 @@ async function cargarLogo(){
   } catch(_){}
 }
 
-function siguienteNumero(){
-  let n = parseInt(localStorage.getItem(NUM_KEY) || '0') || 0;
-  return 'COT-' + String(n + 1).padStart(6, '0');
-}
-function consumirNumero(){
-  let n = parseInt(localStorage.getItem(NUM_KEY) || '0') || 0;
-  try { localStorage.setItem(NUM_KEY, String(n + 1)); } catch(_){}
+/**
+ * Numero de cotizacion automatico con formato AAAADDMMHHmm.
+ * Ej: 13/08/2026 11:52 -> "202613081152" (anio+dia+mes+hora+minuto, 24h).
+ */
+function numeroCotizacion(d){
+  d = d || new Date();
+  const p = n => String(n).padStart(2, '0');
+  return '' + d.getFullYear() + p(d.getDate()) + p(d.getMonth() + 1) + p(d.getHours()) + p(d.getMinutes());
 }
 
 /* ---------- Copiar como texto ---------- */
@@ -680,6 +690,9 @@ async function descargarPDF(){
   const c = calcular();
   if (c.items.length === 0){ mostrarToast('Agrega al menos un producto con cantidad y precio', {type:'error',duration:3200}); return; }
   const btn = document.getElementById('btn-pdf');
+  // Numero de cotizacion automatico, generado en el momento de exportar.
+  document.getElementById('q-num').value = numeroCotizacion();
+  render();
   const q = datosCotizacion(); const e = datosEmpresa(); const sym = q.moneda;
   btn.disabled = true; const prev = btn.innerHTML; btn.innerHTML = '⏳ Generando...';
   try {
@@ -822,21 +835,25 @@ async function descargarPDF(){
       y += bh;
     }
 
-    // --- Pie ---
-    const foot = (c.conIGV ? 'Precios incluyen IGV' : 'Precios sin IGV') + (e.web ? '  ·  ' + e.web : '');
-    pdf.setFontSize(8.5); pdf.setTextColor(150,150,155);
-    pdf.text(foot, W/2, pdf.internal.pageSize.getHeight() - 28, {align:'center'});
+    // --- Pie: web + aviso (estilo cotización) ---
+    const footTop = H - 56;
+    pdf.setDrawColor(230,230,236); pdf.setLineWidth(0.7);
+    pdf.line(M, footTop, W - M, footTop);
+    let fy = footTop + 15;
+    if (e.web){
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(...PURPLE);
+      pdf.text(e.web, W/2, fy, {align:'center'}); fy += 14;
+    }
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(120,120,128);
+    pdf.text(AVISO_L1, W/2, fy, {align:'center'}); fy += 11;
+    pdf.text(AVISO_L2, W/2, fy, {align:'center'}); fy += 11;
+    pdf.setFontSize(7.5); pdf.setTextColor(170,170,176);
+    pdf.text(c.conIGV ? 'Precios incluyen IGV' : 'Precios sin IGV', W/2, fy, {align:'center'});
 
     const nombreArch = (q.num || 'cotizacion').replace(/[^\w\-]+/g,'_')
       + (q.cliente.nombre ? '_' + q.cliente.nombre.replace(/[^\w]+/g,'_').slice(0,24) : '') + '.pdf';
     pdf.save(nombreArch);
-
-    // Consumir el correlativo solo si el número no fue editado a mano.
-    if (q.num === siguienteNumero()){
-      consumirNumero();
-      document.getElementById('q-num').value = siguienteNumero();
-    }
-    mostrarToast('PDF generado', {type:'success',duration:2500});
+    mostrarToast('PDF generado · N° ' + q.num, {type:'success',duration:2800});
   } catch (err){
     console.error(err);
     mostrarToast('No se pudo generar el PDF: ' + (err.message||''), {type:'error',duration:4000});
@@ -851,7 +868,7 @@ function nuevaCotizacion(){
   document.getElementById('chk-igv').checked = false;
   document.getElementById('lineas').innerHTML = '';
   lineas = [];
-  document.getElementById('q-num').value = siguienteNumero();
+  document.getElementById('q-num').value = numeroCotizacion();
   document.getElementById('q-fecha').valueAsDate = new Date();
   agregarLinea();
   render();
@@ -870,9 +887,9 @@ cargarEmpresa();
   const el = document.getElementById('e-'+k);
   if (el) el.addEventListener('input', guardarEmpresa);
 });
-document.getElementById('q-num').value = siguienteNumero();
+document.getElementById('q-num').value = numeroCotizacion();
 document.getElementById('q-fecha').valueAsDate = new Date();
-['c-nombre','c-doc','c-dir','q-num','q-vend'].forEach(id => {
+['c-nombre','c-doc','c-dir','q-vend'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('input', render);
 });
