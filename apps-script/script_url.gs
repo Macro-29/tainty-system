@@ -345,6 +345,7 @@ function doGet(e) {
     const cantidadPedido = {};     // numPedido -> CANTIDAD del pedido (col 6)
     const precioPedido = {};       // numPedido -> PRECIO DE VENTA del pedido (col 8)
     const totalPedido = {};        // numPedido -> MONTO TOTAL del pedido (col 9)
+    const vendedorPedido = {};     // numPedido -> VENDEDOR del pedido (col 7)
     const sheetPed = ss.getSheetByName(SHEET_NAME);
     if (sheetPed) {
       const dataPed = sheetPed.getDataRange().getValues();
@@ -357,6 +358,7 @@ function doGet(e) {
           cantidadPedido[np] = parseFloat(dataPed[i][5]) || 0;     // col F = CANTIDAD
           precioPedido[np] = parseFloat(dataPed[i][7]) || 0;       // col H = PRECIO DE VENTA
           totalPedido[np] = parseFloat(dataPed[i][8]) || 0;        // col I = MONTO TOTAL
+          vendedorPedido[np] = (dataPed[i][6] || '').toString();   // col G = VENDEDOR
         }
       }
     }
@@ -401,7 +403,8 @@ function doGet(e) {
         abono4:r[15], fecha4:r[16], restante4:r[17],
         detalle:r[18], observaciones:r[19],
         estado: estadosPedido[r[0]] || '',
-        condicion: condicionPedido[r[0]] || ''
+        condicion: condicionPedido[r[0]] || '',
+        vendedor: vendedorPedido[r[0]] || ''
       });
     }
     result = { success: true, pagos: pagos };

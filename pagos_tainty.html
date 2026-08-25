@@ -167,6 +167,7 @@ tfoot td{padding:11px 14px;font-family:'DM Mono',monospace;font-size:12px;font-w
   <div class="controls">
     <div class="search-wrap"><span class="search-icon">&#128269;</span><input class="search-input" id="search" placeholder="Buscar cliente, producto o N&#176; pedido..." oninput="renderTabla()"></div>
     <select class="sel" id="filtro-mes" onchange="renderTabla()"><option value="">Todos los meses</option><option>ENERO</option><option>FEBRERO</option><option>MARZO</option><option>ABRIL</option><option>MAYO</option><option>JUNIO</option><option>JULIO</option><option>AGOSTO</option><option>SEPTIEMBRE</option><option>OCTUBRE</option><option>NOVIEMBRE</option><option>DICIEMBRE</option></select>
+    <select class="sel" id="filtro-vendedor" onchange="renderTabla()"><option value="">Todos los vendedores</option></select>
     <select class="sel" id="filtro-cliente" onchange="renderTabla()"><option value="">Todos los clientes</option></select>
     <button class="btn-abono" id="btn-copiar-cliente" onclick="copiarTodosCliente()" title="Copiar todos los pedidos visibles (segun filtros)" style="background:var(--surface);border-color:var(--border2);color:var(--muted);padding:8px 12px">&#128203; Copiar lista</button>
     <button class="btn-abono" onclick="copiarListaEntregados()" title="Copiar solo los pedidos ENTREGADOS que falta cobrar" style="background:var(--red-dim);border-color:rgba(232,82,74,.3);color:var(--red);padding:8px 12px">&#128230; Entregados x cobrar</button>
@@ -242,7 +243,7 @@ function getSortValue(p,col){switch(col){case'fecha':{const d=new Date(p.fecha);
 function sortBy(col){if(sortCol===col){sortDir=-sortDir;}else{sortCol=col;sortDir=SORT_DESC_FIRST.includes(col)?-1:1;}renderTabla();}
 function updateSortIndicators(){document.querySelectorAll('th.sortable').forEach(th=>{const ind=th.querySelector('.sort-ind');if(!ind)return;ind.textContent=(th.dataset.col===sortCol)?(sortDir===1?'▲':'▼'):'';});}
 function switchTab(id,btn){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('tab-'+id).classList.add('active');btn.classList.add('active');if(id==='dashboard')renderCharts();}
-async function cargarPagos(){try{const res=await jsonp(SCRIPT_URL+'?action=pagos&t='+Date.now());if(res.success&&res.pagos){pagos=res.pagos;if(!mesInicializado){const fm=document.getElementById('filtro-mes');const mesActual=MESES[new Date().getMonth()];if(fm)fm.value=mesActual;mesInicializado=true;}poblarFiltroClientes();renderStats();renderCharts();renderTabla();}}catch(e){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--red)">Error al conectar.</td></tr>';}}
+async function cargarPagos(){try{const res=await jsonp(SCRIPT_URL+'?action=pagos&t='+Date.now());if(res.success&&res.pagos){pagos=res.pagos;if(!mesInicializado){const fm=document.getElementById('filtro-mes');const mesActual=MESES[new Date().getMonth()];if(fm)fm.value=mesActual;mesInicializado=true;}poblarFiltroVendedores();poblarFiltroClientes();renderStats();renderCharts();renderTabla();}}catch(e){document.getElementById('tabla-body').innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--red)">Error al conectar.</td></tr>';}}
 // Pobla el dropdown de clientes mostrando SOLO los que tienen al menos un
 // pedido que matchea el filtro de estado actual (todos / pendiente / parcial /
 // realizado). Preserva la selección actual si el cliente sigue disponible;
@@ -357,14 +358,24 @@ function getListaFiltrada(){
   const q=(document.getElementById('search').value||'').toLowerCase();
   const filtroMes=document.getElementById('filtro-mes').value;
   const filtroCliente=document.getElementById('filtro-cliente').value;
+  const filtroVendedor=document.getElementById('filtro-vendedor')?document.getElementById('filtro-vendedor').value:'';
   return pagos.filter(p=>{
     const est=getEstadoPago(p);
     if(filtroActual!=='todos'&&est!==filtroActual)return false;
     if(filtroMes&&getMesPedido(p)!==filtroMes)return false;
+    if(filtroVendedor&&(p.vendedor||'')!==filtroVendedor)return false;
     if(filtroCliente&&p.cliente!==filtroCliente)return false;
     if(q)return(p.numPedido||'').toLowerCase().includes(q)||(p.cliente||'').toLowerCase().includes(q)||(p.producto||'').toLowerCase().includes(q);
     return true;
   });
+}
+// Pobla el selector de vendedores con los que aparecen en los datos.
+function poblarFiltroVendedores(){
+  const sel=document.getElementById('filtro-vendedor');if(!sel)return;
+  const prev=sel.value;
+  const vendedores=[...new Set(pagos.map(p=>(p.vendedor||'').toString().trim()).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todos los vendedores</option>'+vendedores.map(v=>`<option>${v}</option>`).join('');
+  if(prev&&vendedores.includes(prev))sel.value=prev;
 }
 
 function renderFoot(lista){
