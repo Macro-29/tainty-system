@@ -485,15 +485,13 @@ function copiarSaldoCliente(numPedido){
   // Nombre en formato "Título" (de NUEVO CLIENTE -> Nuevo Cliente) para un trato más cordial.
   const nombre=(p.cliente||'').toString().trim().toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
   const lineas=[
-    `Hola ${nombre} 😊`,
-    ``,
-    `Esperamos que estés muy bien. Te escribimos para recordarte que tienes un saldo pendiente con nosotros de tu pedido de ${p.producto||''} (${cant} und):`,
+    `Hola ${nombre}, te saludamos de Tainty Labs. Te recordamos que tienes un saldo pendiente de tu pedido de ${p.producto||''} (${cant} und):`,
     ``,
     `💵 Total: ${m(total)}`,
-    `✅ Ya abonaste: ${m(abonado)}`,
-    `⚠️ Te queda por pagar: ${m(restante)}`,
+    `✅ Abonado: ${m(abonado)}`,
+    `⚠️ Saldo pendiente: ${m(restante)}`,
     ``,
-    `Si ya realizaste el pago, por favor envíanos el comprobante 📲. Si aún no, indícanos por favor si lo estarás abonando hoy o a más tardar mañana. ¡Gracias por confiar en nosotros! 🌿`
+    `Si ya realizaste el pago, envíanos el comprobante por favor. Si aún no, indícanos si lo abonarás hoy o a más tardar mañana. Gracias.`
   ];
   copiarAlPortapapeles(lineas.join('\n'))
     .then(()=>mostrarToast('Mensaje de saldo copiado',{type:'success',duration:2200}))
