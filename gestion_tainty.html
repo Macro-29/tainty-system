@@ -216,7 +216,17 @@ function initDots(){
   w.innerHTML=Array.from({length:PIN_LEN},(_,i)=>`<div class="pin-dot" id="pd${i}"></div>`).join('');
 }
 async function cargarDatos(){
-  document.getElementById('lista-pedidos').innerHTML='<div class="spinner"></div>';
+  // 1) Pintar al instante lo último que se vio (si hay), sin spinner en frío.
+  const cache=cacheLeer('gestion');
+  const teniaCache=!!(cache&&cache.pedidos);
+  if(teniaCache){
+    pedidos=cache.pedidos;
+    estadosInsumos=cache.estados||{};
+    renderLista();
+  }else{
+    document.getElementById('lista-pedidos').innerHTML='<div class="spinner"></div>';
+  }
+  // 2) Traer datos frescos por detrás y actualizar cuando lleguen.
   try{
     const [dp,de]=await Promise.all([
       jsonp(`${SCRIPT_URL}?action=panel&t=${Date.now()}`),
@@ -234,8 +244,14 @@ async function cargarDatos(){
     }
     if(de.success&&de.estados)estadosInsumos=de.estados;
     renderLista();
+    cacheGuardar('gestion',{pedidos,estados:estadosInsumos});
   }catch(e){
-    document.getElementById('lista-pedidos').innerHTML='<div class="empty">Error al conectar. <button onclick="cargarDatos()" style="color:var(--purple);background:none;border:none;cursor:pointer">Reintentar</button></div>';
+    // Si ya había datos en pantalla, no rompemos la vista: solo avisamos.
+    if(teniaCache){
+      mostrarToast('Sin conexión — mostrando lo último guardado',{type:'error',duration:3000});
+    }else{
+      document.getElementById('lista-pedidos').innerHTML='<div class="empty">Error al conectar. <button onclick="cargarDatos()" style="color:var(--purple);background:none;border:none;cursor:pointer">Reintentar</button></div>';
+    }
   }
 }
 

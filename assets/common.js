@@ -184,5 +184,34 @@ function formatFecha(d, withYear = false) {
   return withYear ? `${dd}/${mm}/${date.getFullYear()}` : `${dd}/${mm}`;
 }
 
+/**
+ * Guarda datos en el navegador para pintarlos al instante la próxima vez,
+ * mientras se refrescan por detrás. Silencioso si localStorage no está disponible.
+ * @param {string} clave - identificador corto (ej. 'gestion')
+ * @param {*} datos - cualquier valor serializable a JSON
+ */
+function cacheGuardar(clave, datos) {
+  try {
+    localStorage.setItem('tainty_cache_' + clave, JSON.stringify({ t: Date.now(), datos }));
+  } catch (e) { /* modo incógnito o almacenamiento lleno: ignorar */ }
+}
+
+/**
+ * Lee datos guardados con cacheGuardar. Devuelve null si no hay nada,
+ * si está vencido (maxEdadMs) o si el almacenamiento falla.
+ * @param {string} clave
+ * @param {number} [maxEdadMs=0] - 0 = sin vencimiento
+ * @returns {*|null}
+ */
+function cacheLeer(clave, maxEdadMs = 0) {
+  try {
+    const raw = localStorage.getItem('tainty_cache_' + clave);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (maxEdadMs && (Date.now() - obj.t) > maxEdadMs) return null;
+    return obj.datos;
+  } catch (e) { return null; }
+}
+
 // Note: individual pages declare their own MESES_ES (some uppercase, some title case).
 // Keeping per-page to avoid const redeclaration conflicts.
