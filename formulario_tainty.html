@@ -791,6 +791,14 @@ let listaProductos = [];
 async function cargarCatalogos() {
   const hintC = document.getElementById('hint-clientes');
   const hintP = document.getElementById('hint-productos');
+  // Poblar al instante el autocompletado guardado (si hay) mientras se refresca por detrás.
+  const cache = cacheLeer('formulario');
+  if (cache && cache.productos) {
+    listaClientes = cache.clientes || [];
+    listaProductos = cache.productos || [];
+    renderDatalist('clientes-list', listaClientes);
+    renderDatalist('productos-list', listaProductos);
+  }
   hintC.classList.add('show');
   hintP.classList.add('show');
   try {
@@ -806,6 +814,7 @@ async function cargarCatalogos() {
       listaProductos = resP.data;
       renderDatalist('productos-list', listaProductos);
     }
+    cacheGuardar('formulario', { clientes: listaClientes, productos: listaProductos });
   } catch (e) {
     console.warn('No se pudo cargar catálogos:', e.message);
   } finally {

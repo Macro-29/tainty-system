@@ -128,7 +128,17 @@ function esCompleto(pid, ins, total){
 }
 
 async function cargarDatos(){
-  document.getElementById('lista').innerHTML = '<div class="spinner"></div>';
+  // Pintar al instante lo último visto (si hay); si no, spinner.
+  const cache=cacheLeer('recepcion');
+  const teniaCache=!!(cache&&cache.pedidos);
+  if(teniaCache){
+    pedidos=cache.pedidos;
+    estados=cache.estados||{};
+    cantidades=cache.cantidades||{};
+    render();
+  }else{
+    document.getElementById('lista').innerHTML = '<div class="spinner"></div>';
+  }
   try{
     const [dp, de] = await Promise.all([
       jsonp(`${SCRIPT_URL}?action=panel&t=${Date.now()}`),
@@ -146,9 +156,14 @@ async function cargarDatos(){
     }
     if (de.success){ estados = de.estados || {}; cantidades = de.cantidades || {}; }
     render();
+    cacheGuardar('recepcion',{pedidos,estados,cantidades});
   }catch(e){
-    document.getElementById('lista').innerHTML =
-      '<div class="empty">Error al conectar. <button onclick="cargarDatos()" style="color:var(--purple);background:none;border:none;cursor:pointer">Reintentar</button></div>';
+    if(teniaCache){
+      mostrarToast('Sin conexión — mostrando lo último guardado',{type:'error',duration:3000});
+    }else{
+      document.getElementById('lista').innerHTML =
+        '<div class="empty">Error al conectar. <button onclick="cargarDatos()" style="color:var(--purple);background:none;border:none;cursor:pointer">Reintentar</button></div>';
+    }
   }
 }
 

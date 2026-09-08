@@ -532,6 +532,13 @@ async function cambiarEstadoTicket(pedidoId, nuevoEstado, selectEl){
 
 
 async function cargarPedidos(){
+  // Pintar al instante lo último visto (si hay) mientras se refresca por detrás.
+  const cache=cacheLeer('panel');
+  if(cache&&cache.pedidos){
+    pedidos=cache.pedidos;
+    estadosInsumos=cache.estados||{};
+    renderGrid();
+  }
   try{
     const [dp,de]=await Promise.all([
       jsonp(`${SCRIPT_URL}?action=panel&t=${Date.now()}`),
@@ -540,6 +547,7 @@ async function cargarPedidos(){
     if(dp.success&&dp.pedidos)pedidos=dp.pedidos;
     if(de.success&&de.estados)estadosInsumos=de.estados;
     renderGrid();
+    cacheGuardar('panel',{pedidos,estados:estadosInsumos});
   }catch(err){
     if(!pedidos.length)document.getElementById('grid').innerHTML=`<div class="error-wrap"><p>No se pudo conectar con Google Sheets.</p><button onclick="cargarPedidos()">Reintentar</button></div>`;
   }

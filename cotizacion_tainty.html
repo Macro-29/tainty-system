@@ -304,6 +304,18 @@ function fechaLarga(d){
 /* ---------- Carga de catálogos y precios ---------- */
 async function cargarCatalogos(){
   const hint = document.getElementById('hint-prod');
+  // Pintar al instante el catálogo guardado (si hay) mientras se refresca por detrás.
+  const cache = cacheLeer('cotizacion');
+  const teniaCache = !!(cache && cache.productos);
+  if (teniaCache) {
+    listaProductos = cache.productos;
+    listaClientes = cache.clientes || [];
+    precioPorProducto = cache.precios || {};
+    renderDatalist('productos-list', listaProductos);
+    renderDatalist('clientes-list', listaClientes);
+    const nP = listaProductos.length, nPr = Object.keys(precioPorProducto).length;
+    hint.textContent = `${nP} productos · ${nPr} con precio`;
+  }
   try {
     const [resP, resC, resA] = await Promise.all([
       jsonp(`${SCRIPT_URL}?action=productos`),
@@ -323,9 +335,12 @@ async function cargarCatalogos(){
     }
     const nP = listaProductos.length, nPr = Object.keys(precioPorProducto).length;
     hint.textContent = `${nP} productos · ${nPr} con precio`;
+    cacheGuardar('cotizacion', { productos: listaProductos, clientes: listaClientes, precios: precioPorProducto });
   } catch (e) {
-    hint.textContent = 'No se pudo cargar el catálogo';
-    mostrarToast('Error al cargar catálogo: ' + (e.message||''), {type:'error',duration:3500});
+    if (!teniaCache) {
+      hint.textContent = 'No se pudo cargar el catálogo';
+      mostrarToast('Error al cargar catálogo: ' + (e.message||''), {type:'error',duration:3500});
+    }
   }
 }
 

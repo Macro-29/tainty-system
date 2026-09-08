@@ -302,6 +302,14 @@ let _montoProjTxt='';            // última proyección de monto formateada
 // JSONP
 async function cargarDatos(){
   setLive('load','Actualizando…');
+  // Pintar al instante lo último visto (si hay) mientras se refresca por detrás.
+  const cache=cacheLeer('dashboard');
+  const teniaCache=!!(cache&&cache.allRows);
+  if(teniaCache){
+    allRows=cache.allRows;
+    renderDashboard();
+    document.getElementById('main').classList.add('loaded');
+  }
   try{
     const res=await jsonp(`${SCRIPT_URL}?action=analytics&t=${Date.now()}`);
     if(res.success&&res.rows){
@@ -315,10 +323,11 @@ async function cargarDatos(){
       document.getElementById('main').classList.add('loaded');
       lastUpdate=Date.now();
       tickLive();
+      cacheGuardar('dashboard',{allRows});
     }
   }catch(e){
     setLive('off','Error de conexión');
-    mostrarToast('Error al conectar: ' + (e.message || 'sin detalle'), {type:'error',duration:3500});
+    if(!teniaCache) mostrarToast('Error al conectar: ' + (e.message || 'sin detalle'), {type:'error',duration:3500});
   }
 }
 

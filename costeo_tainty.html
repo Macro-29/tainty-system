@@ -366,8 +366,14 @@ function switchTab(id,btn) {
 // JSONP
 // CARGAR DATOS
 async function cargarCatalogo() {
+  // Pintar al instante el catálogo guardado (si hay) mientras se refresca por detrás.
+  let teniaLocal = false;
   try {
-    document.getElementById('catalogo-list').innerHTML = '<div class="spinner"></div>';
+    const local = localStorage.getItem('tainty_catalogo');
+    if (local) { catalogo = JSON.parse(local); poblarSelects(); renderCatalogo(); teniaLocal = true; }
+  } catch(_) { /* localStorage corrupto: ignorar */ }
+  try {
+    if (!teniaLocal) document.getElementById('catalogo-list').innerHTML = '<div class="spinner"></div>';
     const res = await jsonp(COSTEO_URL + '?t=' + Date.now());
     if (res.success) {
       // New script returns res.data as parsed catalogo array
@@ -377,10 +383,8 @@ async function cargarCatalogo() {
       renderCatalogo();
     }
   } catch(e) {
-    // Usar datos de localStorage si existen
-    const local = localStorage.getItem('tainty_catalogo');
-    if (local) { catalogo = JSON.parse(local); poblarSelects(); renderCatalogo(); }
-    else document.getElementById('catalogo-list').innerHTML = '<div class="empty">No se pudo cargar el catálogo. Verifica la conexión.</div>';
+    // Ya se pintó desde localStorage arriba; solo mostrar error si no había nada.
+    if (!teniaLocal) document.getElementById('catalogo-list').innerHTML = '<div class="empty">No se pudo cargar el catálogo. Verifica la conexión.</div>';
   }
 }
 
