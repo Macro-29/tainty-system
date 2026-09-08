@@ -17,7 +17,7 @@
 
 const COSTEO_ID = '1U9xDfX1wkiSiL8KsJ_Qb9lwGUtmX97VBLfnLwUCEWJs';
 const COSTEO_SHEET = 'COSTO POR PRODUCTO';
-const SCRIPT_VERSION = '2026-05-15e';
+const SCRIPT_VERSION = '2026-09-08-unidad';
 
 function getTipoConfig(tipo) {
   if (['INSUMO', 'LAINA'].indexOf(tipo) >= 0) return 'kg';
@@ -175,7 +175,7 @@ function guardarProducto(e, data) {
     // hasta setValues puede fallar. Lo intentamos, y si falla, limpiamos
     // el formato del rango (lo dejamos en "General") y reintentamos.
     const startRow = sheet.getLastRow() + 1;
-    const rango = sheet.getRange(startRow, 1, filas.length, 13);
+    const rango = sheet.getRange(startRow, 1, filas.length, 14);
     try {
       rango.setValues(filas);
     } catch (writeErr) {
@@ -255,7 +255,8 @@ function buildFila_(producto, ins) {
     producto, tipo, (ins.nombre || '').toString().trim(), (ins.proveedor || '').toString().trim(),
     precio,
     cant[100], cant[300], cant[500], cant[1000],
-    costos[100], costos[300], costos[500], costos[1000]
+    costos[100], costos[300], costos[500], costos[1000],
+    (ins.unidad || '').toString().trim()   // Col 14: unidad del insumo (kg/gr/ml/litros/und). Solo INSUMO la usa.
   ];
 }
 
@@ -328,11 +329,13 @@ function leerCatalogo(e) {
     const k300 = parseFloat(r[10]) || 0;
     const k500 = parseFloat(r[11]) || 0;
     const k1000 = parseFloat(r[12])|| 0;
+    const unidad = (r[13] || '').toString().trim(); // Col 14: unidad del insumo (puede venir vacía)
     if (!producto || !tipo || !nombre) continue;
     if (!catalogo[producto]) catalogo[producto] = { nombre: producto, insumos: [] };
 
     const config = getTipoConfig(tipo);
     const insumo = { tipo: tipo, nombre: nombre, proveedor: proveedor };
+    if (unidad) insumo.unidad = unidad;
     if (config === 'kg' || config === 'und') {
       insumo.precioUnitario = precio;
       insumo.cantidades = { 100: c100, 300: c300, 500: c500, 1000: c1000 };
