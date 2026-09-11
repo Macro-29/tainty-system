@@ -766,7 +766,7 @@ function renderProveedoresPorProducto() {
         <div class="prov-name">🧾 ${p.producto} <span style="font-family:DM Mono,monospace;font-size:12px;color:var(--amber);font-weight:400">· ${Math.round(p.cantidad).toLocaleString('en-US')} und</span></div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="prov-total">S/ ${p.costo.toLocaleString('es-PE',{minimumFractionDigits:2})}</div>
-          <button class="btn-copy" onclick="copiarProducto(${idx},this)" title="Copiar el nombre del producto y todos sus insumos">&#128203; Copiar</button>
+          <button class="btn-copy" onclick="copiarProducto(${idx},this)" title="Copiar el nombre del producto con sus insumos y cápsulas (con cantidad)">&#128203; Copiar</button>
         </div>
       </div>
       <div class="prov-body">${cuerpo}</div>
@@ -775,37 +775,41 @@ function renderProveedoresPorProducto() {
 }
 
 /**
- * Copia el nombre del producto y SOLO sus insumos (tipo INSUMO).
- * Excluye a propósito cápsulas, envases, etiquetas, cajas y lainas.
+ * Copia el nombre del producto con sus INSUMOS y sus CÁPSULAS (con cantidad).
+ * Excluye a propósito envases, etiquetas, cajas y lainas.
  * Distinto de copiarProveedor: aquí el foco es el PRODUCTO, no el proveedor.
  *
- *   📦 PAWSURE ORAL PET (100ml) · 500 und
+ *   📦 ANTI-MANCHAS (90cap) · 100 und
  *
  *   - Camu Camu: 0.9 kg
- *   - Uña De Gato: 0.72 kg
+ *   - Glutatión: 1.08 kg
+ *
+ *   💊 CÁPSULAS
+ *   - 9,000 Cápsula 00 vegetal
  */
 function copiarProducto(idx, btn) {
   const p = (window._insumosPorProducto || [])[idx];
   if (!p) return;
-  const insumos = (p.insumos || [])
-    .filter(i => (i.tipo||'').toUpperCase() === 'INSUMO')
-    .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es'));
-  if (!insumos.length) {
-    mostrarToast('Este producto no tiene insumos para copiar', {type:'error', duration:2500});
+  const norm = t => (t||'').toString().toUpperCase();
+  const porNombre = (a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es');
+  const insumos  = (p.insumos || []).filter(i => norm(i.tipo) === 'INSUMO').sort(porNombre);
+  const capsulas = (p.insumos || []).filter(i => norm(i.tipo) === 'CAPSULA').sort(porNombre);
+  if (!insumos.length && !capsulas.length) {
+    mostrarToast('Este producto no tiene insumos ni cápsulas para copiar', {type:'error', duration:2500});
     return;
   }
-  const lineas = insumos.map(i => {
+  const fmtInsumo = i => {
     const unidad = i.unidad || 'kg';
-    if (unidad === 'und') {
-      const c = Math.round(i.cantidadTotal).toLocaleString('en-US');
-      return `- ${c} ${i.nombre}`;
-    }
-    const c = parseFloat(i.cantidadTotal.toFixed(3)).toString();
-    return `- ${i.nombre}: ${c} ${unidad}`;
-  }).join('\n');
-  const texto = `📦 ${p.producto} · ${Math.round(p.cantidad).toLocaleString('en-US')} und\n\n${lineas}`;
+    if (unidad === 'und') return `- ${Math.round(i.cantidadTotal).toLocaleString('en-US')} ${i.nombre}`;
+    return `- ${i.nombre}: ${parseFloat(i.cantidadTotal.toFixed(3)).toString()} ${unidad}`;
+  };
+  const fmtCapsula = i => `- ${Math.round(i.cantidadTotal).toLocaleString('en-US')} ${i.nombre}`;
+  const bloques = [];
+  if (insumos.length)  bloques.push(insumos.map(fmtInsumo).join('\n'));
+  if (capsulas.length) bloques.push('💊 CÁPSULAS\n' + capsulas.map(fmtCapsula).join('\n'));
+  const texto = `📦 ${p.producto} · ${Math.round(p.cantidad).toLocaleString('en-US')} und\n\n${bloques.join('\n\n')}`;
   copiarAlPortapapeles(texto)
-    .then(() => { mostrarToast(`Insumos copiados: ${p.producto}`, {type:'success', duration:2500}); flashCopiado(btn); })
+    .then(() => { mostrarToast(`Copiado: ${p.producto}`, {type:'success', duration:2500}); flashCopiado(btn); })
     .catch(() => mostrarToast('No se pudo copiar', {type:'error', duration:3000}));
 }
 
