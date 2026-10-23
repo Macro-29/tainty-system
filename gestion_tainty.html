@@ -14,6 +14,23 @@
 <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
 <title>Gestión de Insumos · Tainty</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>/* Tema claro/oscuro compartido · se aplica antes de pintar (sin parpadeo) */
+(function(){
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t==='light'?'light':'dark');
+    var m=document.querySelector('meta[name="theme-color"]');
+    if(m) m.setAttribute('content', t==='light'?'#f3f3f6':'#0d0d0f');
+  }
+  var saved='dark';
+  try{ saved=localStorage.getItem('tainty_theme')||'dark'; }catch(e){}
+  apply(saved);
+  window.taintyTheme={
+    get:function(){try{return localStorage.getItem('tainty_theme')||'dark';}catch(e){return'dark';}},
+    set:function(t){try{localStorage.setItem('tainty_theme',t);}catch(e){}apply(t);},
+    toggle:function(){var n=this.get()==='light'?'dark':'light';this.set(n);return n;}
+  };
+})();
+</script>
 <link rel="stylesheet" href="./assets/common.css">
 <style>
 .topbar-right{display:flex;align-items:center;gap:8px}

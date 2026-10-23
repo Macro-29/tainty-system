@@ -21,6 +21,34 @@
   --teal:#26c6b0;  --teal-dim:rgba(38,198,176,0.12);
 }
 
+/* =========================================================
+   Tema CLARO
+   Se activa con <html data-theme="light"> (lo pone el script
+   compartido según la preferencia guardada en localStorage).
+   Como todo el diseño usa estas variables, solo hace falta
+   redefinirlas aquí para que toda la app cambie de tema.
+   ========================================================= */
+:root[data-theme="light"]{
+  --bg:#f3f3f6;
+  --surface:#ffffff;
+  --surface2:#eceef2;
+  --border:rgba(0,0,0,0.09);
+  --border2:rgba(0,0,0,0.15);
+  --text:#1b1b22;
+  --muted:#5c5c6b;
+  --hint:#9898a6;
+  --purple:#6355e0; --purple-dim:rgba(124,111,239,0.14);
+  --green:#1f9d63;  --green-dim:rgba(62,207,142,0.16);
+  --amber:#b9780c;  --amber-dim:rgba(245,166,35,0.18);
+  --blue:#2e7fc6;   --blue-dim:rgba(76,163,232,0.16);
+  --red:#d33a31;    --red-dim:rgba(232,82,74,0.12);
+  --teal:#128a7b;   --teal-dim:rgba(38,198,176,0.16);
+}
+/* La textura de fondo es oscura: en claro se baja casi del todo. */
+:root[data-theme="light"] body::before{opacity:.035}
+/* El overlay del PIN usa un fondo fijo; en claro debe ser claro. */
+:root[data-theme="light"] .pin-overlay{background:rgba(243,243,246,.97)}
+
 /* Reset */
 *{box-sizing:border-box;margin:0;padding:0}
 body{

@@ -14,6 +14,23 @@
 <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
 <title>Nuevo Pedido · Tainty Corporation</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>/* Tema claro/oscuro compartido · se aplica antes de pintar (sin parpadeo) */
+(function(){
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t==='light'?'light':'dark');
+    var m=document.querySelector('meta[name="theme-color"]');
+    if(m) m.setAttribute('content', t==='light'?'#f3f3f6':'#0d0d0f');
+  }
+  var saved='dark';
+  try{ saved=localStorage.getItem('tainty_theme')||'dark'; }catch(e){}
+  apply(saved);
+  window.taintyTheme={
+    get:function(){try{return localStorage.getItem('tainty_theme')||'dark';}catch(e){return'dark';}},
+    set:function(t){try{localStorage.setItem('tainty_theme',t);}catch(e){}apply(t);},
+    toggle:function(){var n=this.get()==='light'?'dark':'light';this.set(n);return n;}
+  };
+})();
+</script>
 <style>
 :root {
   --bg: #f4f3f0;
@@ -408,6 +425,32 @@ input.invalid, select.invalid, textarea.invalid{
 .linea-total{font-size:12px;font-family:'DM Mono',monospace;color:var(--purple-dark);margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);display:none}
 .btn-add-linea{width:100%;padding:13px;margin-bottom:1rem;border:1.5px dashed var(--border);background:var(--card);color:var(--purple);border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
 .btn-add-linea:hover{border-color:var(--purple);background:var(--purple-light)}
+
+/* =========================================================
+   Tema OSCURO para el formulario.
+   Esta página nació clara y con su propio set de variables;
+   por eso aquí la variante oscura se activa con data-theme="dark"
+   (el resto de módulos es al revés). Así sigue la preferencia
+   global: oscuro por defecto, claro si el usuario lo elige.
+   ========================================================= */
+:root[data-theme="dark"]{
+  --bg:#0d0d0f;
+  --card:#16161a;
+  --border:rgba(255,255,255,0.09);
+  --text:#f0efe8;
+  --muted:#9a9aa8;
+  --hint:#62626f;
+  --purple:#8b7ff2; --purple-light:rgba(124,111,239,0.16); --purple-dark:#9a8ff4;
+  --green:#3ecf8e;  --green-light:rgba(62,207,142,0.14);
+  --amber:#f5a623;  --amber-light:rgba(245,166,35,0.14);
+  --red:#e8524a;    --red-light:rgba(232,82,74,0.14);
+  --blue:#4ca3e8;   --blue-light:rgba(76,163,232,0.14);
+}
+/* Fondos claros fijos → oscuros en modo oscuro. */
+:root[data-theme="dark"] .preview-card{background:#1e1e24}
+:root[data-theme="dark"] .btn-nuevo{background:var(--green-light);border-color:rgba(62,207,142,.35)}
+:root[data-theme="dark"] .btn-nuevo:hover{background:rgba(62,207,142,.22)}
+:root[data-theme="dark"] .prod-del-btn{background:var(--red-light);border-color:rgba(232,82,74,.35)}
 </style>
 <script src="./assets/auth.js"></script>
 <script src="./assets/config.js"></script>

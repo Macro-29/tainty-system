@@ -14,6 +14,23 @@
 <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
 <title>Tainty Labs · Sistema de Gestión</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<script>/* Tema claro/oscuro compartido · se aplica antes de pintar (sin parpadeo) */
+(function(){
+  function apply(t){
+    document.documentElement.setAttribute('data-theme', t==='light'?'light':'dark');
+    var m=document.querySelector('meta[name="theme-color"]');
+    if(m) m.setAttribute('content', t==='light'?'#f3f3f6':'#0d0d0f');
+  }
+  var saved='dark';
+  try{ saved=localStorage.getItem('tainty_theme')||'dark'; }catch(e){}
+  apply(saved);
+  window.taintyTheme={
+    get:function(){try{return localStorage.getItem('tainty_theme')||'dark';}catch(e){return'dark';}},
+    set:function(t){try{localStorage.setItem('tainty_theme',t);}catch(e){}apply(t);},
+    toggle:function(){var n=this.get()==='light'?'dark':'light';this.set(n);return n;}
+  };
+})();
+</script>
 <link rel="stylesheet" href="./assets/common.css">
 <style>
 html,body{height:100%}
@@ -30,6 +47,10 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
 .session-bar{position:absolute;top:0;right:0;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 .session-bar button{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
 .session-bar button:hover{color:var(--text);border-color:var(--red);background:var(--red-dim)}
+/* Botón de tema claro/oscuro (arriba a la izquierda del header). */
+.theme-toggle{position:absolute;top:0;left:0;display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 11px;border-radius:20px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+.theme-toggle:hover{color:var(--text);border-color:var(--purple);background:var(--surface2)}
+.theme-toggle .ic{font-size:14px;line-height:1}
 .dot-live{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
 .dot-on{background:var(--green);box-shadow:0 0 0 0 rgba(62,207,142,.6);animation:pulse 2s infinite}
 .dot-off{background:var(--hint)}
@@ -146,6 +167,7 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
   .card-icon{width:40px;height:40px;font-size:18px}
   .card-title{font-size:14px}
   .session-bar{position:static;justify-content:center;margin-top:12px}
+  .theme-toggle{position:static;margin:0 auto 10px;display:inline-flex}
 }
 @media(min-width:641px) and (max-width:800px){
   .grid{grid-template-columns:repeat(2,1fr)}
@@ -189,6 +211,9 @@ body{overflow-y:scroll;padding:3rem 1rem 4rem}
 
 <div class="wrap">
   <div class="header">
+    <button class="theme-toggle" id="theme-toggle" onclick="cambiarTema()" aria-label="Cambiar tema claro u oscuro">
+      <span class="ic" id="theme-ic">🌙</span><span id="theme-label">Oscuro</span>
+    </button>
     <div class="logo">Tainty <span>Labs</span></div>
     <div class="greeting" id="greeting">Bienvenido</div>
     <div class="tagline" id="clock">Sistema de gestión</div>
@@ -406,6 +431,23 @@ if (isLoggedIn()) {
   document.getElementById('pin-overlay').classList.add('hidden');
 }
 renderEstadoSesion();
+
+/* ---------- Tema claro / oscuro ----------
+   El tema se aplica desde el script compartido del <head> (antes de pintar).
+   Aquí solo cambiamos la preferencia y refrescamos el texto/ícono del botón.
+   Como la preferencia vive en localStorage, todos los módulos la respetan. */
+function pintarBotonTema(){
+  var t = window.taintyTheme ? window.taintyTheme.get() : 'dark';
+  var ic = document.getElementById('theme-ic');
+  var lb = document.getElementById('theme-label');
+  if (ic) ic.textContent = t === 'light' ? '☀️' : '🌙';
+  if (lb) lb.textContent = t === 'light' ? 'Claro' : 'Oscuro';
+}
+function cambiarTema(){
+  if (window.taintyTheme) window.taintyTheme.toggle();
+  pintarBotonTema();
+}
+pintarBotonTema();
 </script>
 <script>
 /* Registro del Service Worker · PWA Tainty */
