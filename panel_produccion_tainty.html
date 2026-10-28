@@ -209,7 +209,7 @@
   <button class="filter-btn" onclick="setFiltro('compras',this)">🛒 Compras</button>
   <button class="filter-btn" onclick="setFiltro('produccion',this)">⚙️ En producción</button>
   <button class="filter-btn" onclick="setFiltro('camino',this)">🚚 En camino</button>
-  <button class="filter-btn" onclick="setFiltro('envio',this)">📦 Listo para envío</button>
+  <button class="filter-btn" onclick="setFiltro('envio',this)">📦 Pendiente de envío</button>
   <button class="filter-btn" onclick="setFiltro('cancelado',this)">❌ Cancelado</button>
 </div>
 
@@ -228,8 +228,8 @@ const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
 const LABELS_INSUMO={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica','encurso':'⚙️ En curso','finalizado':'✅ Finalizado'};
 const DOT_CLS={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
 const CHIP_CLS={'pendiente':'chip-pendiente','compra':'chip-compra','produccion':'chip-produccion','camino':'chip-camino','oficina':'chip-oficina','noaplica':'chip-noaplica','encurso':'chip-produccion','finalizado':'chip-oficina'};
-const ESTADOS_TICKET=['Recibido','Compras de insumos','En produccion','En camino','Listo para envio','Entregado'];
-const LABELS_TICKET={'Recibido':'📬 Recibido','Compras de insumos':'🛒 Compras de insumos','En produccion':'⚙️ En producción','En camino':'🚚 En camino','Listo para envio':'📦 Listo para envío','Entregado':'✅ Entregado'};
+const ESTADOS_TICKET=['Recibido','Compras de insumos','En produccion','En camino','Pendiente de envio','Entregado'];
+const LABELS_TICKET={'Recibido':'📬 Recibido','Compras de insumos':'🛒 Compras de insumos','En produccion':'⚙️ En producción','En camino':'🚚 En camino','Pendiente de envio':'📦 Pendiente de envío','Entregado':'✅ Entregado'};
 // Rango de avance de cada estado: el badge muestra siempre el más avanzado entre el guardado y el automático
 const RANK_ESTADO={recibido:0,compras:1,produccion:2,camino:3,envio:4,entregado:5};
 function rankEstado(k){return k==='cancelado'?99:(RANK_ESTADO[k]??0);}
@@ -300,7 +300,7 @@ function getEstadoTicket(estado){
   if(e.includes('compras'))return{cls:'estado-produccion',icon:'🛒',label:'Compras de insumos',key:'compras'};
   if(e.includes('produccion')||e.includes('producción'))return{cls:'estado-produccion',icon:'⚙️',label:'En producción',key:'produccion'};
   if(e.includes('camino'))return{cls:'estado-camino',icon:'🚚',label:'En camino',key:'camino'};
-  if(e.includes('listo'))return{cls:'estado-listo',icon:'📦',label:'Listo para envío',key:'envio'};
+  if(e.includes('listo')||e.includes('envio')||e.includes('envío'))return{cls:'estado-listo',icon:'📦',label:'Pendiente de envío',key:'envio'};
   if(e.includes('entregado'))return{cls:'estado-listo',icon:'✅',label:'Entregado',key:'entregado'};
   if(e.includes('recibido'))return{cls:'estado-pendiente',icon:'📬',label:'Recibido',key:'recibido'};
   return{cls:'estado-pendiente',icon:'📬',label:'Recibido',key:'recibido'};
@@ -325,7 +325,7 @@ function calcEstadoAutomatico(pedidoId, tipo, estadoActual){
   const algunoProduccion=estados.some(s=>s==='produccion')||getEstadoInsumo(pedidoId,'Maquina')==='encurso';
   const algunoCompra=estados.some(s=>s==='compra');
 
-  if(todosOficina) return 'Listo para envio';
+  if(todosOficina) return 'Pendiente de envio';
   if(algunoCamino) return 'En camino';
   if(algunoProduccion) return 'En produccion';
   if(algunoCompra) return 'Compras de insumos';
