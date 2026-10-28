@@ -365,7 +365,9 @@ function calcProgreso(pedidoId,tipo){
   if(!aplicables.length)return 100;
   const listos=aplicables.filter(i=>{
     const e=getEstadoInsumo(pedidoId,i);
-    return i==='Maquina'?e==='finalizado':e==='oficina';
+    // La maquila cuenta como lista cuando esta "En curso" (es su estado final automatico),
+    // asi el progreso llega a 100% con todos los insumos en oficina + maquila en curso.
+    return i==='Maquina'?(e==='encurso'||e==='finalizado'):e==='oficina';
   }).length;
   return Math.round((listos/aplicables.length)*100);
 }
