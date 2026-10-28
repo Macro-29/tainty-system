@@ -224,7 +224,7 @@
 
 <script>
 const ESTADOS_INSUMO=['pendiente','compra','produccion','camino','oficina','noaplica'];
-const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
+const ESTADOS_MAQUINA=['pendiente','encurso'];
 const LABELS_INSUMO={'pendiente':'⏳ Pendiente','compra':'🛒 En compra','produccion':'⚙️ En producción','camino':'🚚 En camino','oficina':'📦 En oficina','noaplica':'✕ No aplica','encurso':'⚙️ En curso','finalizado':'✅ Finalizado'};
 const DOT_CLS={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'dot-produccion','camino':'dot-camino','oficina':'dot-oficina','noaplica':'dot-noaplica','encurso':'dot-produccion','finalizado':'dot-oficina'};
 const CHIP_CLS={'pendiente':'chip-pendiente','compra':'chip-compra','produccion':'chip-produccion','camino':'chip-camino','oficina':'chip-oficina','noaplica':'chip-noaplica','encurso':'chip-produccion','finalizado':'chip-oficina'};
@@ -344,7 +344,20 @@ function fechaEntregaLabel(str, fechaPedido){
   return{text:f.toLocaleDateString('es-PE',{day:'numeric',month:'short'}),cls:'',key:''};
 }
 function getEstadoInsumo(pedidoId,insumo){
+  if(insumo==='Maquina')return estadoMaquila(pedidoId);
   return estadosInsumos[pedidoId+'|'+insumo]||'pendiente';
+}
+// La maquila es automatica (igual que en Gestion): pasa a "En curso" cuando todos
+// los insumos de produccion + envase + etiqueta estan en oficina (la caja no cuenta);
+// antes de eso, "Pendiente". No existe "finalizado".
+function estadoMaquila(pedidoId){
+  const p=pedidos.find(x=>x.numPedido===pedidoId);
+  const gating=getInsumos(getTipo(p?p.producto:'')).filter(i=>i!=='Maquina'&&i!=='Caja');
+  const listos=gating.every(i=>{
+    const e=estadosInsumos[pedidoId+'|'+i]||'pendiente';
+    return e==='oficina'||e==='noaplica';
+  });
+  return listos?'encurso':'pendiente';
 }
 function calcProgreso(pedidoId,tipo){
   const insumos=getInsumos(tipo);
@@ -390,7 +403,7 @@ function renderTicket(p){
       </div>
       <div class="insumo-right">
         <span class="insumo-fecha ${fc.cls}">${fc.label}</span>
-        ${adminMode
+        ${adminMode&&nombre!=='Maquina'
           ? `<select class="estado-select visible" onchange="cambiarEstado('${p.numPedido}','${nombre}',this.value)">${opts}</select>`
           : `<span class="estado-chip ${chipCls}">${LABELS_INSUMO[estadoIns]}</span>`
         }
