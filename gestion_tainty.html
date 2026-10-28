@@ -217,7 +217,14 @@ function renderStepper(pid,insumo){
   const cur=getEstadoInsumo(pid,insumo);
   const na=cur==='noaplica';
   const curIdx=na?-1:linear.indexOf(cur);
-  const [acc,accDim]=ACC[na?'noaplica':cur]||ACC['pendiente'];
+  let [acc,accDim]=ACC[na?'noaplica':cur]||ACC['pendiente'];
+  // Para cajas en producción/camino, el track toma el color del proveedor
+  // (Guillermo = teal, Luis = azul) para ver a dónde va de un vistazo.
+  if(insumo==='Caja'&&!na&&(cur==='produccion'||cur==='camino')){
+    const provAcc={guillermo:['var(--teal)','var(--teal-dim)'],luis:['var(--blue)','var(--blue-dim)']};
+    const pa=provAcc[getProveedorCaja(pid)];
+    if(pa)[acc,accDim]=pa;
+  }
   const steps=linear.map((s,i)=>{
     let cls='step';
     if(!na){
