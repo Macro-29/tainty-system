@@ -70,6 +70,9 @@
 .step.done .step-label{color:var(--muted)}
 .step.current .step-node{background:var(--acc);border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-dim)}
 .step.current .step-label{color:var(--acc);font-weight:600}
+/* Stepper automático (Maquila): no editable, sin afordancia de clic. */
+.stepper.ro{pointer-events:none}
+.step.ro{cursor:default}
 .step-na{flex-shrink:0;width:26px;height:26px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--hint);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
 .step-na:hover{color:var(--text);border-color:var(--border2)}
 .step-na.active{color:var(--red);border-color:rgba(232,82,74,.4);background:var(--red-dim)}
@@ -175,7 +178,7 @@ if (!requireLogin()) {
   }
 }
 const ESTADOS=['pendiente','compra','produccion','camino','oficina','noaplica'];
-const ESTADOS_MAQUINA=['pendiente','encurso','finalizado'];
+const ESTADOS_MAQUINA=['pendiente','encurso'];
 // Etiquetas y cajas no pasan por la fase de compra (vienen del proveedor
 // directo a producción), así que ocultamos el botón "En compra" en sus secciones.
 const INSUMOS_SIN_COMPRA = new Set(['Etiqueta', 'Caja']);
@@ -225,13 +228,18 @@ function renderStepper(pid,insumo){
     const pa=provAcc[getProveedorCaja(pid)];
     if(pa)[acc,accDim]=pa;
   }
+  // La maquila no se edita a mano: su stepper es de solo lectura (automático).
+  const readonly=insumo==='Maquina';
   const steps=linear.map((s,i)=>{
     let cls='step';
+    if(readonly)cls+=' ro';
     if(!na){
       if(i<curIdx)cls+=' done';
       else if(i===curIdx)cls+=' current';
     }
-    return`<button class="${cls}" onclick="cambiarEstado('${pid}','${insumo}','${s}')" title="${LABELS[s]}">
+    const onclick=readonly?'':` onclick="cambiarEstado('${pid}','${insumo}','${s}')"`;
+    const title=readonly?'Automático — depende de los insumos':LABELS[s];
+    return`<button class="${cls}"${onclick} title="${title}">
       <span class="step-node"></span>
       <span class="step-label">${STEP_LABEL[s]||s}</span>
     </button>`;
@@ -240,7 +248,7 @@ function renderStepper(pid,insumo){
     ?`<button class="step-na${na?' active':''}" onclick="cambiarEstado('${pid}','${insumo}','noaplica')" title="No aplica">✕</button>`
     :'';
   return`<div class="stepper-wrap${na?' is-na':''}">
-    <div class="stepper" style="--acc:${acc};--acc-dim:${accDim}">${steps}</div>
+    <div class="stepper${readonly?' ro':''}" style="--acc:${acc};--acc-dim:${accDim}">${steps}</div>
     ${naBtn}
     <span class="saving-indicator" id="si-${pid}-${insumo}"></span>
   </div>`;
@@ -300,7 +308,23 @@ function getTipo(n){
 function getInsumos(t){
   return t==='cap'?['Insumo','Capsula','Envase','Etiqueta','Caja','Maquina']:['Insumo','Envase','Etiqueta','Caja','Maquina'];
 }
-function getEstadoInsumo(pid,ins){return estadosInsumos[pid+'|'+ins]||'pendiente';}
+function getEstadoInsumo(pid,ins){
+  if(ins==='Maquina')return estadoMaquila(pid);
+  return estadosInsumos[pid+'|'+ins]||'pendiente';
+}
+// La maquila ya no se edita a mano: pasa a "En curso" automáticamente cuando
+// el pedido tiene listos (en oficina) todos sus insumos de producción +
+// envases + etiqueta (la caja no cuenta). Antes de eso, "Pendiente".
+// El estado "finalizado" se eliminó.
+function estadoMaquila(pid){
+  const p=pedidos.find(x=>x.numPedido===pid);
+  const gating=getInsumos(getTipo(p?p.producto:'')).filter(i=>i!=='Maquina'&&i!=='Caja');
+  const listos=gating.every(i=>{
+    const e=estadosInsumos[pid+'|'+i]||'pendiente';
+    return e==='oficina'||e==='noaplica';
+  });
+  return listos?'encurso':'pendiente';
+}
 
 function calcEstadoAuto(pid,tipo){
   const insumos=getInsumos(tipo);
@@ -388,7 +412,7 @@ function renderProveedorCaja(pid){
 
 // Mapea el filtro superior al estado equivalente para insumos físicos y para máquina
 const FILTRO_A_ESTADO={'recibido':'pendiente','compras':'compra','produccion':'produccion','camino':'camino','listo':'oficina'};
-const FILTRO_A_ESTADO_MAQ={'recibido':'pendiente','compras':null,'produccion':'encurso','camino':null,'listo':'finalizado'};
+const FILTRO_A_ESTADO_MAQ={'recibido':'pendiente','compras':null,'produccion':'encurso','camino':null,'listo':null};
 
 // Devuelve la lista de pedidos filtrada por la búsqueda activa y ordenada
 // por número de pedido. NO aplica filtro por estado (eso se hace por sección
@@ -439,7 +463,7 @@ function renderLista(){
 
     // Conteo de estados para los pills de la cabecera
     const conteo=esMaquina
-      ?{pendiente:0,encurso:0,finalizado:0}
+      ?{pendiente:0,encurso:0}
       :{pendiente:0,compra:0,produccion:0,camino:0,oficina:0};
     pedidosSeccion.forEach(p=>{
       const e=getEstadoInsumo(p.numPedido,insumo);
@@ -482,7 +506,6 @@ function renderLista(){
       ? [
           ['pendiente','⏳',conteo.pendiente],
           ['produccion','⚙️',conteo.encurso],
-          ['oficina','✅',conteo.finalizado],
         ]
       : INSUMOS_SIN_COMPRA.has(insumo)
       ? [
@@ -513,7 +536,7 @@ function renderLista(){
       <div class="seccion-header">
         <div class="seccion-titulo">
           <span class="seccion-icono">${ICONO_INSUMO[insumo]||''}</span>
-          ${insumo}
+          ${ORDEN_INSUMOS_LABELS[insumo]||insumo}
           <span class="seccion-count">${pedidosFiltrados.length}/${pedidosSeccion.length}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -559,11 +582,11 @@ function copiarSeccion(insumo){
     pedidosSeccion=pedidosSeccion.filter(p=>getEstadoInsumo(p.numPedido,insumo)===estadoFiltro);
   }
 
-  // Excluir lo que ya está finalizado para esta sección — solo nos importa lo
-  // pendiente / en curso. Para insumos físicos: estados 'oficina' (ya llegó)
-  // y 'noaplica' (no se necesita). Para Maquina: 'finalizado' y 'noaplica'.
+  // Excluir lo que ya no requiere acción. Para insumos físicos: 'oficina'
+  // (ya llegó) y 'noaplica'. Para Maquila (automática): 'encurso' (ya puede
+  // arrancar) y 'noaplica' — solo interesa lo que sigue en 'pendiente'.
   const ESTADOS_EXCLUIR = esMaquina
-    ? new Set(['finalizado','noaplica'])
+    ? new Set(['encurso','noaplica'])
     : new Set(['oficina','noaplica']);
   pedidosSeccion = pedidosSeccion.filter(p =>
     !ESTADOS_EXCLUIR.has(getEstadoInsumo(p.numPedido, insumo))
@@ -609,7 +632,7 @@ function copiarSeccion(insumo){
 
 const ORDEN_INSUMOS_LABELS = {
   'Insumo':'Insumo', 'Capsula':'Cápsula', 'Envase':'Envase',
-  'Etiqueta':'Etiqueta', 'Caja':'Caja', 'Maquina':'Máquina'
+  'Etiqueta':'Etiqueta', 'Caja':'Caja', 'Maquina':'Maquila'
 };
 
 // Texto descriptivo de cada estado (sin emoji), para usar en exports.
