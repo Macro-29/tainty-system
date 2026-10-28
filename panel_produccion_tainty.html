@@ -230,6 +230,9 @@ const DOT_CLS={'pendiente':'dot-pendiente','compra':'dot-compra','produccion':'d
 const CHIP_CLS={'pendiente':'chip-pendiente','compra':'chip-compra','produccion':'chip-produccion','camino':'chip-camino','oficina':'chip-oficina','noaplica':'chip-noaplica','encurso':'chip-produccion','finalizado':'chip-oficina'};
 const ESTADOS_TICKET=['Recibido','Compras de insumos','En produccion','En camino','Listo para envio','Entregado'];
 const LABELS_TICKET={'Recibido':'📬 Recibido','Compras de insumos':'🛒 Compras de insumos','En produccion':'⚙️ En producción','En camino':'🚚 En camino','Listo para envio':'📦 Listo para envío','Entregado':'✅ Entregado'};
+// Rango de avance de cada estado: el badge muestra siempre el más avanzado entre el guardado y el automático
+const RANK_ESTADO={recibido:0,compras:1,produccion:2,camino:3,envio:4,entregado:5};
+function rankEstado(k){return k==='cancelado'?99:(RANK_ESTADO[k]??0);}
 
 let pedidos=[];
 let estadosInsumos={};
@@ -362,9 +365,11 @@ function getProgressColor(pct){
 
 function renderTicket(p){
   const tipo=getTipo(p.producto);
-  // Calcular estado automatico basado en insumos
+  // Estado automatico (segun insumos) vs. estado guardado manualmente: mostrar el mas avanzado
   const estadoDinamico=calcEstadoAutomatico(p.numPedido,tipo,p.estado);
-  const est=getEstadoTicket(estadoDinamico);
+  const estAuto=getEstadoTicket(estadoDinamico);
+  const estManual=getEstadoTicket(p.estado);
+  const est=rankEstado(estManual.key)>=rankEstado(estAuto.key)?estManual:estAuto;
   const fechas=getFechasInsumos(tipo,p.fecha);
   const entrega=fechaEntregaLabel(p.fechaTentativa,p.fecha);
   const pct=calcProgreso(p.numPedido,tipo);
