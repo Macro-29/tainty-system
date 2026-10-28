@@ -85,6 +85,18 @@ details.emp .emp-body{background:var(--surface);border:1px solid var(--border);b
 .qty-chips button:hover{border-color:var(--purple);color:var(--purple)}
 .qty-chips button.active{background:var(--purple-dim);border-color:var(--purple);color:var(--purple)}
 
+/* Escala por cantidad (lista de precios 100/300/500/1000) */
+.escala-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem}
+@media(max-width:560px){.escala-grid{grid-template-columns:1fr 1fr}}
+.escala-hint{font-size:11px;color:var(--teal);margin-top:.55rem;line-height:1.4}
+
+/* Interruptor de modo (escala / pedido) */
+.modo-seg{display:inline-flex;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:3px;gap:3px;margin-bottom:.5rem}
+.modo-seg .modo-btn{border:none;background:none;color:var(--muted);padding:7px 14px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;transition:all .15s}
+.modo-seg .modo-btn:hover{color:var(--text)}
+.modo-seg .modo-btn.active{background:var(--purple);color:#fff}
+.modo-help{font-size:11px;color:var(--hint);margin:0 0 .7rem 2px}
+
 .btn-add{width:100%;background:var(--purple-dim);border:1px dashed rgba(124,111,239,.4);color:var(--purple);
   border-radius:11px;padding:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .15s}
 .btn-add:hover{background:rgba(124,111,239,.2)}
@@ -236,6 +248,11 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
     <div class="panel">
       <div class="panel-title"><span class="num">3</span>Productos
         <span class="hint" id="hint-prod">Cargando cat&aacute;logo...</span></div>
+      <div class="modo-seg" id="modo-seg">
+        <button type="button" class="modo-btn" data-modo="escala" onclick="setModo('escala')">Escala por cantidad</button>
+        <button type="button" class="modo-btn" data-modo="pedido" onclick="setModo('pedido')">Pedido (con total)</button>
+      </div>
+      <div class="modo-help" id="modo-help"></div>
       <datalist id="productos-list"></datalist>
       <div id="lineas"></div>
       <button class="btn-add" onclick="agregarLinea()">+ Agregar producto</button>
@@ -243,7 +260,7 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
 
     <!-- IGV + Observaciones -->
     <div class="panel">
-      <div class="panel-title"><span class="num">4</span>Total y opciones</div>
+      <div class="panel-title"><span class="num">4</span>Opciones</div>
       <div class="igv-box" style="margin-bottom:.85rem">
         <div class="igv-info">
           <div class="t">Agregar IGV (18%)</div>
@@ -292,6 +309,11 @@ if (!requireLogin()) { throw new Error('sin sesión'); }
 const IGV_RATE = 0.18;
 const EMP_KEY = 'tainty_empresa';
 const LOGO_KEY = 'tainty_logo';
+const MODO_KEY = 'tainty_cot_modo';
+// Escala de precios por cantidad: tramos y descuentos entre tramos.
+const TIERS = [100, 300, 500, 1000];       // unidades por tramo
+const TIER_DELTAS = [1, 1, 2];             // 100→300:-1 · 300→500:-1 · 500→1000:-2
+let modo = 'escala';                        // 'escala' (lista por cantidad) | 'pedido' (con total)
 const NOTA_SIN_IGV = 'Los precios mostrados NO incluyen IGV, por lo que no se emite factura. Si necesitas factura, se agrega el 18% de IGV al precio por unidad.';
 const AVISO_L1 = 'Por favor, revisar los detalles del producto, cantidad y precio unitario.';
 const AVISO_L2 = 'No aceptamos cambios o devoluciones.';
@@ -383,24 +405,22 @@ function renderDatalist(id, items){
 }
 
 /* ---------- Líneas de producto ---------- */
-function agregarLinea(prefill){
-  const n = ++lineaSeq;
-  lineas.push(n);
-  const div = document.createElement('div');
-  div.className = 'linea';
-  div.id = 'linea-' + n;
-  div.innerHTML = `
-    <div class="linea-head">
+function cabeceraLinea(n){
+  return `<div class="linea-head">
       <span class="linea-tag">Producto ${lineas.length}</span>
       <button class="linea-del" title="Quitar" onclick="removerLinea(${n})">&#10005;</button>
     </div>
-    <div class="linea-grid">
-      <div>
-        <span class="mini-lbl">Producto / descripci&oacute;n</span>
-        <input class="inp" id="prod-${n}" list="productos-list" placeholder="Escribe o elige..." autocomplete="off"
-               oninput="onProdInput(${n})" onchange="onProdChange(${n})">
-        <div class="ps-tip" id="tip-${n}"></div>
-      </div>
+    <div>
+      <span class="mini-lbl">Producto / descripci&oacute;n</span>
+      <input class="inp" id="prod-${n}" list="productos-list" placeholder="Escribe o elige..." autocomplete="off"
+             oninput="onProdInput(${n})" onchange="onProdChange(${n})">
+      <div class="ps-tip" id="tip-${n}"></div>
+    </div>`;
+}
+/** Plantilla modo PEDIDO: cantidad + precio + total (suma). */
+function tmplPedido(n){
+  return `${cabeceraLinea(n)}
+    <div class="linea-grid" style="margin-top:.55rem">
       <div class="linea-nums">
         <div><span class="mini-lbl">Cantidad</span>
           <input class="inp" type="number" id="cant-${n}" min="0" step="1" value="100" oninput="onCantInput(${n})"></div>
@@ -417,13 +437,35 @@ function agregarLinea(prefill){
         <button type="button" data-q="1000" onclick="setCant(${n},1000)">1000</button>
       </div>
     </div>`;
+}
+/** Plantilla modo ESCALA: precio por tramo 100/300/500/1000 (sin total). */
+function tmplEscala(n){
+  const campo = (i, u) => `<div><span class="mini-lbl">${u} U</span>
+      <input class="inp" type="number" id="p${i}-${n}" min="0" step="0.01" placeholder="0.00" oninput="recalcEscala(${n},${i})"></div>`;
+  return `${cabeceraLinea(n)}
+    <div class="escala-grid" style="margin-top:.55rem">
+      ${TIERS.map((u,i)=>campo(i,u)).join('')}
+    </div>
+    <div class="escala-hint">Escribe el precio de 100 U; 300/500/1000 se autocompletan (&minus;1, &minus;1, &minus;2). Cada uno es editable.</div>`;
+}
+function agregarLinea(prefill){
+  const n = ++lineaSeq;
+  lineas.push(n);
+  const div = document.createElement('div');
+  div.className = 'linea';
+  div.id = 'linea-' + n;
+  div.innerHTML = (modo === 'escala') ? tmplEscala(n) : tmplPedido(n);
   document.getElementById('lineas').appendChild(div);
   if (prefill){
-    if (prefill.prod)  document.getElementById('prod-'+n).value = prefill.prod;
-    if (prefill.cant)  document.getElementById('cant-'+n).value = prefill.cant;
-    if (prefill.precio)document.getElementById('precio-'+n).value = prefill.precio;
+    if (prefill.prod) document.getElementById('prod-'+n).value = prefill.prod;
+    if (modo === 'escala'){
+      if (prefill.precio){ document.getElementById('p0-'+n).value = prefill.precio; recalcEscala(n, 0); }
+    } else {
+      if (prefill.cant)   document.getElementById('cant-'+n).value = prefill.cant;
+      if (prefill.precio) document.getElementById('precio-'+n).value = prefill.precio;
+    }
   }
-  onCantInput(n);
+  if (modo === 'escala') render(); else onCantInput(n);
 }
 
 function removerLinea(n){
@@ -451,20 +493,70 @@ function onProdInput(n){
 /** Al elegir producto: si el precio está vacío, autocompleta con el histórico. */
 function onProdChange(n){
   const prod = document.getElementById('prod-'+n).value.trim();
-  const precioInp = document.getElementById('precio-'+n);
   const tip = document.getElementById('tip-'+n);
   const hit = precioPorProducto[norm(prod)];
-  if (hit && hit.precio > 0){
-    if (!precioInp.value || parseFloat(precioInp.value) === 0){
-      precioInp.value = hit.precio.toFixed(2);
+  if (modo === 'escala'){
+    const p0 = document.getElementById('p0-'+n);
+    if (hit && hit.precio > 0){
+      if (!p0.value || parseFloat(p0.value) === 0){ p0.value = hit.precio.toFixed(2); recalcEscala(n, 0); }
+      tip.textContent = '↳ Último precio (100 U): ' + money(hit.precio); tip.classList.add('show');
+    } else {
+      tip.textContent = 'Sin precio previo — ingresa el de 100 U'; tip.classList.add('show');
     }
-    tip.textContent = '↳ Último precio de venta: ' + money(hit.precio);
-    tip.classList.add('show');
+    render();
+    return;
+  }
+  const precioInp = document.getElementById('precio-'+n);
+  if (hit && hit.precio > 0){
+    if (!precioInp.value || parseFloat(precioInp.value) === 0){ precioInp.value = hit.precio.toFixed(2); }
+    tip.textContent = '↳ Último precio de venta: ' + money(hit.precio); tip.classList.add('show');
   } else {
-    tip.textContent = 'Sin precio previo — ingrésalo manualmente';
-    tip.classList.add('show');
+    tip.textContent = 'Sin precio previo — ingrésalo manualmente'; tip.classList.add('show');
   }
   render();
+}
+
+/** Escala: al escribir un tramo, recalcula los siguientes con los descuentos. */
+function recalcEscala(n, fromIdx){
+  let prev = parseFloat(document.getElementById('p'+fromIdx+'-'+n)?.value) || 0;
+  for (let j = fromIdx + 1; j < TIERS.length; j++){
+    const v = Math.max(0, prev - TIER_DELTAS[j-1]);
+    const el = document.getElementById('p'+j+'-'+n);
+    if (el) el.value = v > 0 ? v.toFixed(2) : '';
+    prev = v;
+  }
+  render();
+}
+
+/** Cambia entre modo escala / pedido, conservando producto y precio base. */
+function setModo(m){
+  if ((m !== 'escala' && m !== 'pedido') || m === modo) return;
+  const snap = lineas.map(nn => {
+    const prod = (document.getElementById('prod-'+nn)?.value || '').trim();
+    const precio = (modo === 'escala')
+      ? (parseFloat(document.getElementById('p0-'+nn)?.value) || 0)
+      : (parseFloat(document.getElementById('precio-'+nn)?.value) || 0);
+    return { prod, precio };
+  });
+  modo = m;
+  try { localStorage.setItem(MODO_KEY, m); } catch(_){}
+  document.getElementById('lineas').innerHTML = '';
+  lineas = [];
+  if (snap.length === 0) agregarLinea();
+  else snap.forEach(s => agregarLinea({ prod: s.prod, precio: s.precio || '', cant: 100 }));
+  actualizarModoUI();
+  render();
+}
+
+/** Resalta el botón del modo activo y muestra la ayuda. */
+function actualizarModoUI(){
+  document.querySelectorAll('#modo-seg .modo-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-modo') === modo);
+  });
+  const help = document.getElementById('modo-help');
+  if (help) help.textContent = (modo === 'escala')
+    ? 'Lista de precios por cantidad (100/300/500/1000). No suma total.'
+    : 'Cada producto con cantidad y precio; se suma el total al final.';
 }
 
 /** Fija la cantidad de una línea desde los botones rápidos (100/300/500/1000). */
@@ -485,6 +577,10 @@ function onCantInput(n){
 function leerLineas(){
   return lineas.map(n => {
     const prod = (document.getElementById('prod-'+n)?.value || '').trim();
+    if (modo === 'escala'){
+      const precios = TIERS.map((u,i) => parseFloat(document.getElementById('p'+i+'-'+n)?.value) || 0);
+      return { n, prod, precios, valida: !!prod && precios[0] > 0 };
+    }
     const cant = parseFloat(document.getElementById('cant-'+n)?.value) || 0;
     const precio = parseFloat(document.getElementById('precio-'+n)?.value) || 0;
     const total = cant * precio;
@@ -495,11 +591,18 @@ function leerLineas(){
 }
 
 function calcular(){
+  const conIGV = document.getElementById('chk-igv').checked;
+  if (modo === 'escala'){
+    // Sin total; con IGV se suma el 18% a cada precio unitario mostrado.
+    const factor = conIGV ? (1 + IGV_RATE) : 1;
+    const items = leerLineas().filter(l => l.valida)
+      .map(l => ({ prod: l.prod, precios: l.precios.map(p => p > 0 ? p * factor : 0) }));
+    return { modo:'escala', items, conIGV };
+  }
   const items = leerLineas().filter(l => l.valida);
   const subtotal = items.reduce((s,l) => s + l.total, 0);
-  const conIGV = document.getElementById('chk-igv').checked;
   const igv = conIGV ? subtotal * IGV_RATE : 0;
-  return { items, subtotal, conIGV, igv, total: subtotal + igv };
+  return { modo:'pedido', items, subtotal, conIGV, igv, total: subtotal + igv };
 }
 
 function datosEmpresa(){
@@ -547,22 +650,39 @@ function render(){
           <div class="el">${[e.ruc?('RUC '+esc(e.ruc)):'', esc(e.dir)].filter(Boolean).join('<br>')}</div></div>
         <div class="doc-badge"><div class="cot"><div class="l">COTIZACI&Oacute;N</div><div class="n">${esc(q.num)||'—'}</div></div></div>
       </div>
-      <div class="doc-empty">Agrega al menos un producto con cantidad y precio para ver la cotizaci&oacute;n.</div>`;
+      <div class="doc-empty">Agrega al menos un producto con su precio para ver la cotizaci&oacute;n.</div>`;
     return;
   }
 
-  const filas = c.items.map((l,i) => `<tr>
-      <td class="c">${i+1}</td>
-      <td>${esc(l.prod)}</td>
-      <td class="c">${l.cant.toLocaleString('es-PE')}</td>
-      <td class="r">${money(l.precio, sym)}</td>
-      <td class="r">${money(l.total, sym)}</td>
-    </tr>`).join('');
-
-  const totFilas = `
-    ${c.conIGV ? `<tr><td class="lbl">Subtotal</td><td>${money(c.subtotal,sym)}</td></tr>
-      <tr><td class="lbl">IGV (18%)</td><td>${money(c.igv,sym)}</td></tr>` : ''}
-    <tr class="grand"><td class="lbl">TOTAL</td><td>${money(c.total,sym)}</td></tr>`;
+  const celdaPrecio = p => p > 0 ? money(p, sym) : '—';
+  let tablaHTML, totHTML = '';
+  if (c.modo === 'escala'){
+    const filas = c.items.map((l,i) => `<tr>
+        <td class="c">${i+1}</td><td>${esc(l.prod)}</td>
+        <td class="r">${celdaPrecio(l.precios[0])}</td>
+        <td class="r">${celdaPrecio(l.precios[1])}</td>
+        <td class="r">${celdaPrecio(l.precios[2])}</td>
+        <td class="r">${celdaPrecio(l.precios[3])}</td>
+      </tr>`).join('');
+    tablaHTML = `<table class="doc-tbl">
+      <thead><tr><th class="c">#</th><th>Descripci&oacute;n</th><th class="r">100 U</th><th class="r">300 U</th><th class="r">500 U</th><th class="r">1000 U</th></tr></thead>
+      <tbody>${filas}</tbody></table>`;
+  } else {
+    const filas = c.items.map((l,i) => `<tr>
+        <td class="c">${i+1}</td><td>${esc(l.prod)}</td>
+        <td class="c">${l.cant.toLocaleString('es-PE')}</td>
+        <td class="r">${money(l.precio, sym)}</td>
+        <td class="r">${money(l.total, sym)}</td>
+      </tr>`).join('');
+    tablaHTML = `<table class="doc-tbl">
+      <thead><tr><th class="c">#</th><th>Descripci&oacute;n</th><th class="c">Cant.</th><th class="r">P. Unit.</th><th class="r">Total</th></tr></thead>
+      <tbody>${filas}</tbody></table>`;
+    totHTML = `<div class="doc-tot"><table>
+      ${c.conIGV ? `<tr><td class="lbl">Subtotal</td><td>${money(c.subtotal,sym)}</td></tr>
+        <tr><td class="lbl">IGV (18%)</td><td>${money(c.igv,sym)}</td></tr>` : ''}
+      <tr class="grand"><td class="lbl">TOTAL</td><td>${money(c.total,sym)}</td></tr>
+    </table></div>`;
+  }
 
   const bancos = e.bancos ? `<div class="doc-bank"><div class="bt">Cuentas bancarias</div>${esc(e.bancos).replace(/\n/g,'<br>')}</div>` : '';
   const obs = q.obs ? `<div class="doc-obs"><b>Observaciones:</b> ${esc(q.obs)}</div>` : '';
@@ -593,11 +713,8 @@ function render(){
         <div class="kv"><b>Moneda:</b> <span>${sym==='S/'?'Soles':'D&oacute;lares'}</span></div>
       </div>
     </div>
-    <table class="doc-tbl">
-      <thead><tr><th class="c">#</th><th>Descripci&oacute;n</th><th class="c">Cant.</th><th class="r">P. Unit.</th><th class="r">Total</th></tr></thead>
-      <tbody>${filas}</tbody>
-    </table>
-    <div class="doc-tot"><table>${totFilas}</table></div>
+    ${tablaHTML}
+    ${totHTML}
     ${notaIGV}
     ${obs}
     ${bancos}
@@ -726,10 +843,19 @@ function copiarTexto(){
   L.push(`Fecha: ${fechaLarga(q.emision)}  ·  Válida hasta: ${fechaLarga(q.venc)}`);
   if (q.cliente.nombre) L.push(`Cliente: ${q.cliente.nombre}${q.cliente.doc?' ('+q.cliente.doc+')':''}`);
   L.push('');
-  c.items.forEach((l,i) => L.push(`${i+1}. ${l.prod} — ${l.cant} und × ${money(l.precio,sym)} = ${money(l.total,sym)}`));
-  L.push('');
-  if (c.conIGV){ L.push(`Subtotal: ${money(c.subtotal,sym)}`); L.push(`IGV (18%): ${money(c.igv,sym)}`); }
-  L.push(`TOTAL: ${money(c.total,sym)} (${c.conIGV?'IGV incluido':'sin IGV'})`);
+  if (c.modo === 'escala'){
+    c.items.forEach((l,i) => {
+      const parts = TIERS.map((u,k) => l.precios[k] > 0 ? `${u}u: ${money(l.precios[k],sym)}` : null).filter(Boolean);
+      L.push(`${i+1}. ${l.prod} — ${parts.join('  ·  ')}`);
+    });
+    L.push('');
+    L.push(c.conIGV ? 'Precios incluyen IGV' : 'Precios sin IGV');
+  } else {
+    c.items.forEach((l,i) => L.push(`${i+1}. ${l.prod} — ${l.cant} und × ${money(l.precio,sym)} = ${money(l.total,sym)}`));
+    L.push('');
+    if (c.conIGV){ L.push(`Subtotal: ${money(c.subtotal,sym)}`); L.push(`IGV (18%): ${money(c.igv,sym)}`); }
+    L.push(`TOTAL: ${money(c.total,sym)} (${c.conIGV?'IGV incluido':'sin IGV'})`);
+  }
   if (!c.conIGV) { L.push(''); L.push(NOTA_SIN_IGV); }
   if (q.obs) { L.push(''); L.push('Obs: ' + q.obs); }
   copiarAlPortapapeles(L.join('\n'))
@@ -837,43 +963,57 @@ async function descargarPDF(){
 
     y += metaH + 16;
 
-    // --- Tabla de items ---
-    const body = c.items.map((l,i) => [ String(i+1), l.prod,
-      l.cant.toLocaleString('es-PE'), money(l.precio,sym), money(l.total,sym) ]);
-    pdf.autoTable({
-      startY: y, margin:{left:M, right:M},
-      head: [['#','Descripción','Cant.','P. Unit.','Total']],
-      body,
+    // --- Tabla de items (según modo) ---
+    const estilosTabla = {
       styles:{ font:'helvetica', fontSize:9, cellPadding:6, textColor:[50,50,50], lineColor:[235,235,235], lineWidth:0.5 },
       headStyles:{ fillColor:DARK, textColor:[255,255,255], fontStyle:'bold', fontSize:9 },
-      alternateRowStyles:{ fillColor:[250,250,250] },
-      columnStyles:{ 0:{halign:'center',cellWidth:26}, 2:{halign:'center',cellWidth:48},
-        3:{halign:'right',cellWidth:80}, 4:{halign:'right',cellWidth:88} }
-    });
-    y = pdf.lastAutoTable.finalY + 24;
-
-    // --- Totales (derecha) ---
-    const tx = W - M; const lblX = W - M - 160;
-    const totLine = (k, v) => {
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(10); pdf.setTextColor(110,110,120);
-      pdf.text(k, lblX, y);
-      pdf.setTextColor(70,70,75);
-      pdf.text(v, tx, y, {align:'right'}); y += 15;
+      alternateRowStyles:{ fillColor:[250,250,250] }
     };
-    // Subtotal + IGV solo cuando aplica; la línea separadora únicamente si hay desglose.
-    if (c.conIGV){
-      totLine('Subtotal', money(c.subtotal, sym));
-      totLine('IGV (18%)', money(c.igv, sym));
-      pdf.setDrawColor(220,220,220); pdf.setLineWidth(0.6);
-      pdf.line(lblX, y - 4, tx, y - 4);
-      y += 13;
+    const celdaPrecioPDF = p => p > 0 ? money(p, sym) : '—';
+    if (c.modo === 'escala'){
+      const body = c.items.map((l,i) => [ String(i+1), l.prod,
+        celdaPrecioPDF(l.precios[0]), celdaPrecioPDF(l.precios[1]),
+        celdaPrecioPDF(l.precios[2]), celdaPrecioPDF(l.precios[3]) ]);
+      pdf.autoTable({
+        startY: y, margin:{left:M, right:M},
+        head: [['#','Descripción','100 U','300 U','500 U','1000 U']], body, ...estilosTabla,
+        columnStyles:{ 0:{halign:'center',cellWidth:24}, 1:{halign:'left'},
+          2:{halign:'right',cellWidth:72}, 3:{halign:'right',cellWidth:72},
+          4:{halign:'right',cellWidth:72}, 5:{halign:'right',cellWidth:72} }
+      });
+      y = pdf.lastAutoTable.finalY + 14;   // modo escala: no se suma total
+    } else {
+      const body = c.items.map((l,i) => [ String(i+1), l.prod,
+        l.cant.toLocaleString('es-PE'), money(l.precio,sym), money(l.total,sym) ]);
+      pdf.autoTable({
+        startY: y, margin:{left:M, right:M},
+        head: [['#','Descripción','Cant.','P. Unit.','Total']], body, ...estilosTabla,
+        columnStyles:{ 0:{halign:'center',cellWidth:26}, 2:{halign:'center',cellWidth:48},
+          3:{halign:'right',cellWidth:80}, 4:{halign:'right',cellWidth:88} }
+      });
+      y = pdf.lastAutoTable.finalY + 24;
+
+      // --- Totales (derecha) ---
+      const tx = W - M; const lblX = W - M - 160;
+      const totLine = (k, v) => {
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(10); pdf.setTextColor(110,110,120);
+        pdf.text(k, lblX, y);
+        pdf.setTextColor(70,70,75);
+        pdf.text(v, tx, y, {align:'right'}); y += 15;
+      };
+      if (c.conIGV){
+        totLine('Subtotal', money(c.subtotal, sym));
+        totLine('IGV (18%)', money(c.igv, sym));
+        pdf.setDrawColor(220,220,220); pdf.setLineWidth(0.6);
+        pdf.line(lblX, y - 4, tx, y - 4);
+        y += 13;
+      }
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...PURPLE);
+      pdf.text('TOTAL', lblX, y);
+      pdf.setTextColor(20,20,25);
+      pdf.text(money(c.total, sym), tx, y, {align:'right'});
+      y += 8;
     }
-    // TOTAL destacado
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...PURPLE);
-    pdf.text('TOTAL', lblX, y);
-    pdf.setTextColor(20,20,25);
-    pdf.text(money(c.total, sym), tx, y, {align:'right'});
-    y += 8;
 
     // --- Observaciones ---
     if (q.obs){
@@ -971,6 +1111,9 @@ document.getElementById('q-fecha').valueAsDate = new Date();
   const el = document.getElementById(id);
   if (el) el.addEventListener('input', render);
 });
+// Modo recordado (escala por defecto)
+try { const m = localStorage.getItem(MODO_KEY); if (m === 'escala' || m === 'pedido') modo = m; } catch(_){}
+actualizarModoUI();
 agregarLinea();
 render();
 cargarLogo();
