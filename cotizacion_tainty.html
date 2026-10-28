@@ -157,6 +157,12 @@ table.doc-tbl tr:nth-child(even) td{background:#fafafa}
 .doc-obs{padding:2px 18px 10px;font-size:10.5px;color:#555}
 .doc-obs b{color:#111}
 .doc-note{margin:2px 18px 10px;background:#fff7ec;border:1px solid #f5d9a8;border-radius:8px;padding:8px 11px;font-size:10px;color:#8a5a12;line-height:1.5}
+/* Escala: precio unitario + total del lote en cada celda */
+table.doc-tbl td .pu{font-weight:600;color:#222}
+table.doc-tbl td .pt{font-size:9px;color:#1f9d6b;margin-top:1px}
+.doc-legend{padding:0 18px 8px;font-size:9.5px;color:#999;font-style:italic}
+.doc-incluye{margin:2px 18px 12px;background:#f3f1fc;border:1px solid #e2ddf5;border-radius:8px;padding:8px 11px;font-size:10px;color:#5a4f8a;line-height:1.6}
+.doc-incluye b{color:#3a2f6a}
 .doc-bank{margin:0 18px 14px;background:#f7f7fa;border-radius:8px;padding:10px 12px;font-size:10px;color:#444}
 .doc-bank .bt{font-weight:700;color:#111;margin-bottom:4px;font-size:10px}
 .doc-foot{border-top:1px solid #ececec;padding:11px 18px;text-align:center;font-size:10px;color:#888;line-height:1.5}
@@ -317,6 +323,14 @@ let modo = 'escala';                        // 'escala' (lista por cantidad) | '
 const NOTA_SIN_IGV = 'Los precios mostrados NO incluyen IGV, por lo que no se emite factura. Si necesitas factura, se agrega el 18% de IGV al precio por unidad.';
 const AVISO_L1 = 'Por favor, revisar los detalles del producto, cantidad y precio unitario.';
 const AVISO_L2 = 'No aceptamos cambios o devoluciones.';
+// Desglose de lo que incluye cada producto (emoji solo para pantalla; el PDF usa el texto).
+const INCLUYE = [
+  { emoji:'🛠️', txt:'Insumos' },
+  { emoji:'🥫', txt:'Envase' },
+  { emoji:'🏷️', txt:'Etiqueta personalizada' },
+  { emoji:'📦', txt:'Caja' },
+  { emoji:'🧤', txt:'Mano de obra' }
+];
 
 let listaProductos = [];
 let listaClientes  = [];
@@ -595,8 +609,11 @@ function calcular(){
   if (modo === 'escala'){
     // Sin total; con IGV se suma el 18% a cada precio unitario mostrado.
     const factor = conIGV ? (1 + IGV_RATE) : 1;
-    const items = leerLineas().filter(l => l.valida)
-      .map(l => ({ prod: l.prod, precios: l.precios.map(p => p > 0 ? p * factor : 0) }));
+    const items = leerLineas().filter(l => l.valida).map(l => {
+      const precios = l.precios.map(p => p > 0 ? p * factor : 0);
+      const totales = precios.map((p, i) => p > 0 ? p * TIERS[i] : 0);  // total del lote
+      return { prod: l.prod, precios, totales };
+    });
     return { modo:'escala', items, conIGV };
   }
   const items = leerLineas().filter(l => l.valida);
@@ -654,19 +671,22 @@ function render(){
     return;
   }
 
-  const celdaPrecio = p => p > 0 ? money(p, sym) : '—';
   let tablaHTML, totHTML = '';
   if (c.modo === 'escala'){
+    const cel = (p, t) => p > 0
+      ? `<td class="r"><div class="pu">${money(p,sym)}</div><div class="pt">${money(t,sym)}</div></td>`
+      : `<td class="r">—</td>`;
     const filas = c.items.map((l,i) => `<tr>
         <td class="c">${i+1}</td><td>${esc(l.prod)}</td>
-        <td class="r">${celdaPrecio(l.precios[0])}</td>
-        <td class="r">${celdaPrecio(l.precios[1])}</td>
-        <td class="r">${celdaPrecio(l.precios[2])}</td>
-        <td class="r">${celdaPrecio(l.precios[3])}</td>
+        ${cel(l.precios[0], l.totales[0])}
+        ${cel(l.precios[1], l.totales[1])}
+        ${cel(l.precios[2], l.totales[2])}
+        ${cel(l.precios[3], l.totales[3])}
       </tr>`).join('');
     tablaHTML = `<table class="doc-tbl">
       <thead><tr><th class="c">#</th><th>Descripci&oacute;n</th><th class="r">100 U</th><th class="r">300 U</th><th class="r">500 U</th><th class="r">1000 U</th></tr></thead>
-      <tbody>${filas}</tbody></table>`;
+      <tbody>${filas}</tbody></table>
+      <div class="doc-legend">En cada columna: precio por unidad y, debajo, el total del lote.</div>`;
   } else {
     const filas = c.items.map((l,i) => `<tr>
         <td class="c">${i+1}</td><td>${esc(l.prod)}</td>
@@ -685,6 +705,7 @@ function render(){
   }
 
   const bancos = e.bancos ? `<div class="doc-bank"><div class="bt">Cuentas bancarias</div>${esc(e.bancos).replace(/\n/g,'<br>')}</div>` : '';
+  const incluye = c.items.length ? `<div class="doc-incluye"><b>Incluye:</b> ${INCLUYE.map(x=>`${x.emoji} ${esc(x.txt)}`).join(' &nbsp;&middot;&nbsp; ')}</div>` : '';
   const obs = q.obs ? `<div class="doc-obs"><b>Observaciones:</b> ${esc(q.obs)}</div>` : '';
   const notaIGV = !c.conIGV ? `<div class="doc-note">${esc(NOTA_SIN_IGV)}</div>` : '';
   const igvNota = c.conIGV ? 'Precios incluyen IGV' : 'Precios sin IGV';
@@ -715,6 +736,7 @@ function render(){
     </div>
     ${tablaHTML}
     ${totHTML}
+    ${incluye}
     ${notaIGV}
     ${obs}
     ${bancos}
@@ -845,7 +867,8 @@ function copiarTexto(){
   L.push('');
   if (c.modo === 'escala'){
     c.items.forEach((l,i) => {
-      const parts = TIERS.map((u,k) => l.precios[k] > 0 ? `${u}u: ${money(l.precios[k],sym)}` : null).filter(Boolean);
+      const parts = TIERS.map((u,k) => l.precios[k] > 0
+        ? `${u}u: ${money(l.precios[k],sym)} (lote ${money(l.totales[k],sym)})` : null).filter(Boolean);
       L.push(`${i+1}. ${l.prod} — ${parts.join('  ·  ')}`);
     });
     L.push('');
@@ -856,6 +879,8 @@ function copiarTexto(){
     if (c.conIGV){ L.push(`Subtotal: ${money(c.subtotal,sym)}`); L.push(`IGV (18%): ${money(c.igv,sym)}`); }
     L.push(`TOTAL: ${money(c.total,sym)} (${c.conIGV?'IGV incluido':'sin IGV'})`);
   }
+  L.push('');
+  L.push('Incluye: ' + INCLUYE.map(x => x.emoji + ' ' + x.txt).join('  ·  '));
   if (!c.conIGV) { L.push(''); L.push(NOTA_SIN_IGV); }
   if (q.obs) { L.push(''); L.push('Obs: ' + q.obs); }
   copiarAlPortapapeles(L.join('\n'))
@@ -969,11 +994,12 @@ async function descargarPDF(){
       headStyles:{ fillColor:DARK, textColor:[255,255,255], fontStyle:'bold', fontSize:9 },
       alternateRowStyles:{ fillColor:[250,250,250] }
     };
-    const celdaPrecioPDF = p => p > 0 ? money(p, sym) : '—';
     if (c.modo === 'escala'){
+      // Cada celda: precio unitario (línea 1) y total del lote (línea 2).
+      const celEsc = (p, t) => p > 0 ? money(p, sym) + '\n' + money(t, sym) : '—';
       const body = c.items.map((l,i) => [ String(i+1), l.prod,
-        celdaPrecioPDF(l.precios[0]), celdaPrecioPDF(l.precios[1]),
-        celdaPrecioPDF(l.precios[2]), celdaPrecioPDF(l.precios[3]) ]);
+        celEsc(l.precios[0], l.totales[0]), celEsc(l.precios[1], l.totales[1]),
+        celEsc(l.precios[2], l.totales[2]), celEsc(l.precios[3], l.totales[3]) ]);
       pdf.autoTable({
         startY: y, margin:{left:M, right:M},
         head: [['#','Descripción','100 U','300 U','500 U','1000 U']], body, ...estilosTabla,
@@ -981,7 +1007,10 @@ async function descargarPDF(){
           2:{halign:'right',cellWidth:72}, 3:{halign:'right',cellWidth:72},
           4:{halign:'right',cellWidth:72}, 5:{halign:'right',cellWidth:72} }
       });
-      y = pdf.lastAutoTable.finalY + 14;   // modo escala: no se suma total
+      y = pdf.lastAutoTable.finalY + 12;   // modo escala: no se suma total
+      pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(150,150,156);
+      pdf.text('En cada columna: precio por unidad y, debajo, el total del lote.', M, y);
+      pdf.setFont('helvetica','normal'); y += 12;
     } else {
       const body = c.items.map((l,i) => [ String(i+1), l.prod,
         l.cant.toLocaleString('es-PE'), money(l.precio,sym), money(l.total,sym) ]);
@@ -1013,6 +1042,22 @@ async function descargarPDF(){
       pdf.setTextColor(20,20,25);
       pdf.text(money(c.total, sym), tx, y, {align:'right'});
       y += 8;
+    }
+
+    // --- Incluye (desglose de lo que contiene) ---
+    {
+      y += 8;
+      const incTxt = INCLUYE.map(x => x.txt).join('   ·   ');
+      const incLines = pdf.splitTextToSize(incTxt, W - 2*M - 70);
+      const incH = 12 + incLines.length * 11;
+      ensure(incH);
+      pdf.setFillColor(243,241,252); pdf.setDrawColor(226,221,245); pdf.setLineWidth(0.6);
+      pdf.roundedRect(M, y, W - 2*M, incH, 4, 4, 'FD');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(58,47,106);
+      pdf.text('Incluye:', M + 10, y + 14);
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(90,79,138);
+      let iy = y + 14; incLines.forEach(t => { pdf.text(t, M + 55, iy); iy += 11; });
+      y += incH;
     }
 
     // --- Observaciones ---
