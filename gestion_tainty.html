@@ -82,9 +82,11 @@
 .prov-btn:hover{color:var(--text)}
 .prov-btn.sel.prov-guillermo{background:var(--teal-dim);color:var(--teal);border-color:rgba(38,198,176,.45);font-weight:500}
 .prov-btn.sel.prov-luis{background:var(--blue-dim);color:var(--blue);border-color:rgba(76,163,232,.45);font-weight:500}
+/* Seleccionado por la regla por defecto (no fijado a mano): borde punteado,
+   sin relleno — para distinguirlo de una elección manual. */
+.prov-btn.sel.auto{background:transparent;border-style:dashed}
 .stat-pill.s-guillermo.has-count{background:var(--teal-dim);color:var(--teal);border-color:rgba(38,198,176,.3)}
 .stat-pill.s-luis.has-count{background:var(--blue-dim);color:var(--blue);border-color:rgba(76,163,232,.3)}
-.stat-pill.s-sinprov.has-count{color:var(--text);border-color:var(--border2)}
 .seccion-insumo{margin-bottom:2rem}
 .seccion-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--border2);border-radius:14px 14px 0 0;border-bottom:none;position:sticky;top:0;z-index:5}
 .seccion-titulo{display:flex;align-items:center;gap:10px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:1px}
@@ -341,20 +343,39 @@ const ORDEN_INSUMOS=['Insumo','Capsula','Envase','Etiqueta','Caja','Maquina'];
    'luis' o '' (sin asignar). */
 const CAJA_PROV_KEY='CajaProv';
 const PROV_CAJA={'guillermo':'Guillermo','luis':'Luis Chiroque'};
-function getProveedorCaja(pid){
+// Regla por defecto: cajas de menos de 300 und van a Luis Chiroque;
+// de 300 und a más, a Guillermo. Es solo el valor por defecto — elegir
+// un proveedor a mano (clic) lo sobrescribe.
+const UMBRAL_PROV_CAJA=300;
+function proveedorPorDefecto(pid){
+  const p=pedidos.find(x=>x.numPedido===pid);
+  const cant=parseInt((p&&p.cantidad)||0)||0;
+  return cant<UMBRAL_PROV_CAJA?'luis':'guillermo';
+}
+// Valor fijado a mano (vacío si nunca se eligió explícitamente).
+function getProveedorCajaRaw(pid){
   const v=getEstadoInsumo(pid,CAJA_PROV_KEY);
   return (v==='guillermo'||v==='luis')?v:'';
 }
+// Proveedor efectivo: el elegido a mano, o el de la regla por cantidad.
+function getProveedorCaja(pid){
+  return getProveedorCajaRaw(pid)||proveedorPorDefecto(pid);
+}
 function setProveedorCaja(pid,prov){
-  // Volver a tocar el proveedor ya activo lo desasigna (vuelve a pendiente).
-  const next=getProveedorCaja(pid)===prov?'pendiente':prov;
+  // Tocar el proveedor fijado a mano lo desfija y vuelve a la regla automática.
+  const next=getProveedorCajaRaw(pid)===prov?'pendiente':prov;
   cambiarEstado(pid,CAJA_PROV_KEY,next);
 }
 function renderProveedorCaja(pid){
-  const cur=getProveedorCaja(pid);
-  const btns=Object.keys(PROV_CAJA).map(k=>
-    `<button class="prov-btn prov-${k}${cur===k?' sel':''}" onclick="setProveedorCaja('${pid}','${k}')" title="Enviada a ${PROV_CAJA[k]}">${PROV_CAJA[k]}</button>`
-  ).join('');
+  const raw=getProveedorCajaRaw(pid);
+  const cur=raw||proveedorPorDefecto(pid);
+  const btns=Object.keys(PROV_CAJA).map(k=>{
+    const sel=cur===k;
+    const auto=sel&&!raw;   // seleccionado por la regla, no fijado a mano
+    const cls='prov-btn prov-'+k+(sel?' sel':'')+(auto?' auto':'');
+    const title=auto?`Por defecto según cantidad · ${PROV_CAJA[k]}`:`Enviada a ${PROV_CAJA[k]}`;
+    return`<button class="${cls}" onclick="setProveedorCaja('${pid}','${k}')" title="${title}">${PROV_CAJA[k]}</button>`;
+  }).join('');
   return`<div class="caja-prov">${btns}</div>`;
 }
 
@@ -475,9 +496,9 @@ function renderLista(){
     // Para Caja, además, cuántas cajas van a cada proveedor.
     let provPillsHtml='';
     if(insumo==='Caja'){
-      const cp={guillermo:0,luis:0,sinprov:0};
-      pedidosSeccion.forEach(p=>{cp[getProveedorCaja(p.numPedido)||'sinprov']++;});
-      provPillsHtml=[['guillermo','Guillermo',cp.guillermo],['luis','Luis Chiroque',cp.luis],['sinprov','Sin proveedor',cp.sinprov]]
+      const cp={guillermo:0,luis:0};
+      pedidosSeccion.forEach(p=>{cp[getProveedorCaja(p.numPedido)]++;});
+      provPillsHtml=[['guillermo','Guillermo',cp.guillermo],['luis','Luis Chiroque',cp.luis]]
         .map(([k,lbl,n])=>`<span class="stat-pill s-${k}${n>0?' has-count':''}">${lbl} ${n}</span>`).join('');
     }
 
@@ -555,10 +576,10 @@ function copiarSeccion(insumo){
   let texto;
   if(insumo==='Caja'){
     // Agrupamos por proveedor para poder enviar a cada uno su lista.
-    const grupos={guillermo:[],luis:[],sinprov:[]};
-    pedidosSeccion.forEach(p=>{grupos[getProveedorCaja(p.numPedido)||'sinprov'].push(p);});
-    const titulos={guillermo:'📦 GUILLERMO',luis:'📦 LUIS CHIROQUE',sinprov:'📦 SIN PROVEEDOR'};
-    texto=['guillermo','luis','sinprov']
+    const grupos={guillermo:[],luis:[]};
+    pedidosSeccion.forEach(p=>{grupos[getProveedorCaja(p.numPedido)].push(p);});
+    const titulos={guillermo:'📦 GUILLERMO',luis:'📦 LUIS CHIROQUE'};
+    texto=['guillermo','luis']
       .filter(k=>grupos[k].length)
       .map(k=>`${titulos[k]}\n${grupos[k].map(lineaPedido).join('\n')}`)
       .join('\n\n');
