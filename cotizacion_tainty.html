@@ -97,6 +97,26 @@ details.emp .emp-body{background:var(--surface);border:1px solid var(--border);b
 .modo-seg .modo-btn.active{background:var(--purple);color:#fff}
 .modo-help{font-size:11px;color:var(--hint);margin:0 0 .7rem 2px}
 
+/* Calculadora privada de costo (SOLO en el formulario, nunca en el PDF) */
+details.costo{margin-top:.6rem;border:1px dashed var(--amber);border-radius:10px;background:rgba(245,166,35,.06)}
+details.costo>summary{list-style:none;cursor:pointer;padding:.55rem .7rem;font-size:12px;font-weight:600;color:var(--amber);display:flex;align-items:center;gap:7px}
+details.costo>summary::-webkit-details-marker{display:none}
+details.costo .solo-yo{margin-left:auto;font-size:10px;font-weight:600;color:var(--hint);border:1px solid var(--border2);border-radius:20px;padding:2px 8px}
+.costo-body{padding:0 .7rem .7rem}
+.costo-row{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.55rem}
+.costo-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.6rem}
+.costo-chips button{background:var(--surface);border:1px solid var(--border2);color:var(--muted);border-radius:8px;padding:4px 11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;transition:all .15s}
+.costo-chips button:hover{border-color:var(--amber);color:var(--amber)}
+.costo-out{font-size:12px}
+.costo-line{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)}
+.costo-line:last-child{border-bottom:none}
+.costo-line span{color:var(--muted)}
+.costo-line b{color:var(--text);font-family:'Syne',sans-serif}
+.costo-line.sub span{color:var(--green);font-size:11px}
+.costo-hint{color:var(--hint);font-size:11px}
+.costo-use{margin-top:.6rem;width:100%;background:var(--amber-dim);border:1px solid rgba(245,166,35,.4);color:var(--amber);border-radius:9px;padding:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;transition:all .15s}
+.costo-use:hover{background:rgba(245,166,35,.2)}
+
 .btn-add{width:100%;background:var(--purple-dim);border:1px dashed rgba(124,111,239,.4);color:var(--purple);
   border-radius:11px;padding:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .15s}
 .btn-add:hover{background:rgba(124,111,239,.2)}
@@ -450,7 +470,8 @@ function tmplPedido(n){
         <button type="button" data-q="500" onclick="setCant(${n},500)">500</button>
         <button type="button" data-q="1000" onclick="setCant(${n},1000)">1000</button>
       </div>
-    </div>`;
+    </div>
+    ${bloqueCosto(n)}`;
 }
 /** Plantilla modo ESCALA: precio por tramo 100/300/500/1000 (sin total). */
 function tmplEscala(n){
@@ -460,7 +481,8 @@ function tmplEscala(n){
     <div class="escala-grid" style="margin-top:.55rem">
       ${TIERS.map((u,i)=>campo(i,u)).join('')}
     </div>
-    <div class="escala-hint">Escribe el precio de 100 U; 300/500/1000 se autocompletan (&minus;1, &minus;1, &minus;2). Cada uno es editable.</div>`;
+    <div class="escala-hint">Escribe el precio de 100 U; 300/500/1000 se autocompletan (&minus;1, &minus;1, &minus;2). Cada uno es editable.</div>
+    ${bloqueCosto(n)}`;
 }
 function agregarLinea(prefill){
   const n = ++lineaSeq;
@@ -585,6 +607,65 @@ function onCantInput(n){
     b.classList.toggle('active', b.getAttribute('data-q') === String(val));
   });
   render();
+}
+
+/* ---------- Calculadora privada de costo (NO sale en el PDF) ----------
+   Independiente de la casilla IGV: siempre muestra el precio sugerido y
+   el mismo +18%, sin afectar ni verse afectada por el IGV de la cotización. */
+function bloqueCosto(n){
+  return `<details class="costo">
+    <summary>&#128161; Calcular precio desde costo <span class="solo-yo">solo para ti</span></summary>
+    <div class="costo-body">
+      <div class="costo-row">
+        <div><span class="mini-lbl">Costo (S/)</span>
+          <input class="inp" type="number" id="costo-${n}" min="0" step="0.01" placeholder="0.00" oninput="calcCosto(${n})"></div>
+        <div><span class="mini-lbl">Ganancia %</span>
+          <input class="inp" type="number" id="margen-${n}" min="0" step="1" value="40" oninput="calcCosto(${n})"></div>
+      </div>
+      <div class="costo-chips">
+        <button type="button" onclick="setMargen(${n},30)">30%</button>
+        <button type="button" onclick="setMargen(${n},40)">40%</button>
+        <button type="button" onclick="setMargen(${n},50)">50%</button>
+        <button type="button" onclick="setMargen(${n},100)">100%</button>
+      </div>
+      <div class="costo-out" id="costo-out-${n}"><span class="costo-hint">Ingresa el costo para ver el precio sugerido.</span></div>
+      <button type="button" class="costo-use" id="costo-use-${n}" onclick="usarPrecioCosto(${n})" style="display:none">Usar como precio del producto</button>
+    </div>
+  </details>`;
+}
+function setMargen(n, m){ const el = document.getElementById('margen-'+n); if (el){ el.value = m; calcCosto(n); } }
+function calcCosto(n){
+  const costo = parseFloat(document.getElementById('costo-'+n)?.value) || 0;
+  const m = parseFloat(document.getElementById('margen-'+n)?.value) || 0;
+  const out = document.getElementById('costo-out-'+n);
+  const useBtn = document.getElementById('costo-use-'+n);
+  if (!out) return;
+  if (costo <= 0){
+    out.innerHTML = '<span class="costo-hint">Ingresa el costo para ver el precio sugerido.</span>';
+    if (useBtn) useBtn.style.display = 'none';
+    return;
+  }
+  const venta = costo * (1 + m/100);     // precio de venta sugerido (neto)
+  const conIGV = venta * (1 + IGV_RATE); // mismo precio + 18%
+  const ganancia = venta - costo;
+  out.innerHTML = `
+    <div class="costo-line"><span>Precio de venta sugerido</span><b>${money(venta)}</b></div>
+    <div class="costo-line"><span>Con IGV (+18%)</span><b>${money(conIGV)}</b></div>
+    <div class="costo-line sub"><span>Ganancia por unidad</span><span>${money(ganancia)} &middot; ${m}%</span></div>`;
+  if (useBtn){ useBtn.style.display = ''; useBtn.dataset.precio = venta.toFixed(2); }
+}
+/** Aplica el precio sugerido (neto) al producto de esta línea. */
+function usarPrecioCosto(n){
+  const v = parseFloat(document.getElementById('costo-use-'+n)?.dataset.precio) || 0;
+  if (v <= 0) return;
+  if (modo === 'escala'){
+    const p0 = document.getElementById('p0-'+n);
+    if (p0){ p0.value = v.toFixed(2); recalcEscala(n, 0); }
+  } else {
+    const p = document.getElementById('precio-'+n);
+    if (p){ p.value = v.toFixed(2); render(); }
+  }
+  mostrarToast('Precio aplicado al producto', {type:'success', duration:1600});
 }
 
 /* ---------- Cálculo + vista previa ---------- */
