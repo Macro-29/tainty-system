@@ -21,7 +21,110 @@ const SHEET_NAME = 'NUEVO PEDIDO';
 const CLIENTES_SHEET = 'CLIENTES';
 const PRODUCTOS_SHEET = 'PRODUCTOS';
 
+/* =========================================================
+   CACHÉ DE LECTURAS (CacheService)
+   ---------------------------------------------------------
+   Las lecturas (panel, estados, analytics, pagos, clientes,
+   productos, pedidos_activos) abren la hoja y la leen entera:
+   eso es lo que tarda 2–5s. Guardamos el resultado en el caché
+   COMPARTIDO del script (lo ven todas las personas y pestañas)
+   para servirlo al instante durante CACHE_TTL segundos.
+
+   El caché se limpia solo cuando:
+     - la plataforma escribe algo (ver cacheInvalidar_ en doPost/doGet), o
+     - editas la hoja a mano (disparador onEditTainty_, que instalas
+       UNA vez ejecutando instalarTriggerCache desde el editor).
+
+   Como una clave de CacheService admite máx. 100KB y 'pagos'/'analytics'
+   son más grandes, el valor se parte en trozos de CACHE_CHUNK.
+   Parámetro &fresh=1 (o &nocache=1) salta el caché y lee fresco.
+   ========================================================= */
+const CACHE_TTL = 90;      // segundos que viven los datos cacheados
+const CACHE_CHUNK = 50000; // tamaño por trozo (< 100KB por clave, con margen)
+const CACHE_MAX_CHUNKS = 40;
+const CACHE_KEYS = ['panel', 'estados', 'analytics', 'pagos', 'clientes', 'productos', 'pedidos_activos'];
+
+function cacheGet_(key) {
+  try {
+    const c = CacheService.getScriptCache();
+    const meta = c.get(key + '::n');
+    if (!meta) return null;
+    const n = parseInt(meta, 10);
+    if (!(n > 0)) return null;
+    const keys = [];
+    for (let i = 0; i < n; i++) keys.push(key + '::' + i);
+    const parts = c.getAll(keys);
+    let raw = '';
+    for (let j = 0; j < n; j++) {
+      const p = parts[key + '::' + j];
+      if (p == null) return null; // un trozo expiró: tratamos como miss
+      raw += p;
+    }
+    return JSON.parse(raw);
+  } catch (err) { return null; }
+}
+
+function cachePut_(key, value) {
+  try {
+    const raw = JSON.stringify(value);
+    const n = Math.ceil(raw.length / CACHE_CHUNK);
+    if (n < 1 || n > CACHE_MAX_CHUNKS) return; // demasiado grande: no cacheamos
+    const obj = {};
+    obj[key + '::n'] = String(n);
+    for (let i = 0; i < n; i++) {
+      obj[key + '::' + i] = raw.substr(i * CACHE_CHUNK, CACHE_CHUNK);
+    }
+    CacheService.getScriptCache().putAll(obj, CACHE_TTL);
+  } catch (err) { /* sin caché no pasa nada: se sirve igual, solo más lento */ }
+}
+
+function cacheInvalidar_() {
+  try {
+    const keys = [];
+    CACHE_KEYS.forEach(function (k) {
+      keys.push(k + '::n');
+      for (let i = 0; i < CACHE_MAX_CHUNKS; i++) keys.push(k + '::' + i);
+    });
+    CacheService.getScriptCache().removeAll(keys);
+  } catch (err) { /* ignorar */ }
+}
+
+/** Sirve `key` desde caché; si no está (o &fresh=1), ejecuta producer() y cachea. */
+function cacheWrap_(key, e, producer) {
+  const fresh = e && e.parameter && (e.parameter.fresh === '1' || e.parameter.nocache === '1');
+  if (!fresh) {
+    const hit = cacheGet_(key);
+    if (hit) return hit;
+  }
+  const val = producer();
+  cachePut_(key, val);
+  return val;
+}
+
+/* Acciones de doGet que ESCRIBEN: al llegar una de estas, limpiamos el caché. */
+const WRITE_ACTIONS = ['guardarPedido', 'recibirInsumo', 'agregarCliente', 'agregarProducto',
+  'editarCliente', 'editarProducto', 'eliminarCliente', 'eliminarProducto',
+  'inicializarCatalogos', 'repararPagosIniciales'];
+
+/* --- Disparador para limpiar caché cuando editas la hoja A MANO ---
+   Ejecuta UNA sola vez: en el editor de Apps Script elige la función
+   instalarTriggerCache y pulsa Ejecutar (te pedirá autorizar). Listo. */
+function instalarTriggerCache() {
+  const yaExiste = ScriptApp.getProjectTriggers().some(function (t) {
+    return t.getHandlerFunction() === 'onEditTainty_';
+  });
+  if (yaExiste) return 'El disparador ya estaba instalado.';
+  ScriptApp.newTrigger('onEditTainty_').forSpreadsheet(SHEET_ID).onEdit().create();
+  return 'Disparador instalado: la caché se limpiará al editar la hoja.';
+}
+
+function onEditTainty_(e) {
+  cacheInvalidar_();
+}
+
 function doPost(e) {
+  cacheInvalidar_(); // cualquier POST es una escritura: invalida el caché
+
   try {
     if (e.parameter && e.parameter.action === 'setEstado') {
       const ok = setEstadoInsumo(e.parameter.pedido, e.parameter.insumo, e.parameter.estado);
@@ -264,6 +367,8 @@ function fechaKey_(val) {
 
 function doGet(e) {
   let result;
+  const _accion = e && e.parameter && e.parameter.action;
+  if (_accion && WRITE_ACTIONS.indexOf(_accion) !== -1) cacheInvalidar_();
   if (e && e.parameter && e.parameter.action === 'precio') {
     // Sugerencia solo si existe una venta previa IDÉNTICA en
     // producto + vendedor + cliente + cantidad.
@@ -285,53 +390,60 @@ function doGet(e) {
     // Usar &dry=1 para solo previsualizar (no escribe nada).
     result = repararPagosIniciales(e.parameter.dry == '1' || e.parameter.dry === 'true');
   } else if (e && e.parameter && e.parameter.action === 'panel') {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
-    const sheet = ss.getSheetByName(SHEET_NAME);
-    const data = sheet.getDataRange().getValues();
-    const pedidos = [];
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row[0]) continue;
-      const estado = (row[13] || '').toString().toLowerCase();
-      if (estado.includes('entregado')) continue;
-      pedidos.push({
-        numPedido: row[0], fecha: row[2], cliente: row[3],
-        producto: row[4], cantidad: row[5], vendedor: row[6],
-        precio: row[7], montoTotal: row[8], abono: row[9],
-        fechaTentativa: row[12], estado: row[13], observaciones: row[14],
-        condicion: row[15]
-      });
-    }
-    result = { success: true, pedidos: pedidos };
+    result = cacheWrap_('panel', e, function () {
+      const ss = SpreadsheetApp.openById(SHEET_ID);
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const data = sheet.getDataRange().getValues();
+      const pedidos = [];
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (!row[0]) continue;
+        const estado = (row[13] || '').toString().toLowerCase();
+        if (estado.includes('entregado')) continue;
+        pedidos.push({
+          numPedido: row[0], fecha: row[2], cliente: row[3],
+          producto: row[4], cantidad: row[5], vendedor: row[6],
+          precio: row[7], montoTotal: row[8], abono: row[9],
+          fechaTentativa: row[12], estado: row[13], observaciones: row[14],
+          condicion: row[15]
+        });
+      }
+      return { success: true, pedidos: pedidos };
+    });
   } else if (e && e.parameter && e.parameter.action === 'estados') {
     // `cantidades` es adicional (mapa pedido|insumo → unidades recibidas). Gestión
     // ignora este campo; la página de Recepción lo usa para mostrar el avance.
-    result = { success: true, estados: getEstadosInsumos(), cantidades: getCantidadesInsumos() };
+    result = cacheWrap_('estados', e, function () {
+      return { success: true, estados: getEstadosInsumos(), cantidades: getCantidadesInsumos() };
+    });
   } else if (e && e.parameter && e.parameter.action === 'recibirInsumo') {
     // Recepción de producción: registra unidades recibidas de un insumo.
     result = recibirInsumo(e.parameter.pedido, e.parameter.insumo, e.parameter.cantidad, e.parameter.total);
   } else if (e && e.parameter && e.parameter.action === 'analytics') {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
-    const sheet = ss.getSheetByName(SHEET_NAME);
-    const data = sheet.getDataRange().getValues();
-    const rows = [];
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row[0]) continue;
-      rows.push({
-        numPedido: row[0],
-        fecha: row[2],
-        cliente: row[3],
-        producto: row[4],
-        cantidad: row[5],
-        precio: row[7],
-        montoTotal: row[8],
-        mes: row[11],
-        estado: row[13]
-      });
-    }
-    result = { success: true, rows: rows };
+    result = cacheWrap_('analytics', e, function () {
+      const ss = SpreadsheetApp.openById(SHEET_ID);
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const data = sheet.getDataRange().getValues();
+      const rows = [];
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (!row[0]) continue;
+        rows.push({
+          numPedido: row[0],
+          fecha: row[2],
+          cliente: row[3],
+          producto: row[4],
+          cantidad: row[5],
+          precio: row[7],
+          montoTotal: row[8],
+          mes: row[11],
+          estado: row[13]
+        });
+      }
+      return { success: true, rows: rows };
+    });
   } else if (e && e.parameter && e.parameter.action === 'pagos') {
+    result = cacheWrap_('pagos', e, function () {
     const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName('PAGOS');
     const data = sheet.getDataRange().getValues();
@@ -407,9 +519,11 @@ function doGet(e) {
         vendedor: vendedorPedido[r[0]] || ''
       });
     }
-    result = { success: true, pagos: pagos };
+    return { success: true, pagos: pagos };
+    });
 
   } else if (e && e.parameter && e.parameter.action === 'pedidos_activos') {
+    result = cacheWrap_('pedidos_activos', e, function () {
     const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName(SHEET_NAME);
     const data = sheet.getDataRange().getValues();
@@ -428,12 +542,17 @@ function doGet(e) {
         estado: row[13]
       });
     }
-    result = { success: true, pedidos: pedidos };
+    return { success: true, pedidos: pedidos };
+    });
 
   } else if (e && e.parameter && e.parameter.action === 'clientes') {
-    result = { success: true, data: leerListaSimple(CLIENTES_SHEET) };
+    result = cacheWrap_('clientes', e, function () {
+      return { success: true, data: leerListaSimple(CLIENTES_SHEET) };
+    });
   } else if (e && e.parameter && e.parameter.action === 'productos') {
-    result = { success: true, data: leerListaSimple(PRODUCTOS_SHEET) };
+    result = cacheWrap_('productos', e, function () {
+      return { success: true, data: leerListaSimple(PRODUCTOS_SHEET) };
+    });
   } else if (e && e.parameter && e.parameter.action === 'agregarCliente') {
     result = agregarASimple(CLIENTES_SHEET, e.parameter.nombre);
   } else if (e && e.parameter && e.parameter.action === 'agregarProducto') {
