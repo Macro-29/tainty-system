@@ -97,6 +97,12 @@ details.emp .emp-body{background:var(--surface);border:1px solid var(--border);b
 .modo-seg .modo-btn.active{background:var(--purple);color:#fff}
 .modo-help{font-size:11px;color:var(--hint);margin:0 0 .7rem 2px}
 
+/* Chips para elegir qué incluye la cotización */
+.incl-pills{display:flex;flex-wrap:wrap;gap:7px}
+.incl-pill{background:var(--surface2);border:1px solid var(--border2);color:var(--muted);border-radius:20px;padding:6px 13px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;transition:all .15s}
+.incl-pill:hover{border-color:var(--purple);color:var(--text)}
+.incl-pill.active{background:var(--purple-dim);border-color:var(--purple);color:var(--purple)}
+
 /* Calculadora privada de costo (SOLO en el formulario, nunca en el PDF) */
 details.costo{margin-top:.6rem;border:1px dashed var(--amber);border-radius:10px;background:rgba(245,166,35,.06)}
 details.costo>summary{list-style:none;cursor:pointer;padding:.55rem .7rem;font-size:12px;font-weight:600;color:var(--amber);display:flex;align-items:center;gap:7px}
@@ -294,6 +300,10 @@ table.doc-tbl td .pt{font-size:9px;color:#1f9d6b;margin-top:1px}
         </div>
         <label class="switch"><input type="checkbox" id="chk-igv" onchange="render()"><span class="slider"></span></label>
       </div>
+      <div class="field">
+        <label>Incluye <span style="color:var(--hint)">(elige qu&eacute; sale en la cotizaci&oacute;n)</span></label>
+        <div class="incl-pills" id="incluye-sel"></div>
+      </div>
       <div class="field"><label>Observaciones</label>
         <textarea class="inp" id="q-obs" placeholder="Condiciones, tiempo de entrega, etc. (opcional)" oninput="render()"></textarea></div>
     </div>
@@ -345,12 +355,15 @@ const AVISO_L1 = 'Por favor, revisar los detalles del producto, cantidad y preci
 const AVISO_L2 = 'No aceptamos cambios o devoluciones.';
 // Desglose de lo que incluye cada producto (emoji solo para pantalla; el PDF usa el texto).
 const INCLUYE = [
-  { emoji:'🛠️', txt:'Insumos' },
-  { emoji:'🥫', txt:'Envase' },
-  { emoji:'🏷️', txt:'Etiqueta personalizada' },
-  { emoji:'📦', txt:'Caja' },
-  { emoji:'🧤', txt:'Mano de obra' }
+  { key:'insumos',  emoji:'🛠️', txt:'Insumos' },
+  { key:'envase',   emoji:'🥫', txt:'Envase' },
+  { key:'etiqueta', emoji:'🏷️', txt:'Etiqueta personalizada' },
+  { key:'caja',     emoji:'📦', txt:'Caja' },
+  { key:'mano',     emoji:'🧤', txt:'Mano de obra' }
 ];
+const INCLUYE_KEY = 'tainty_cot_incluye';
+// Qué componentes van marcados (por defecto todos). Se puede editar por cotización.
+let incluyeSel = { insumos:true, envase:true, etiqueta:true, caja:true, mano:true };
 
 let listaProductos = [];
 let listaClientes  = [];
@@ -595,6 +608,22 @@ function actualizarModoUI(){
     : 'Cada producto con cantidad y precio; se suma el total al final.';
 }
 
+/* ---------- Selector de "Incluye" ---------- */
+function renderIncluyeSel(){
+  const cont = document.getElementById('incluye-sel');
+  if (!cont) return;
+  cont.innerHTML = INCLUYE.map(x =>
+    `<button type="button" class="incl-pill${incluyeSel[x.key] ? ' active' : ''}" onclick="toggleIncluye('${x.key}')">${x.emoji} ${esc(x.txt)}</button>`
+  ).join('');
+}
+function toggleIncluye(k){
+  incluyeSel[k] = !incluyeSel[k];
+  try { localStorage.setItem(INCLUYE_KEY, JSON.stringify(incluyeSel)); } catch(_){}
+  renderIncluyeSel(); render();
+}
+/** Devuelve solo los componentes marcados. */
+function incluyeActivos(){ return INCLUYE.filter(x => incluyeSel[x.key]); }
+
 /** Fija la cantidad de una línea desde los botones rápidos (100/300/500/1000). */
 function setCant(n, v){
   const el = document.getElementById('cant-' + n);
@@ -786,7 +815,8 @@ function render(){
   }
 
   const bancos = e.bancos ? `<div class="doc-bank"><div class="bt">Cuentas bancarias</div>${esc(e.bancos).replace(/\n/g,'<br>')}</div>` : '';
-  const incluye = c.items.length ? `<div class="doc-incluye"><b>Incluye:</b> ${INCLUYE.map(x=>`${x.emoji} ${esc(x.txt)}`).join(' &nbsp;&middot;&nbsp; ')}</div>` : '';
+  const incSel = incluyeActivos();
+  const incluye = (c.items.length && incSel.length) ? `<div class="doc-incluye"><b>Incluye:</b> ${incSel.map(x=>`${x.emoji} ${esc(x.txt)}`).join(' &nbsp;&middot;&nbsp; ')}</div>` : '';
   const obs = q.obs ? `<div class="doc-obs"><b>Observaciones:</b> ${esc(q.obs)}</div>` : '';
   const notaIGV = !c.conIGV ? `<div class="doc-note">${esc(NOTA_SIN_IGV)}</div>` : '';
   const igvNota = c.conIGV ? 'Precios incluyen IGV' : 'Precios sin IGV';
@@ -960,8 +990,8 @@ function copiarTexto(){
     if (c.conIGV){ L.push(`Subtotal: ${money(c.subtotal,sym)}`); L.push(`IGV (18%): ${money(c.igv,sym)}`); }
     L.push(`TOTAL: ${money(c.total,sym)} (${c.conIGV?'IGV incluido':'sin IGV'})`);
   }
-  L.push('');
-  L.push('Incluye: ' + INCLUYE.map(x => x.emoji + ' ' + x.txt).join('  ·  '));
+  const incSelTxt = incluyeActivos();
+  if (incSelTxt.length){ L.push(''); L.push('Incluye: ' + incSelTxt.map(x => x.emoji + ' ' + x.txt).join('  ·  ')); }
   if (!c.conIGV) { L.push(''); L.push(NOTA_SIN_IGV); }
   if (q.obs) { L.push(''); L.push('Obs: ' + q.obs); }
   copiarAlPortapapeles(L.join('\n'))
@@ -1125,10 +1155,11 @@ async function descargarPDF(){
       y += 8;
     }
 
-    // --- Incluye (desglose de lo que contiene) ---
-    {
+    // --- Incluye (desglose de lo que contiene; solo los componentes marcados) ---
+    const incSelPDF = incluyeActivos();
+    if (incSelPDF.length){
       y += 8;
-      const incTxt = INCLUYE.map(x => x.txt).join('   ·   ');
+      const incTxt = incSelPDF.map(x => x.txt).join('   ·   ');
       const incLines = pdf.splitTextToSize(incTxt, W - 2*M - 70);
       const incH = 12 + incLines.length * 11;
       ensure(incH);
@@ -1240,6 +1271,9 @@ document.getElementById('q-fecha').valueAsDate = new Date();
 // Modo recordado (escala por defecto)
 try { const m = localStorage.getItem(MODO_KEY); if (m === 'escala' || m === 'pedido') modo = m; } catch(_){}
 actualizarModoUI();
+// Selección de "Incluye" recordada (por defecto todos marcados)
+try { const saved = JSON.parse(localStorage.getItem(INCLUYE_KEY) || 'null'); if (saved && typeof saved === 'object') incluyeSel = Object.assign(incluyeSel, saved); } catch(_){}
+renderIncluyeSel();
 agregarLinea();
 render();
 cargarLogo();
