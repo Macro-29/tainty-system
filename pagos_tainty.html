@@ -287,7 +287,9 @@ function poblarFiltroClientes(){
     ? pagos
     : filtroActual === 'por_entregar'
       ? pagos.filter(p => !esEntregado(p.estado))
-      : pagos.filter(p => getEstadoPago(p) === filtroActual);
+      : filtroActual === 'parcial'
+        ? pagos.filter(p => getEstadoPago(p) === 'parcial' && esEntregado(p.estado))
+        : pagos.filter(p => getEstadoPago(p) === filtroActual);
   const clientes=[...new Set(pagosFiltrados.map(p=>p.cliente).filter(Boolean))].sort();
   sel.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(c=>`<option>${c}</option>`).join('');
   // Mantener la selección si todavía aparece en el nuevo conjunto
@@ -395,6 +397,7 @@ function getListaFiltrada(){
   return pagos.filter(p=>{
     const est=getEstadoPago(p);
     if(filtroActual==='por_entregar'){ if(esEntregado(p.estado))return false; }
+    else if(filtroActual==='parcial'){ if(est!=='parcial'||!esEntregado(p.estado))return false; } // solo parciales YA entregados
     else if(filtroActual!=='todos'&&est!==filtroActual)return false;
     if(filtroMes&&getMesPedido(p)!==filtroMes)return false;
     if(filtroVendedor&&(p.vendedor||'')!==filtroVendedor)return false;
