@@ -194,6 +194,7 @@ tfoot td{padding:11px 14px;font-family:'DM Mono',monospace;font-size:12px;font-w
       <button class="ftab" onclick="setFiltro('pendiente',this)">&#128176; Pendiente</button>
       <button class="ftab" onclick="setFiltro('parcial',this)">&#9203; Parcial</button>
       <button class="ftab" onclick="setFiltro('realizado',this)">&#9989; Realizado</button>
+      <button class="ftab" onclick="setFiltro('por_entregar',this)">&#128666; Por entregar</button>
     </div>
     <button class="btn-add-pago" onclick="abrirModalBuscar()">+ Agregar pago</button>
   </div>
@@ -284,7 +285,9 @@ function poblarFiltroClientes(){
   const seleccionPrev=sel.value;
   const pagosFiltrados = filtroActual === 'todos'
     ? pagos
-    : pagos.filter(p => getEstadoPago(p) === filtroActual);
+    : filtroActual === 'por_entregar'
+      ? pagos.filter(p => !esEntregado(p.estado))
+      : pagos.filter(p => getEstadoPago(p) === filtroActual);
   const clientes=[...new Set(pagosFiltrados.map(p=>p.cliente).filter(Boolean))].sort();
   sel.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(c=>`<option>${c}</option>`).join('');
   // Mantener la selección si todavía aparece en el nuevo conjunto
@@ -391,7 +394,8 @@ function getListaFiltrada(){
   const filtroVendedor=document.getElementById('filtro-vendedor')?document.getElementById('filtro-vendedor').value:'';
   return pagos.filter(p=>{
     const est=getEstadoPago(p);
-    if(filtroActual!=='todos'&&est!==filtroActual)return false;
+    if(filtroActual==='por_entregar'){ if(esEntregado(p.estado))return false; }
+    else if(filtroActual!=='todos'&&est!==filtroActual)return false;
     if(filtroMes&&getMesPedido(p)!==filtroMes)return false;
     if(filtroVendedor&&(p.vendedor||'')!==filtroVendedor)return false;
     if(filtroCliente&&p.cliente!==filtroCliente)return false;
